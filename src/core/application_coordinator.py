@@ -311,6 +311,7 @@ class ApplicationCoordinator:
                 slm_runtime_provider=lambda: self.slm_runtime,
                 event_emitter=self.event_bus.emit,
                 stats_provider=lambda: compute_usage_stats(self.db) if self.db else {},
+                ttl_transcripts=3,
                 prompt_template=_MOTD_PROMPT,
                 cache_filename="motd_cache.json",
                 event_name="motd_ready",

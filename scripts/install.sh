@@ -96,10 +96,28 @@ echo "✓ Build tools upgraded"
 # Install all requirements
 echo ""
 echo "=========================================="
-echo "Installing dependencies from requirements.txt"
+echo "Installing dependencies"
 echo "=========================================="
+
+# GPU/CUDA Detection for Linux
+CUDA_BUILD_FLAGS=""
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
+        echo "NVIDIA GPU detected. Enabling CUDA build flags."
+        # GGML_CUDA=on is for both whisper.cpp and llama.cpp
+        CUDA_BUILD_FLAGS="CMAKE_ARGS=\"-DGGML_CUDA=on\""
+    fi
+fi
+
 cd "$PROJECT_DIR"
-pip install -r requirements.txt
+
+if [ -n "$CUDA_BUILD_FLAGS" ]; then
+    echo "Building with CUDA support (this may take a few minutes)..."
+    # We must force source builds to ensure CUDA is compiled in
+    eval "$CUDA_BUILD_FLAGS" pip install --no-binary pywhispercpp,llama-cpp-python -r requirements.txt
+else
+    pip install -r requirements.txt
+fi
 echo "✓ Dependencies installed"
 
 # Verify critical dependencies (use venv Python, not system Python)

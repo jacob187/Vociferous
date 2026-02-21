@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+# Ensure /sbin and /usr/sbin are in PATH for ldconfig and modprobe
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
 if [ "${EUID}" -ne 0 ]; then
     if [ -t 0 ]; then
         echo "This script requires root privileges. Re-running with sudo..."

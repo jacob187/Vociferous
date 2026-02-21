@@ -100,23 +100,21 @@ Primary development is done on the following system. Other configurations should
 - Python 3.12 or 3.13
 - Node.js 18+ and npm
 - System audio packages (`libportaudio2`, `xclip`)
-- For GPU acceleration: NVIDIA driver 550+ and CUDA toolkit
+- **For GPU acceleration**: NVIDIA driver 550+ and CUDA toolkit (`nvcc`) must be in your PATH.
 
 ### Linux (Debian/Ubuntu)
 
+The installation script automatically detects NVIDIA GPUs and builds the ASR and SLM engines from source with CUDA support.
+
 ```bash
-# Install system dependencies and create venv
+# Install system dependencies, create venv, and build GPU-accelerated engines
 bash scripts/install.sh
 
 # Download ASR and SLM models (~2–4 GB)
 make provision
-
-# Optional: install desktop launcher (.desktop entry)
-make install-desktop
-
-# Run the application
-./vociferous.sh
 ```
+
+> **Note**: If a GPU is detected, the initial install will take longer as it compiles `pywhispercpp` and `llama-cpp-python` specifically for your hardware. If this fails, the script will fall back to CPU-only wheels or report missing build headers.
 
 ### macOS
 
@@ -192,15 +190,21 @@ docker compose --profile gpu up
 
 ## NVIDIA GPU Troubleshooting
 
+### Long Transcription Times (CPU Fallback)
+
+If transcribing a 30-second clip takes 2 minutes even with an RTX card, you're likely running the CPU-only pre-compiled wheels.
+
+1.  **Check build logs**: Ensure `nvcc` is in your `$PATH` before running `install.sh`. 
+2.  **Force Rebuild**: If you installed it wrong, purge the venv and start over:
+    ```bash
+    rm -rf .venv
+    bash scripts/install.sh
+    ```
+
+### UVM Kernel Module Issues (Debian/Ubuntu)
+
 If GPU inference fails with CUDA errors, the NVIDIA UVM (Unified Virtual Memory)
-kernel module may not be loaded. This is a **known issue on Debian with the
-550.x driver series**, especially after kernel updates or cold boots.
-
-### Symptoms
-
-- `pywhispercpp` or `llama-cpp-python` fails with CUDA initialization errors
-- `/dev/nvidia-uvm` device node is missing
-- `nvidia-uvm` kernel module is not loaded (`lsmod | grep nvidia_uvm` returns nothing)
+kernel module may not be loaded. This is common after kernel updates.
 
 ### Fix
 

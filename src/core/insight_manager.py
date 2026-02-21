@@ -103,21 +103,13 @@ class InsightCache:
         """Update cache in memory and on disk."""
         self._data = {
             "text": text,
-            "created_at": time.time(),
+            "generated_at": time.time(),
         }
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(json.dumps(self._data), encoding="utf-8")
+            self._path.write_text(json.dumps(self._data, ensure_ascii=False), encoding="utf-8")
         except Exception as e:
             logger.error("Failed to save insight cache: %s", e)
-        try:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(
-                json.dumps({"text": text, "generated_at": time.time()}, ensure_ascii=False),
-                encoding="utf-8",
-            )
-        except Exception:
-            logger.warning("Failed to write insight cache", exc_info=True)
 
     @property
     def text(self) -> str:
@@ -127,7 +119,9 @@ class InsightCache:
         data = self.load()
         if not data.get("generated_at"):
             return True
-        return (time.time() - data["generated_at"]) > ttl_seconds
+        if (time.time() - data["generated_at"]) > ttl_seconds:
+            return True
+        return False
 
 
 class InsightManager:
@@ -142,6 +136,7 @@ class InsightManager:
     """
 
     DEFAULT_TTL_HOURS = 24
+    DEFAULT_TTL_TRANSCRIPTS = 5
 
     def __init__(
         self,
@@ -149,6 +144,7 @@ class InsightManager:
         event_emitter: Callable[[str, dict], None],
         stats_provider: Callable[[], dict[str, Any]],
         ttl_hours: float = DEFAULT_TTL_HOURS,
+        ttl_transcripts: int = DEFAULT_TTL_TRANSCRIPTS,
         prompt_template: str = _INSIGHT_PROMPT,
         cache_filename: str = "insight_cache.json",
         event_name: str = "insight_ready",
@@ -157,6 +153,7 @@ class InsightManager:
         self._emit = event_emitter
         self._get_stats = stats_provider
         self._ttl = ttl_hours * 3600
+        self._ttl_transcripts = ttl_transcripts
         self._prompt_template = prompt_template
         self._event_name = event_name
 
@@ -165,6 +162,7 @@ class InsightManager:
 
         self._lock = threading.Lock()
         self._generating = False
+        self._transcripts_since_generation = 0
 
     # ── Public API ──────────────────────────────────────────────────────────
 
@@ -179,16 +177,18 @@ class InsightManager:
         generation is due and, if so, starts a background thread to do it.
 
         Conditions to proceed:
-        1. The cache is stale (older than TTL).
+        1. The cache is stale (older than TTL or enough transcripts have passed).
         2. SLM runtime is loaded and not currently inferring.
         3. No generation is already in flight.
         """
         with self._lock:
+            self._transcripts_since_generation += 1
+            
             if self._generating:
                 logger.debug("Insight: generation already in flight, skipping")
                 return
 
-            if not self._cache.is_stale(self._ttl):
+            if self._transcripts_since_generation < self._ttl_transcripts and not self._cache.is_stale(self._ttl):
                 logger.debug("Insight: cache is fresh, skipping generation")
                 return
 
@@ -257,12 +257,19 @@ class InsightManager:
                 return
 
             logger.info("Insight: running SLM inference...")
-            result = slm.refine_text_sync(prompt, level=1)
+            result = slm.generate_custom_sync(
+                system_prompt=prompt,
+                user_prompt="Generate the insight based on the provided statistics.",
+                max_tokens=150,
+                temperature=0.7,
+            )
 
             if result and result.strip():
                 self._cache.save(result.strip())
                 self._emit(self._event_name, {"text": result.strip()})
                 logger.info("Insight: generation complete, cache updated")
+                with self._lock:
+                    self._transcripts_since_generation = 0
 
         except Exception:
             logger.exception("Insight: generation failed")

@@ -4,6 +4,22 @@
 
 ---
 
+## v4.4.1 — Expansion Fix & Insight Refinement
+
+**Date:** 2026-02-21
+**Status:** Maintenance Release
+
+### Fixed
+
+- **Date Header Expansion Corrected** — Older transcript buckets (Yesterday, etc.) now actually expand after a click. Decoupled the initialization logic from the render cycle to prevent UI staleness.
+- **Insight Generation Logic Fixed** — Updated `InsightManager` to use the correct SLM inference method, preventing the system prompt from being confused as a transcript for refinement.
+
+### Improved
+
+- **Insight Regeneration Frequency** — The AI-generated dashboard insights and MOTD lines now regenerate more frequently based on the number of captured transcripts (5 for insights, 3 for MOTD), reducing reliance on the 24-hour TTL alone.
+
+---
+
 ## v4.4.0 — Project Management Overhaul & UI Consistency Pass
 
 **Date:** 2026-02-18
