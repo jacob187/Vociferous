@@ -44,6 +44,7 @@ class VADModel:
     repo: str
     size_mb: int
 
+
 # --- ASR Models (whisper.cpp GGML) ---
 
 ASR_MODELS: dict[str, ASRModel] = {

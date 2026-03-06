@@ -9,13 +9,13 @@ import logging
 
 import typer
 
+from src.core.model_registry import ASR_MODELS, SILERO_VAD, SLM_MODELS, get_asr_model, get_slm_model
 from src.core.resource_manager import ResourceManager
-from src.core.model_registry import ASR_MODELS, SLM_MODELS, SILERO_VAD, get_asr_model, get_slm_model
 from src.provisioning.core import (
+    ProvisioningError,
     provision_asr_model,
     provision_slm_model,
     provision_vad_model,
-    ProvisioningError,
 )
 from src.provisioning.requirements import (
     check_dependencies,
@@ -89,12 +89,8 @@ def check():
 
 @app.command()
 def install(
-    model_id: str = typer.Argument(
-        ..., help="ID of the model to install (e.g., large-v3-turbo-q5_0, qwen4b)"
-    ),
-    force: bool = typer.Option(
-        False, "--force", "-f", help="Re-download even if already present"
-    ),
+    model_id: str = typer.Argument(..., help="ID of the model to install (e.g., large-v3-turbo-q5_0, qwen4b)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Re-download even if already present"),
 ):
     """Download and install a specific model."""
     cache_dir = _get_cache_dir()

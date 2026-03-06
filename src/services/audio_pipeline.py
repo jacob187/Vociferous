@@ -109,8 +109,7 @@ class AudioPipeline:
             from src.provisioning.core import ProvisioningError as PE
 
             raise PE(
-                f"Failed to download Silero VAD model: {e}. "
-                "Run 'make provision' or ensure internet connectivity."
+                f"Failed to download Silero VAD model: {e}. Run 'make provision' or ensure internet connectivity."
             ) from e
 
     # ------------------------------------------------------------------
