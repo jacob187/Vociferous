@@ -111,11 +111,14 @@ def coordinator(tmp_path: Path):
     )
     coord._register_handlers()
 
+    # Keep a reference so teardown can close the DB even if tests set
+    # coord.db = None (e.g. TestDbUnavailable).
+    _db_ref = coord.db
+
     yield coord
 
     # Cleanup
-    if coord.db:
-        coord.db.close()
+    _db_ref.close()
     coord.event_bus.clear()
     reset_for_tests()
 

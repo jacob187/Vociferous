@@ -10,17 +10,7 @@
     import { renameTranscript, retitleTranscript, deleteVariant } from "../api";
     import type { Transcript } from "../api";
     import { formatDayHeader, formatTime, formatDuration, formatWpm, wordCount } from "../formatters";
-    import {
-        Copy,
-        Check,
-        Trash2,
-        Sparkles,
-        RefreshCw,
-        Calendar,
-        Loader2,
-        X,
-        Pencil,
-    } from "lucide-svelte";
+    import { Copy, Check, Trash2, Sparkles, RefreshCw, Calendar, Loader2, X, Pencil } from "lucide-svelte";
     import WorkspacePanel from "./WorkspacePanel.svelte";
 
     interface Props {
@@ -54,9 +44,7 @@
     let displayText = $derived(entry.text || entry.normalized_text || entry.raw_text || "");
     let displayWordCount = $derived(wordCount(displayText));
     let title = $derived(entry.display_name?.trim() || `Transcript #${entry.id}`);
-    let visibleVariants = $derived(
-        (entry.variants ?? []).filter((v) => v.kind.trim().toLowerCase() !== "raw"),
-    );
+    let visibleVariants = $derived((entry.variants ?? []).filter((v) => v.kind.trim().toLowerCase() !== "raw"));
 
     /* ===== Title editing ===== */
 
@@ -146,9 +134,7 @@
                 <RefreshCw size={14} />
             {/if}
         </button>
-        <h2
-            class="flex-1 text-xl font-semibold text-[var(--text-primary)] m-0 leading-tight text-center truncate"
-        >
+        <h2 class="flex-1 text-xl font-semibold text-[var(--text-primary)] m-0 leading-tight text-center truncate">
             {#if editingTitle}
                 <input
                     type="text"
@@ -192,9 +178,7 @@
     <div class="overflow-hidden flex flex-col relative group flex-1 min-h-[80px]">
         <WorkspacePanel>
             <div class="overflow-y-auto h-full">
-                <p
-                    class="text-base leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words m-0"
-                >
+                <p class="text-base leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words m-0">
                     {displayText}
                 </p>
             </div>
@@ -204,9 +188,7 @@
     <!-- Variants -->
     {#if visibleVariants.length > 0}
         <div class="flex-1 min-h-[60px] overflow-y-auto">
-            <h3
-                class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2 m-0 mt-2"
-            >
+            <h3 class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2 m-0 mt-2">
                 Variants
             </h3>
             {#each visibleVariants as variant (variant.id)}
@@ -266,9 +248,7 @@
             title="Refine"
             disabled={refining === entry.id}
         >
-            {#if refining === entry.id}<Loader2 size={14} class="animate-spin" /> Refining…{:else}<Sparkles
-                    size={14}
-                /> Refine{/if}
+            {#if refining === entry.id}<Loader2 size={14} class="animate-spin" /> Refining…{:else}<Sparkles size={14} /> Refine{/if}
         </button>
         <span class="text-xs text-[var(--text-tertiary)]">Right-click transcript to assign project</span>
         <div class="flex-1"></div>

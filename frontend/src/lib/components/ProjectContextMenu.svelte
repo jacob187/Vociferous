@@ -37,7 +37,8 @@
     </div>
     {#each options as option}
         <button
-            class="w-full flex items-center justify-between gap-2 px-3 py-1.5 border-none bg-transparent text-left text-[var(--text-sm)] cursor-pointer transition-colors duration-150 hover:bg-[var(--hover-overlay-blue)] {currentProjectId === option.value
+            class="w-full flex items-center justify-between gap-2 px-3 py-1.5 border-none bg-transparent text-left text-[var(--text-sm)] cursor-pointer transition-colors duration-150 hover:bg-[var(--hover-overlay-blue)] {currentProjectId ===
+            option.value
                 ? 'text-[var(--accent)]'
                 : 'text-[var(--text-primary)]'}"
             onclick={() => onSelect(option.value)}

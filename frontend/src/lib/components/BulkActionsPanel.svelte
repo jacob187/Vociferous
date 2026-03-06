@@ -26,9 +26,7 @@
     <h3 class="m-0 text-[var(--text-primary)] text-lg font-semibold">
         {count} transcripts selected
     </h3>
-    <p class="m-0 text-[var(--text-tertiary)] text-sm">
-        Right-click to assign to project, or use actions below
-    </p>
+    <p class="m-0 text-[var(--text-tertiary)] text-sm">Right-click to assign to project, or use actions below</p>
 
     <div class="flex flex-col gap-[var(--space-2)] w-full max-w-[320px]">
         <button

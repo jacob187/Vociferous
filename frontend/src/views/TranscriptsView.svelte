@@ -26,16 +26,7 @@
     import { nav } from "../lib/navigation.svelte";
     import { SelectionManager } from "../lib/selection.svelte";
     import { onMount } from "svelte";
-    import {
-        Trash2,
-        RefreshCw,
-        ChevronDown,
-        ChevronRight,
-        FileText,
-        Loader2,
-        Pencil,
-        Plus,
-    } from "lucide-svelte";
+    import { Trash2, RefreshCw, ChevronDown, ChevronRight, FileText, Loader2, Pencil, Plus } from "lucide-svelte";
     import ProjectModal from "../lib/components/ProjectModal.svelte";
     import type { ProjectModalResult } from "../lib/components/ProjectModal.svelte";
     import TranscriptDetailPanel from "../lib/components/TranscriptDetailPanel.svelte";
