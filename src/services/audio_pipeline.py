@@ -102,6 +102,7 @@ class AudioPipeline:
                 repo_id=SILERO_VAD.repo,
                 filename=SILERO_VAD.filename,
                 target_dir=model_path.parent,
+                expected_sha256=SILERO_VAD.sha256,
             )
         except ProvisioningError:
             raise

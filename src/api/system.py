@@ -196,6 +196,7 @@ async def download_model(data: dict) -> Response:
                 filename=model.filename,
                 target_dir=cache_dir,
                 progress_callback=on_progress,
+                expected_sha256=getattr(model, "sha256", None),
             )
             coordinator.event_bus.emit(
                 "download_progress",

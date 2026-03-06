@@ -19,6 +19,7 @@ class ASRModel:
     repo: str
     size_mb: int
     tier: str  # fast, balanced, quality
+    sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +33,7 @@ class SLMModel:
     size_mb: int
     tier: str  # fast, balanced, quality, pro
     quant: str
+    sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +45,7 @@ class VADModel:
     filename: str
     repo: str
     size_mb: int
+    sha256: str | None = None
 
 
 # --- ASR Models (whisper.cpp GGML) ---
@@ -55,6 +58,7 @@ ASR_MODELS: dict[str, ASRModel] = {
         repo="ggerganov/whisper.cpp",
         size_mb=547,
         tier="fast",
+        sha256="394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
     ),
     "large-v3-turbo": ASRModel(
         id="large-v3-turbo",
@@ -63,6 +67,7 @@ ASR_MODELS: dict[str, ASRModel] = {
         repo="ggerganov/whisper.cpp",
         size_mb=1500,
         tier="balanced",
+        sha256="1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69",
     ),
     "large-v3": ASRModel(
         id="large-v3",
@@ -71,6 +76,7 @@ ASR_MODELS: dict[str, ASRModel] = {
         repo="ggerganov/whisper.cpp",
         size_mb=3100,
         tier="quality",
+        sha256="64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2",
     ),
 }
 
@@ -85,6 +91,7 @@ SLM_MODELS: dict[str, SLMModel] = {
         size_mb=1800,
         tier="fast",
         quant="Q8_0",
+        sha256="061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
     ),
     "qwen4b": SLMModel(
         id="qwen4b",
@@ -94,6 +101,7 @@ SLM_MODELS: dict[str, SLMModel] = {
         size_mb=2500,
         tier="balanced",
         quant="Q4_K_M",
+        sha256="7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
     ),
     "qwen8b": SLMModel(
         id="qwen8b",
@@ -103,6 +111,7 @@ SLM_MODELS: dict[str, SLMModel] = {
         size_mb=5030,
         tier="quality",
         quant="Q4_K_M",
+        sha256="d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
     ),
     "qwen14b": SLMModel(
         id="qwen14b",
@@ -112,6 +121,7 @@ SLM_MODELS: dict[str, SLMModel] = {
         size_mb=8500,
         tier="pro",
         quant="Q4_K_M",
+        sha256="500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0",
     ),
 }
 
@@ -122,8 +132,9 @@ SILERO_VAD = VADModel(
     id="silero_vad",
     name="Silero VAD v5",
     filename="silero_vad.onnx",
-    repo="snakers4/silero-vad",
+    repo="deepghs/silero-vad-onnx",
     size_mb=2,
+    sha256="2623a2953f6ff3d2c1e61740c6cdb7168133479b267dfef114a4a3cc5bdd788f",
 )
 
 

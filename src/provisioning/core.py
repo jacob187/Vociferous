@@ -5,6 +5,7 @@ v4.0: No more CTranslate2 conversion pipeline. Models are pre-quantized
 GGUF/GGML files downloaded directly from HuggingFace repos.
 """
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Callable, Optional
@@ -15,9 +16,39 @@ logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[str], None]
 
+_SHA256_BUF_SIZE = 1 << 18  # 256 KiB read chunks for hashing
+
 
 class ProvisioningError(Exception):
     """Raised when provisioning fails."""
+
+
+class IntegrityError(ProvisioningError):
+    """Raised when a downloaded file fails SHA-256 verification."""
+
+
+def _compute_sha256(path: Path) -> str:
+    """Compute the SHA-256 hex digest of a file without slurping it all into RAM."""
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        while chunk := f.read(_SHA256_BUF_SIZE):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _verify_integrity(path: Path, expected_sha256: str) -> None:
+    """Verify file integrity against an expected SHA-256 hash.
+
+    Deletes the file and raises IntegrityError on mismatch.
+    """
+    actual = _compute_sha256(path)
+    if actual != expected_sha256:
+        path.unlink(missing_ok=True)
+        raise IntegrityError(
+            f"SHA-256 mismatch for {path.name}: "
+            f"expected {expected_sha256}, got {actual}. "
+            f"Corrupted file removed."
+        )
 
 
 def download_model_file(
@@ -25,6 +56,7 @@ def download_model_file(
     filename: str,
     target_dir: Path,
     progress_callback: Optional[ProgressCallback] = None,
+    expected_sha256: str | None = None,
 ) -> Path:
     """
     Download a single model file from a HuggingFace repository.
@@ -34,9 +66,14 @@ def download_model_file(
         filename: File to download (e.g. 'ggml-large-v3-turbo-q5_0.bin').
         target_dir: Local directory for the downloaded file.
         progress_callback: Optional status callback.
+        expected_sha256: If provided, verify the file after download.
 
     Returns:
         Path to the downloaded file.
+
+    Raises:
+        ProvisioningError: On download failure.
+        IntegrityError: On SHA-256 mismatch (file is deleted automatically).
     """
     from huggingface_hub import hf_hub_download
 
@@ -51,13 +88,23 @@ def download_model_file(
             filename=filename,
             local_dir=str(target_dir),
         )
+        result = Path(downloaded)
         logger.info("Downloaded %s -> %s", filename, downloaded)
+
+        # --- SHA-256 integrity check ---
+        if expected_sha256:
+            if progress_callback:
+                progress_callback(f"Verifying integrity of {filename}...")
+            _verify_integrity(result, expected_sha256)
+            logger.info("SHA-256 verified for %s", filename)
 
         if progress_callback:
             progress_callback(f"Downloaded {filename} successfully.")
 
-        return Path(downloaded)
+        return result
 
+    except IntegrityError:
+        raise
     except Exception as e:
         raise ProvisioningError(f"Failed to download {filename} from {repo_id}: {e}") from e
 
@@ -77,6 +124,7 @@ def provision_asr_model(
         filename=model.filename,
         target_dir=cache_dir,
         progress_callback=progress_callback,
+        expected_sha256=model.sha256,
     )
 
 
@@ -95,6 +143,7 @@ def provision_slm_model(
         filename=model.filename,
         target_dir=cache_dir,
         progress_callback=progress_callback,
+        expected_sha256=model.sha256,
     )
 
 
@@ -113,4 +162,5 @@ def provision_vad_model(
         filename=model.filename,
         target_dir=cache_dir,
         progress_callback=progress_callback,
+        expected_sha256=model.sha256,
     )
