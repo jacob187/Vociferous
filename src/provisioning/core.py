@@ -45,9 +45,7 @@ def _verify_integrity(path: Path, expected_sha256: str) -> None:
     if actual != expected_sha256:
         path.unlink(missing_ok=True)
         raise IntegrityError(
-            f"SHA-256 mismatch for {path.name}: "
-            f"expected {expected_sha256}, got {actual}. "
-            f"Corrupted file removed."
+            f"SHA-256 mismatch for {path.name}: expected {expected_sha256}, got {actual}. Corrupted file removed."
         )
 
 

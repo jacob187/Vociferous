@@ -18,8 +18,8 @@ import pytest
 
 from src.core.model_registry import (
     ASR_MODELS,
-    SLM_MODELS,
     SILERO_VAD,
+    SLM_MODELS,
     ASRModel,
     SLMModel,
     VADModel,
