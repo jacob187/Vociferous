@@ -8,7 +8,7 @@ GGUF/GGML files downloaded directly from HuggingFace repos.
 import hashlib
 import logging
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from src.core.model_registry import ASRModel, SLMModel, VADModel
 
@@ -53,7 +53,7 @@ def download_model_file(
     repo_id: str,
     filename: str,
     target_dir: Path,
-    progress_callback: Optional[ProgressCallback] = None,
+    progress_callback: ProgressCallback | None = None,
     expected_sha256: str | None = None,
 ) -> Path:
     """
@@ -63,7 +63,7 @@ def download_model_file(
         repo_id: HuggingFace repo (e.g. 'ggerganov/whisper.cpp').
         filename: File to download (e.g. 'ggml-large-v3-turbo-q5_0.bin').
         target_dir: Local directory for the downloaded file.
-        progress_callback: Optional status callback.
+        progress_callback: Status callback (called with message strings).
         expected_sha256: If provided, verify the file after download.
 
     Returns:
@@ -110,7 +110,7 @@ def download_model_file(
 def provision_asr_model(
     model: ASRModel,
     cache_dir: Path,
-    progress_callback: Optional[ProgressCallback] = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> Path:
     """
     Provision an ASR (whisper.cpp) model.
@@ -129,7 +129,7 @@ def provision_asr_model(
 def provision_slm_model(
     model: SLMModel,
     cache_dir: Path,
-    progress_callback: Optional[ProgressCallback] = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> Path:
     """
     Provision an SLM (llama.cpp) model.
@@ -148,7 +148,7 @@ def provision_slm_model(
 def provision_vad_model(
     model: VADModel,
     cache_dir: Path,
-    progress_callback: Optional[ProgressCallback] = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> Path:
     """
     Provision the Silero VAD ONNX model.

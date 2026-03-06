@@ -107,9 +107,7 @@ class AudioPipeline:
         except ProvisioningError:
             raise
         except Exception as e:
-            from src.provisioning.core import ProvisioningError as PE
-
-            raise PE(
+            raise ProvisioningError(
                 f"Failed to download Silero VAD model: {e}. Run 'make provision' or ensure internet connectivity."
             ) from e
 
@@ -221,9 +219,8 @@ class AudioPipeline:
         chunk_size = self._CHUNK_SIZE
         n_chunks = len(audio) // chunk_size
 
-        # Silero VAD v5 LSTM state: 2 layers × 1 batch × 64 units
-        h = np.zeros((2, 1, 64), dtype=np.float32)
-        c = np.zeros((2, 1, 64), dtype=np.float32)
+        # Silero VAD v5 state: single tensor [2, batch=1, 128]
+        state = np.zeros((2, 1, 128), dtype=np.float32)
         sr = np.array(self.sample_rate, dtype=np.int64)
 
         probabilities: list[float] = []
@@ -235,12 +232,11 @@ class AudioPipeline:
 
             ort_inputs = {
                 "input": chunk_data,
-                "h": h,
-                "c": c,
+                "state": state,
                 "sr": sr,
             }
 
-            output, h, c = session.run(None, ort_inputs)
+            output, state = session.run(None, ort_inputs)
             probabilities.append(float(output[0][0]))
 
         return probabilities
