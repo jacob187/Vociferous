@@ -1,12 +1,14 @@
 """
 Unified audio preprocessing pipeline for Vociferous.
 
-Stages: normalize → highpass → gate → Silero VAD → clean speech output.
+Stages: normalize → highpass → Silero VAD → clean speech output.
 
-Replaces the piecemeal silence detection that used webrtcvad + four separate
-RMS-based trim functions in transcription_service.py.  One neural VAD pass
-now handles leading/trailing/internal silence detection, producing cleaner
-audio for whisper with fewer hallucinations.
+The noise gate that existed between highpass and VAD has been removed:
+Whisper large-v3 was trained on raw noisy audio, and digital-zero
+regions created by a gate are out-of-distribution — causing
+hallucinations, soft phoneme loss (/h/, /f/, /s/), and word-boundary
+truncation.  RMS normalization + 100 Hz highpass is sufficient signal
+sanitization.  Silero VAD handles speech/silence discrimination.
 """
 
 from __future__ import annotations
@@ -30,10 +32,15 @@ class AudioPipeline:
     Pipeline stages:
       1. int16 → float32 normalization
       2. RMS normalization to consistent amplitude
-      3. First-order IIR highpass @ 80 Hz (DC offset, hum, rumble)
-      4. Fine noise gate @ −52 dBFS (zero provably-silent frames)
-      5. Silero VAD speech/silence classification per 32 ms chunk
-      6. Extract speech segments with padding, collapse long silence
+      3. First-order IIR highpass @ 100 Hz (DC offset, hum, rumble)
+      4. Silero VAD speech/silence classification per 32 ms chunk
+      5. Extract speech segments with hysteresis, asymmetric padding,
+         and inter-segment silence insertion
+
+    The noise gate that was previously Stage 4 has been removed: Whisper
+    large-v3 was trained on raw noisy audio. Digital-zero regions created
+    by a gate are out-of-distribution and cause hallucinations, soft
+    phoneme loss (/h/, /f/, /s/), and word-boundary truncation.
 
     Returns None from :meth:`process` when no meaningful speech is detected
     (replaces ``_is_effective_silence`` + all trim functions).
@@ -41,16 +48,20 @@ class AudioPipeline:
 
     # ── Silero VAD parameters ──
     _CHUNK_SIZE: int = 512  # 32 ms at 16 kHz — Silero's native chunk size
-    _SPEECH_THRESHOLD: float = 0.5  # probability above which a chunk is speech
-    _MIN_SILENCE_CHUNKS: int = 12  # ~384 ms of continuous silence before collapsing
-    _SPEECH_PAD_CHUNKS: int = 3  # ~96 ms padding around speech segments
-    _MIN_SPEECH_CHUNKS: int = 3  # ~96 ms minimum speech segment duration
+    _SPEECH_THRESHOLD: float = 0.45  # activation threshold (enter speech)
+    _SPEECH_EXIT_THRESHOLD: float = 0.35  # deactivation threshold (hysteresis)
+    _MIN_SILENCE_CHUNKS: int = 47  # ~1500 ms pause before splitting segments
+    _PRE_SPEECH_PAD_CHUNKS: int = 7  # ~224 ms pre-roll (capture consonant attack)
+    _POST_SPEECH_PAD_CHUNKS: int = 13  # ~416 ms post-roll (trailing silence for punctuation)
+    _MIN_SPEECH_CHUNKS: int = 8  # ~256 ms minimum speech segment (filter transients)
 
     # ── Pre-processing parameters ──
-    _HIGHPASS_CUTOFF: float = 80.0  # Hz
-    _GATE_THRESHOLD_DB: float = -52.0  # dBFS
+    _HIGHPASS_CUTOFF: float = 100.0  # Hz (below fundamental speech floor ~85 Hz)
     _TARGET_RMS: float = 0.1  # normalization target
     _SILENCE_RMS_FLOOR: float = 1e-5  # fast pre-check: dead silence
+
+    # ── Inter-segment silence ──
+    _INTER_SEGMENT_SILENCE_MS: int = 300  # silence insert between split segments
 
     def __init__(self, sample_rate: int = 16000) -> None:
         self.sample_rate = sample_rate
@@ -60,9 +71,6 @@ class AudioPipeline:
         rc = 1.0 / (2.0 * np.pi * self._HIGHPASS_CUTOFF)
         dt = 1.0 / self.sample_rate
         self._hp_alpha: float = rc / (rc + dt)
-
-        # Pre-compute noise gate threshold (linear amplitude)
-        self._gate_threshold: float = 10.0 ** (self._GATE_THRESHOLD_DB / 20.0)
 
     # ------------------------------------------------------------------
     # VAD model lifecycle
@@ -141,16 +149,13 @@ class AudioPipeline:
         # Stage 2: RMS normalization
         audio_f32 = self._rms_normalize(audio_f32)
 
-        # Stage 3: Highpass filter @ 80 Hz
+        # Stage 3: Highpass filter @ 100 Hz
         audio_f32 = self._highpass(audio_f32)
 
-        # Stage 4: Fine noise gate
-        audio_f32 = self._noise_gate(audio_f32)
-
-        # Stage 5: Silero VAD classification
+        # Stage 4: Silero VAD classification
         speech_probs = self._vad_classify(audio_f32)
 
-        # Stage 6: Extract speech segments
+        # Stage 5: Extract speech segments (hysteresis + inter-segment silence)
         result = self._extract_speech(audio_f32, speech_probs)
 
         if result is None or result.size == 0:
@@ -179,7 +184,7 @@ class AudioPipeline:
         """First-order IIR highpass filter.
 
         Removes DC offset, AC hum (50/60 Hz), and sub-bass rumble below
-        80 Hz.  No effect on speech content — fundamental floor is ~85 Hz.
+        100 Hz.  No effect on speech content — fundamental floor is ~85 Hz.
 
         Uses a simple recursive filter.  For a 10 s recording at 16 kHz
         that's ~160 k iterations, taking ~20 ms in pure Python.  Not worth
@@ -192,25 +197,6 @@ class AudioPipeline:
         for i in range(1, n):
             out[i] = alpha * (out[i - 1] + audio[i] - audio[i - 1])
         return out
-
-    def _noise_gate(self, audio: NDArray[np.float32]) -> NDArray[np.float32]:
-        """Zero frames that are provably below any speech level.
-
-        Not aggressive — only kills frames well below the speech floor.
-        Marginal frames pass through for Silero to judge.
-        """
-        chunk = self._CHUNK_SIZE
-        n_chunks = len(audio) // chunk
-        result = audio.copy()
-
-        for i in range(n_chunks):
-            start = i * chunk
-            end = start + chunk
-            frame_rms = float(np.sqrt(np.mean(result[start:end] ** 2)))
-            if frame_rms < self._gate_threshold:
-                result[start:end] = 0.0
-
-        return result
 
     def _vad_classify(self, audio: NDArray[np.float32]) -> list[float]:
         """Run Silero VAD on 32 ms chunks, return speech probability per chunk."""
@@ -246,10 +232,17 @@ class AudioPipeline:
         audio: NDArray[np.float32],
         speech_probs: list[float],
     ) -> NDArray[np.float32] | None:
-        """Extract speech segments using VAD probabilities.
+        """Extract speech segments using VAD probabilities with hysteresis.
 
-        Keeps speech chunks plus padding.  Collapses long silence gaps.
-        Preserves short pauses (< MIN_SILENCE_CHUNKS) for natural phrasing.
+        Uses a two-threshold state machine: activation at _SPEECH_THRESHOLD,
+        deactivation at _SPEECH_EXIT_THRESHOLD (lower).  This prevents
+        mid-word cutoffs during brief energy dips (fricatives, nasals).
+
+        Segments separated by short silence (< _MIN_SILENCE_CHUNKS) are merged
+        to preserve natural phrasing context for Whisper.  Segments that remain
+        separate get a brief low-level noise insert between them — Whisper
+        needs silence *duration* to generate punctuation, but digital zero is
+        out-of-distribution, so we use Gaussian noise at ~-80 dBFS instead.
         """
         if not speech_probs:
             return None
@@ -257,8 +250,18 @@ class AudioPipeline:
         chunk_size = self._CHUNK_SIZE
         n_chunks = len(speech_probs)
 
-        # Classify chunks
-        is_speech = [p >= self._SPEECH_THRESHOLD for p in speech_probs]
+        # Classify chunks with hysteresis (two-threshold state machine).
+        # Once speech is detected (p >= SPEECH_THRESHOLD), we stay in speech
+        # until p drops below SPEECH_EXIT_THRESHOLD.  This prevents the VAD
+        # from cutting out during mid-word energy dips (fricatives, nasals).
+        is_speech: list[bool] = []
+        in_speech = False
+        for p in speech_probs:
+            if in_speech:
+                in_speech = p >= self._SPEECH_EXIT_THRESHOLD
+            else:
+                in_speech = p >= self._SPEECH_THRESHOLD
+            is_speech.append(in_speech)
 
         # Find contiguous speech runs
         segments: list[tuple[int, int]] = []  # (start_chunk, end_chunk)
@@ -287,11 +290,13 @@ class AudioPipeline:
             else:
                 merged.append((seg_start, seg_end))
 
-        # Extract audio for each segment with padding
+        # Extract audio for each segment with asymmetric padding.
+        # Pre-roll captures consonant attack; post-roll captures word-final
+        # decay and provides silence for Whisper's punctuation decoder.
         parts: list[NDArray[np.float32]] = []
         for seg_start, seg_end in merged:
-            padded_start = max(0, seg_start - self._SPEECH_PAD_CHUNKS)
-            padded_end = min(n_chunks, seg_end + self._SPEECH_PAD_CHUNKS)
+            padded_start = max(0, seg_start - self._PRE_SPEECH_PAD_CHUNKS)
+            padded_end = min(n_chunks, seg_end + self._POST_SPEECH_PAD_CHUNKS)
             sample_start = padded_start * chunk_size
             sample_end = min(padded_end * chunk_size, len(audio))
             parts.append(audio[sample_start:sample_end])
@@ -299,7 +304,21 @@ class AudioPipeline:
         if not parts:
             return None
 
-        result = np.concatenate(parts)
+        # Assemble segments with inter-segment silence.
+        # Whisper uses silence duration to decide punctuation tokens.
+        # Digital zero is out-of-distribution (trained on real noisy audio),
+        # so we insert low-level Gaussian noise (~-80 dBFS) instead.
+        if len(parts) > 1:
+            silence_samples = int(self._INTER_SEGMENT_SILENCE_MS * self.sample_rate / 1000)
+            rng = np.random.default_rng(42)
+            assembled: list[NDArray[np.float32]] = [parts[0]]
+            for part in parts[1:]:
+                silence = rng.normal(0, 1e-4, silence_samples).astype(np.float32)
+                assembled.append(silence)
+                assembled.append(part)
+            result = np.concatenate(assembled)
+        else:
+            result = parts[0]
 
         # Log diagnostics
         original_ms = len(audio) / self.sample_rate * 1000

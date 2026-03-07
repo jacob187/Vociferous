@@ -37,7 +37,7 @@ class TestDefaults:
 
     def test_default_asr_model(self):
         s = VociferousSettings()
-        assert s.model.model == "large-v3-turbo-q5_0"
+        assert s.model.model == "large-v3-turbo-int8"
 
     def test_default_language(self):
         s = VociferousSettings()
@@ -98,7 +98,7 @@ class TestModuleAPI:
         assert config_file.exists()
 
         loaded = json.loads(config_file.read_text())
-        assert loaded["model"]["model"] == "large-v3-turbo-q5_0"
+        assert loaded["model"]["model"] == "large-v3-turbo-int8"
 
     def test_save_creates_backup(self, tmp_path: Path):
         config_file = tmp_path / "settings.json"

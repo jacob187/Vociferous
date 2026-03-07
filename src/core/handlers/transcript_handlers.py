@@ -28,8 +28,11 @@ class TranscriptHandlers:
     def handle_delete(self, intent: Any) -> None:
         db = self._db_provider()
         if db:
-            db.delete_transcript(intent.transcript_id)
-            self._emit("transcript_deleted", {"id": intent.transcript_id})
+            deleted = db.delete_transcript(intent.transcript_id)
+            if deleted:
+                self._emit("transcript_deleted", {"id": intent.transcript_id})
+            else:
+                logger.warning("Delete requested for nonexistent transcript %d", intent.transcript_id)
 
     def handle_delete_variant(self, intent: Any) -> None:
         db = self._db_provider()

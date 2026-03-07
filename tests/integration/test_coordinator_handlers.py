@@ -18,13 +18,18 @@ ALL_EVENTS = [
     "recording_started",
     "recording_stopped",
     "transcript_deleted",
+    "transcript_updated",
+    "transcripts_cleared",
     "project_created",
+    "project_updated",
     "project_deleted",
     "refinement_started",
     "refinement_complete",
     "refinement_error",
     "transcription_complete",
     "transcription_error",
+    "config_updated",
+    "batch_retitle_progress",
 ]
 
 
@@ -57,15 +62,14 @@ class TestDeleteTranscript:
         assert deleted_events[0]["id"] == t.id
 
     def test_delete_nonexistent_no_crash(self, wired):
-        """Deleting a non-existent transcript should not raise."""
+        """Deleting a non-existent transcript should not raise or emit."""
         coord, events = wired
         from src.core.intents.definitions import DeleteTranscriptIntent
 
         result = coord.command_bus.dispatch(DeleteTranscriptIntent(transcript_id=99999))
-        # Handler still runs (db.delete_transcript returns False silently)
+        # Handler runs but db.delete_transcript returns False → no event emitted
         assert result is True
-        # Event is still emitted (current behavior — handler doesn't check return)
-        assert len(events.of_type("transcript_deleted")) == 1
+        assert len(events.of_type("transcript_deleted")) == 0
 
     def test_delete_without_db(self, coordinator, event_collector):
         """If db is None, handler silently returns."""
@@ -289,3 +293,289 @@ class TestRecordingStateMachine:
 
         # StopRecording sets the stop event
         assert coord.recording_session._recording_stop.is_set()
+
+
+# ── UpdateProjectIntent ───────────────────────────────────────────────────
+
+
+class TestUpdateProject:
+    """Update project via CommandBus → DB row mutated + event emitted."""
+
+    def test_update_name(self, wired):
+        coord, events = wired
+        p = coord.db.add_project(name="Old Name", color="#111111")
+
+        from src.core.intents.definitions import UpdateProjectIntent
+
+        coord.command_bus.dispatch(
+            UpdateProjectIntent(project_id=p.id, name="New Name"),
+        )
+
+        updated = events.of_type("project_updated")
+        assert len(updated) == 1
+        assert updated[0]["id"] == p.id
+        assert updated[0]["name"] == "New Name"
+        assert updated[0]["color"] == "#111111"  # unchanged
+
+    def test_update_color(self, wired):
+        coord, events = wired
+        p = coord.db.add_project(name="Stable", color="#000000")
+
+        from src.core.intents.definitions import UpdateProjectIntent
+
+        coord.command_bus.dispatch(
+            UpdateProjectIntent(project_id=p.id, color="#ff00ff"),
+        )
+
+        updated = events.of_type("project_updated")
+        assert len(updated) == 1
+        assert updated[0]["color"] == "#ff00ff"
+        assert updated[0]["name"] == "Stable"
+
+    def test_update_nonexistent_no_event(self, wired):
+        """Updating a nonexistent project emits nothing."""
+        coord, events = wired
+
+        from src.core.intents.definitions import UpdateProjectIntent
+
+        coord.command_bus.dispatch(
+            UpdateProjectIntent(project_id=99999, name="Ghost"),
+        )
+
+        assert len(events.of_type("project_updated")) == 0
+
+
+# ── AssignProjectIntent ───────────────────────────────────────────────────
+
+
+class TestAssignProject:
+    """Assign transcript to project via CommandBus → DB + event."""
+
+    def test_assign_transcript_to_project(self, wired):
+        coord, events = wired
+        t = coord.db.add_transcript(raw_text="test", duration_ms=100)
+        p = coord.db.add_project(name="Inbox")
+
+        from src.core.intents.definitions import AssignProjectIntent
+
+        coord.command_bus.dispatch(
+            AssignProjectIntent(transcript_id=t.id, project_id=p.id),
+        )
+
+        updated = events.of_type("transcript_updated")
+        assert len(updated) == 1
+        assert updated[0]["id"] == t.id
+        assert updated[0]["project_id"] == p.id
+
+
+# ── ClearTranscriptsIntent ────────────────────────────────────────────────
+
+
+class TestClearTranscripts:
+    """Clear all transcripts via CommandBus → DB emptied + event emitted."""
+
+    def test_clear_deletes_all(self, wired):
+        coord, events = wired
+        coord.db.add_transcript(raw_text="one", duration_ms=100)
+        coord.db.add_transcript(raw_text="two", duration_ms=200)
+
+        from src.core.intents.definitions import ClearTranscriptsIntent
+
+        coord.command_bus.dispatch(ClearTranscriptsIntent())
+
+        cleared = events.of_type("transcripts_cleared")
+        assert len(cleared) == 1
+        assert cleared[0]["count"] == 2
+
+        # Verify rows are gone
+        assert coord.db.get_transcript(1) is None
+        assert coord.db.get_transcript(2) is None
+
+    def test_clear_empty_db(self, wired):
+        """Clearing with no transcripts emits count 0."""
+        coord, events = wired
+
+        from src.core.intents.definitions import ClearTranscriptsIntent
+
+        coord.command_bus.dispatch(ClearTranscriptsIntent())
+
+        cleared = events.of_type("transcripts_cleared")
+        assert len(cleared) == 1
+        assert cleared[0]["count"] == 0
+
+
+# ── DeleteTranscriptVariantIntent ─────────────────────────────────────────
+
+
+class TestDeleteTranscriptVariant:
+    """Delete a specific variant via CommandBus → DB + conditional event."""
+
+    def test_delete_variant_emits_update(self, wired):
+        coord, events = wired
+        t = coord.db.add_transcript(raw_text="base text", duration_ms=500)
+        v = coord.db.add_variant(t.id, "user_edit", "edited", set_current=True)
+
+        from src.core.intents.definitions import DeleteTranscriptVariantIntent
+
+        coord.command_bus.dispatch(
+            DeleteTranscriptVariantIntent(transcript_id=t.id, variant_id=v.id),
+        )
+
+        updated = events.of_type("transcript_updated")
+        assert len(updated) == 1
+        assert updated[0]["id"] == t.id
+
+    def test_delete_nonexistent_variant_no_event(self, wired):
+        """Deleting a variant that doesn't exist emits nothing."""
+        coord, events = wired
+        t = coord.db.add_transcript(raw_text="base", duration_ms=100)
+
+        from src.core.intents.definitions import DeleteTranscriptVariantIntent
+
+        coord.command_bus.dispatch(
+            DeleteTranscriptVariantIntent(transcript_id=t.id, variant_id=99999),
+        )
+
+        assert len(events.of_type("transcript_updated")) == 0
+
+
+# ── RenameTranscriptIntent ────────────────────────────────────────────────
+
+
+class TestRenameTranscript:
+    """Rename transcript via CommandBus → display_name set + event."""
+
+    def test_rename_emits_update(self, wired):
+        coord, events = wired
+        t = coord.db.add_transcript(raw_text="hello", duration_ms=100)
+
+        from src.core.intents.definitions import RenameTranscriptIntent
+
+        coord.command_bus.dispatch(
+            RenameTranscriptIntent(transcript_id=t.id, title="My Title"),
+        )
+
+        updated = events.of_type("transcript_updated")
+        assert len(updated) == 1
+        assert updated[0]["id"] == t.id
+
+        # Verify in DB
+        refreshed = coord.db.get_transcript(t.id)
+        assert refreshed.display_name == "My Title"
+
+    def test_rename_empty_title_is_noop(self, wired):
+        """Empty/whitespace title should NOT rename or emit."""
+        coord, events = wired
+        t = coord.db.add_transcript(raw_text="hello", duration_ms=100)
+
+        from src.core.intents.definitions import RenameTranscriptIntent
+
+        coord.command_bus.dispatch(
+            RenameTranscriptIntent(transcript_id=t.id, title="   "),
+        )
+
+        assert len(events.of_type("transcript_updated")) == 0
+
+
+# ── BatchRetitleIntent ────────────────────────────────────────────────────
+
+
+class TestBatchRetitle:
+    """BatchRetitle with no TitleGenerator emits an error event."""
+
+    def test_batch_retitle_without_generator(self, wired):
+        """No title_generator → error event emitted."""
+        coord, events = wired
+        assert coord.title_generator is None
+
+        from src.core.intents.definitions import BatchRetitleIntent
+
+        coord.command_bus.dispatch(BatchRetitleIntent())
+
+        errors = events.of_type("batch_retitle_progress")
+        assert len(errors) == 1
+        assert errors[0]["status"] == "error"
+
+
+# ── RetitleTranscriptIntent ───────────────────────────────────────────────
+
+
+class TestRetitleTranscript:
+    """RetitleTranscript with no TitleGenerator is a safe noop."""
+
+    def test_retitle_without_generator_is_noop(self, wired):
+        """No title_generator → silently returns."""
+        coord, events = wired
+        assert coord.title_generator is None
+        t = coord.db.add_transcript(raw_text="some text", duration_ms=100)
+
+        from src.core.intents.definitions import RetitleTranscriptIntent
+
+        coord.command_bus.dispatch(RetitleTranscriptIntent(transcript_id=t.id))
+
+        # No crash, no events — just a silent noop
+        assert len(events.events) == 0
+
+
+# ── UpdateConfigIntent ────────────────────────────────────────────────────
+
+
+class TestUpdateConfig:
+    """UpdateConfig via CommandBus → settings updated + event emitted."""
+
+    def test_update_config_emits_event(self, wired):
+        coord, events = wired
+
+        from src.core.intents.definitions import UpdateConfigIntent
+
+        coord.command_bus.dispatch(
+            UpdateConfigIntent(settings={"output": {"auto_copy_to_clipboard": False}}),
+        )
+
+        cfg_events = events.of_type("config_updated")
+        assert len(cfg_events) == 1
+        # config_updated payload is the full settings model_dump()
+        assert cfg_events[0]["output"]["auto_copy_to_clipboard"] is False
+
+    def test_update_config_applies_to_coordinator(self, wired):
+        """Settings object on coordinator should reflect the new value."""
+        coord, events = wired
+
+        from src.core.intents.definitions import UpdateConfigIntent
+
+        coord.command_bus.dispatch(
+            UpdateConfigIntent(settings={"output": {"auto_copy_to_clipboard": False}}),
+        )
+
+        assert coord.settings.output.auto_copy_to_clipboard is False
+
+
+# ── RestartEngineIntent ───────────────────────────────────────────────────
+
+
+class TestRestartEngine:
+    """RestartEngine dispatches the coordinator's restart_engine method."""
+
+    def test_restart_engine_calls_method(self, wired):
+        """Validate the intent dispatches to restart_engine."""
+        from unittest.mock import MagicMock
+
+        coord, events = wired
+        coord.restart_engine = MagicMock()
+
+        # SystemHandlers holds a reference to the restart_engine callable
+        # captured at __init__ time, so we need to re-register to pick up mock
+        from src.core.handlers.system_handlers import SystemHandlers
+        from src.core.intents.definitions import RestartEngineIntent
+
+        system = SystemHandlers(
+            event_bus_emit=coord.event_bus.emit,
+            input_listener_provider=lambda: coord.input_listener,
+            on_settings_updated=lambda s: setattr(coord, "settings", s),
+            restart_engine=coord.restart_engine,
+        )
+        coord.command_bus.register(RestartEngineIntent, system.handle_restart_engine)
+
+        coord.command_bus.dispatch(RestartEngineIntent())
+
+        coord.restart_engine.assert_called_once()

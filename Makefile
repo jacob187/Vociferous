@@ -62,7 +62,7 @@ fix-gpu: ## Fix NVIDIA UVM module for GPU acceleration
 # ── Development ──────────────────────────────────────────────────────────────
 
 run: ## Run the application
-	./vociferous
+	./vociferous.sh
 
 test: ## Run the test suite
 	$(UV) run pytest

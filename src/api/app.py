@@ -50,6 +50,7 @@ from src.api.transcripts import (
     get_transcript,
     list_transcripts,
     refine_transcript,
+    rename_transcript,
     retitle_transcript,
     search_transcripts,
 )
@@ -254,6 +255,7 @@ def create_app(coordinator: ApplicationCoordinator) -> Litestar:
             clear_all_transcripts,
             delete_variant,
             refine_transcript,
+            rename_transcript,
             retitle_transcript,
             search_transcripts,
             # Projects

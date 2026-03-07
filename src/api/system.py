@@ -142,11 +142,13 @@ def list_models() -> dict:
     catalog = get_model_catalog()
     models_dir = ResourceManager.get_user_cache_dir("models")
 
-    # Attach download status to each model entry
+    # Attach download status to each model entry.
+    # CT2 models are directories named after the repo slug.
     for category in ("asr", "slm"):
         for model_id, info in catalog[category].items():
-            filepath = models_dir / info["filename"]
-            info["downloaded"] = filepath.is_file()
+            local_dir_name = info["repo"].split("/")[-1]
+            model_bin = models_dir / local_dir_name / info["model_file"]
+            info["downloaded"] = model_bin.is_file()
 
     return catalog
 
@@ -174,7 +176,7 @@ async def download_model(data: dict) -> Response:
     cache_dir = ResourceManager.get_user_cache_dir("models")
 
     def do_download():
-        from src.provisioning.core import ProvisioningError, download_model_file
+        from src.provisioning.core import ProvisioningError, download_model_directory
 
         def on_progress(msg: str):
             coordinator.event_bus.emit(
@@ -191,12 +193,12 @@ async def download_model(data: dict) -> Response:
                     "message": f"Starting download of {model.name}...",
                 },
             )
-            download_model_file(
+            download_model_directory(
                 repo_id=model.repo,
-                filename=model.filename,
                 target_dir=cache_dir,
                 progress_callback=on_progress,
                 expected_sha256=getattr(model, "sha256", None),
+                model_file=model.model_file,
             )
             coordinator.event_bus.emit(
                 "download_progress",
@@ -259,11 +261,12 @@ def _detect_gpu_status() -> dict:
     except Exception as e:
         gpu["detail"] = str(e)
 
-    # Whisper.cpp compiled backend info
+    # CTranslate2 backend info
     try:
-        from pywhispercpp.model import Model as WhisperModel
+        import ctranslate2
 
-        gpu["whisper_backends"] = WhisperModel.system_info() or ""
+        cuda_count = ctranslate2.get_cuda_device_count()
+        gpu["whisper_backends"] = f"ctranslate2 (CUDA devices: {cuda_count})" if cuda_count > 0 else "ctranslate2 (CPU)"
     except Exception:
         gpu["whisper_backends"] = "unavailable"
 

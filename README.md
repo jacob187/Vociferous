@@ -1,12 +1,12 @@
 <div align="center">
 
-## Vociferous v4.4
+## Vociferous v5.0
 
-**February 2026**
+**July 2026**
 
 </div>
 
-> In January 2026, Vociferous was a PyQt6 desktop application running faster-whisper through CTranslate2, using SQLAlchemy for persistence, with 73 Qt widget files and a hand-rolled YAML configuration system. By February 14 it had been completely rebuilt: PyQt6 replaced by a Svelte 5 SPA inside a pywebview shell, a Litestar REST+WebSocket API, whisper.cpp for ASR, llama.cpp for SLM refinement, raw SQLite3, and Pydantic Settings. The God Object coordinator was decomposed into domain handler classes. File-explorer-style multi-select landed across all views. The History and Projects views were merged into a single unified Transcriptions view with inline project management. And v4.4 shipped a full project management overhaul: a full-spectrum color picker, a conditional delete modal with subproject promotion logic, dark-themed parent selectors, and a comprehensive UI polish pass covering multi-select visual correctness, stats staleness, search input consistency, and destructive action clarity.
+> In January 2026, Vociferous was a PyQt6 desktop application running faster-whisper through CTranslate2, using SQLAlchemy for persistence, with 73 Qt widget files and a hand-rolled YAML configuration system. By February 14 it had been completely rebuilt: PyQt6 replaced by a Svelte 5 SPA inside a pywebview shell, a Litestar REST+WebSocket API, whisper.cpp for ASR, llama.cpp for SLM refinement, raw SQLite3, and Pydantic Settings. The God Object coordinator was decomposed into domain handler classes. File-explorer-style multi-select landed across all views. The History and Projects views were merged into a single unified Transcriptions view with inline project management. v4.4 shipped a full project management overhaul: a full-spectrum color picker, a conditional delete modal with subproject promotion logic, dark-themed parent selectors, and a comprehensive UI polish pass. And v5.0 unified the entire inference stack under CTranslate2: ASR via faster-whisper, SLM via ctranslate2 Generator + tokenizers, eliminating the libggml shared-library conflicts and GGML/GGUF model formats entirely.
 
 ---
 
@@ -15,8 +15,8 @@
 **Cross-platform, offline speech-to-text with local AI refinement.**
 
 Vociferous captures audio from your microphone, transcribes it in real-time using
-[whisper.cpp](https://github.com/ggerganov/whisper.cpp), and optionally refines the
-output with a local Small Language Model via [llama.cpp](https://github.com/ggerganov/llama.cpp).
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (CTranslate2 Whisper backend), and optionally refines the
+output with a local Small Language Model via [CTranslate2](https://github.com/OpenNMT/CTranslate2).
 Everything runs on your hardware — no cloud, no API keys, no data leaves your machine.
 
 **License:** AGPL-3.0-or-later
@@ -69,8 +69,8 @@ Everything runs on your hardware — no cloud, no API keys, no data leaves your 
 | Window Shell | [pywebview](https://pywebview.flowrl.com/)      |
 | Frontend | Svelte 5 + Tailwind CSS v4 + Vite 6  |
 | Backend API | Litestar (REST + WebSocket)   |
-| ASR Engine  | pywhispercpp (whisper.cpp, GGML models) |
-| SLM Engine  | llama-cpp-python (llama.cpp, GGUF models) |
+| ASR Engine  | faster-whisper (CTranslate2 Whisper backend) |
+| SLM Engine  | CTranslate2 Generator + tokenizers (Qwen3 models) |
 | Database    | SQLite with WAL mode          |
 | Config      | Pydantic Settings (JSON persistence, atomic)  |
 
@@ -114,7 +114,7 @@ bash scripts/install.sh
 make provision
 ```
 
-> **Note**: If a GPU is detected, the initial install will take longer as it compiles `pywhispercpp` and `llama-cpp-python` specifically for your hardware. If this fails, the script will fall back to CPU-only wheels or report missing build headers.
+> **Note**: CTranslate2 ships pre-built wheels with optional CUDA support. No compilation is required — the library detects CUDA at runtime.
 
 ### macOS
 
@@ -171,7 +171,7 @@ docker compose build
 
 # Provision models on first run (persisted in named volume — only needed once)
 # NOTE: --entrypoint is required to override the default ENTRYPOINT
-docker compose run --rm --entrypoint python3 vociferous scripts/provision_models.py install large-v3-turbo-q5_0
+docker compose run --rm --entrypoint python3 vociferous scripts/provision_models.py install large-v3-turbo-int8
 docker compose run --rm --entrypoint python3 vociferous scripts/provision_models.py install qwen14b
 
 # CPU mode
@@ -222,9 +222,7 @@ This script:
 3. Creates `/dev/nvidia-uvm` device node if missing (via `nvidia-modprobe -u`
 or manual `mknod`)
 4. Fixes device permissions (`chmod 666`)
-5. Hardens `pywhispercpp`'s libcuda linkage by symlinking its bundled `libcuda`
-stub to the system driver's `libcuda.so.1` — prevents version mismatch crashes
-6. Verifies CUDA availability from Python
+5. Verifies CUDA availability from Python (CTranslate2 probes for cuBLAS/cuDNN at runtime)
 
 ### WebKitGTK + NVIDIA DRM Workaround
 
@@ -280,8 +278,8 @@ Frontend UI → POST /api/intents → CommandBus → Service Logic → EventBus 
 
 - API handlers dispatch Intents — they never call services directly
 - The `ApplicationCoordinator` is the Composition Root (owns all lifecycle)
-- ASR inference runs in a dedicated background thread (`pywhispercpp`)
-- SLM inference runs in a dedicated background thread with a mutex lock (`llama-cpp-python`)
+- ASR inference runs in a dedicated background thread (`faster-whisper` / CTranslate2)
+- SLM inference runs in a dedicated background thread with a mutex lock (`ctranslate2` Generator)
 - The main/UI thread runs `pywebview` — zero blocking operations allowed
 
 ---
@@ -325,7 +323,7 @@ cd frontend && npm run dev
 
 ## Model Provisioning
 
-Vociferous uses GGML models for ASR and GGUF models for SLM refinement. Models
+Vociferous uses CTranslate2-format models for both ASR and SLM. Models
 are downloaded from HuggingFace Hub via the provisioning system.
 
 ```bash
@@ -338,8 +336,8 @@ make provision
 
 Default models:
 
-- **ASR**: `ggml-large-v3-turbo-q5_0.bin` (~1 GB) from `ggerganov/whisper.cpp`
-- **SLM**: `Qwen3-1.7B-Q8_0.gguf` (~2 GB) from `Qwen/Qwen3-1.7B-GGUF`
+- **ASR**: `faster-whisper-large-v3-turbo-int8-ct2` (~780 MB) from `Zoont/faster-whisper-large-v3-turbo-int8-ct2`
+- **SLM**: `Qwen3-1.7B-ct2-int8` (~1.7 GB) from `jncraton/Qwen3-1.7B-ct2-int8`
 
 Models are cached in `~/.cache/vociferous/models/` (XDG-compliant).
 

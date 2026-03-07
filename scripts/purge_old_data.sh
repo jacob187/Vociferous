@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────
-# Vociferous v4.0 — Pre-Launch Purge Script
+# Vociferous v5.0 — Pre-Launch Purge Script
 #
 # Removes ALL data from previous Vociferous installations:
 #   • Old configs (YAML format, Qt window state)
 #   • Old databases and history
-#   • Old CTranslate2/faster-whisper models (v4 uses GGML/GGUF)
+#   • Old models (GGML/GGUF from v4, CTranslate2 directories from v5)
 #   • Cache files, logs, crash dumps
 #   • HuggingFace Hub download cache
 #   • Stale lockfiles and __pycache__
@@ -33,7 +33,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 echo -e "${CYAN}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║   Vociferous v4.0 — Pre-Launch Data Purge       ║${NC}"
+echo -e "${CYAN}║   Vociferous v5.0 — Pre-Launch Data Purge       ║${NC}"
 echo -e "${CYAN}╚══════════════════════════════════════════════════╝${NC}"
 echo
 
@@ -117,7 +117,7 @@ echo -e "  ${GREEN}✓${NC} Removed stale .pyc files"
 
 echo
 echo -e "${GREEN}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║   Purge complete! Clean slate for v4.0           ║${NC}"
+echo -e "${GREEN}║   Purge complete! Clean slate for v5.0           ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════╝${NC}"
 echo
 echo -e "Next steps:"

@@ -56,7 +56,7 @@ class TestCorruptFileRecovery:
 
         s = init_settings(config_path=config_file)
         assert isinstance(s, VociferousSettings)
-        assert s.model.model == "large-v3-turbo-q5_0"
+        assert s.model.model == "large-v3-turbo-int8"
 
     def test_empty_file_falls_back_to_defaults(self, tmp_path: Path) -> None:
         config_file = tmp_path / "settings.json"
@@ -82,20 +82,20 @@ class TestCorruptFileRecovery:
         s = init_settings(config_path=config_file)
         assert s.user.name == "TestUser"
         # Non-specified sections still have defaults
-        assert s.model.model == "large-v3-turbo-q5_0"
+        assert s.model.model == "large-v3-turbo-int8"
         assert s.recording.sample_rate == 16000
 
-    def test_extra_unknown_keys_trigger_fallback(self, tmp_path: Path) -> None:
-        """Unknown top-level keys cause validation error → falls back to defaults."""
+    def test_extra_unknown_keys_silently_ignored(self, tmp_path: Path) -> None:
+        """Unknown top-level keys are silently dropped; valid keys still parse."""
         config_file = tmp_path / "settings.json"
         config_file.write_text(
             json.dumps({"user": {"name": "X"}, "unknown_section": {"foo": "bar"}}),
             encoding="utf-8",
         )
         s = init_settings(config_path=config_file)
-        # Pydantic forbids extra inputs → entire load fails → defaults
-        assert s.user.name == ""
-        assert s.model.model == "large-v3-turbo-q5_0"
+        # extra="ignore" drops unknown keys — valid settings survive
+        assert s.user.name == "X"
+        assert s.model.model == "large-v3-turbo-int8"
 
 
 # ── Atomic Write Guarantees ───────────────────────────────────────────────
@@ -154,7 +154,7 @@ class TestDeepMerge:
 
         s = get_settings()
         assert s.model.language == "fr"
-        assert s.model.model == "large-v3-turbo-q5_0"  # preserved
+        assert s.model.model == "large-v3-turbo-int8"  # preserved
         assert s.model.device == "auto"  # preserved
 
     def test_update_multiple_sections(self, tmp_path: Path) -> None:
@@ -310,4 +310,4 @@ class TestNonexistentConfig:
         config_file = tmp_path / "does_not_exist" / "settings.json"
         s = init_settings(config_path=config_file)
         assert isinstance(s, VociferousSettings)
-        assert s.model.model == "large-v3-turbo-q5_0"
+        assert s.model.model == "large-v3-turbo-int8"

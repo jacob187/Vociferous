@@ -29,9 +29,13 @@ async def create_project(data: dict) -> Response:
     """Create a project via CommandBus intent."""
     from src.core.intents.definitions import CreateProjectIntent
 
+    name = data.get("name", "").strip()
+    if not name:
+        return Response(content={"error": "Project name is required"}, status_code=400)
+
     coordinator = get_coordinator()
     intent = CreateProjectIntent(
-        name=data["name"],
+        name=name,
         color=data.get("color"),
         parent_id=data.get("parent_id"),
     )

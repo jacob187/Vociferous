@@ -110,7 +110,7 @@ Write-Host "Verifying critical dependencies"           -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
 $DepsOk = $true
-$modules = @("pywhispercpp", "webview", "sounddevice", "pydantic", "litestar", "llama_cpp")
+$modules = @("ctranslate2", "faster_whisper", "tokenizers", "webview", "sounddevice", "pydantic", "litestar")
 
 foreach ($mod in $modules) {
     try {

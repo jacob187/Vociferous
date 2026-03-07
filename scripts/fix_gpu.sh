@@ -112,67 +112,24 @@ if [ ! -x "${PYTHON_BIN}" ]; then
     PYTHON_BIN="python3"
 fi
 
-SYSTEM_LIBCUDA="$(ldconfig -p | awk '/libcuda\.so\.1 /{print $NF; exit}')"
-if [ -n "${SYSTEM_LIBCUDA}" ] && [ -e "${SYSTEM_LIBCUDA}" ]; then
-    echo ""
-    echo "Hardening pywhispercpp CUDA linkage..."
-    SYSTEM_LIBCUDA="${SYSTEM_LIBCUDA}" "${PYTHON_BIN}" - <<'PY'
-import os
-from pathlib import Path
-
-system_libcuda = Path(os.environ["SYSTEM_LIBCUDA"]).resolve()
-
-try:
-    import _pywhispercpp as pywhisper_ext
-except Exception as exc:
-    print(f"pywhispercpp native extension not available ({exc}); skipping linkage hardening.")
-    raise SystemExit(0)
-
-site_packages = Path(pywhisper_ext.__file__).resolve().parent
-libs_dir = site_packages / "pywhispercpp.libs"
-if not libs_dir.exists():
-    print("pywhispercpp.libs directory not found; skipping linkage hardening.")
-    raise SystemExit(0)
-
-bundled = sorted(libs_dir.glob("libcuda-*.so.*"))
-if not bundled:
-    print("No bundled pywhispercpp libcuda detected; no override needed.")
-    raise SystemExit(0)
-
-target = bundled[0]
-if target.is_symlink() and target.resolve() == system_libcuda:
-    print("pywhispercpp libcuda already points to system driver.")
-    raise SystemExit(0)
-
-backup = Path(str(target) + ".bak")
-if target.exists() and not target.is_symlink() and not backup.exists():
-    target.rename(backup)
-elif target.exists() and not target.is_symlink() and backup.exists():
-    target.unlink()
-elif target.is_symlink():
-    target.unlink()
-
-target.symlink_to(system_libcuda)
-print(f"Linked {target.name} -> {system_libcuda}")
-if backup.exists():
-    print(f"Backup preserved at {backup.name}")
-PY
-else
-    echo ""
-    echo "! Could not locate system libcuda.so.1 via ldconfig; skipping pywhispercpp linkage hardening."
-fi
+echo ""
+echo "Verifying CUDA availability for CTranslate2..."
 
 "${PYTHON_BIN}" -c "
 try:
-    from pywhispercpp.model import Model
-    print('pywhispercpp: available')
+    import ctranslate2
+    count = ctranslate2.get_cuda_device_count()
+    if count > 0:
+        print(f'ctranslate2: {count} CUDA device(s) available')
+    else:
+        print('ctranslate2: available (CPU only — no CUDA devices detected)')
 except ImportError:
-    print('pywhispercpp: NOT available')
+    print('ctranslate2: NOT available')
 try:
-    from llama_cpp import Llama
-    print('llama-cpp-python: available')
+    import faster_whisper
+    print('faster-whisper: available')
 except ImportError:
-    print('llama-cpp-python: NOT available')
-print('CUDA device check requires model load — skipping quick test.')
+    print('faster-whisper: NOT available')
+print()
 print('If nvidia-uvm is loaded and /dev/nvidia-uvm exists, GPU inference should work.')
 "

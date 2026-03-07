@@ -186,8 +186,7 @@
                         }}
                     />
                     <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] italic"
-                        >Layers to offload to GPU. -1 = all (fastest), 0 = CPU only. Requires CUDA-compiled
-                        llama-cpp-python.</span
+                        >Layers to offload to GPU. -1 = all (fastest), 0 = CPU only. Requires CUDA-compiled CTranslate2.</span
                     >
                 </div>
             </div>

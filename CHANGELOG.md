@@ -1,6 +1,56 @@
 # Vociferous Changelog
 
-**Vociferous** is a Linux-native speech-to-text application with offline transcription powered by whisper.cpp and text refinement via a local Small Language Model.
+**Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
+
+---
+
+## v5.0.1 — Post-Migration Bug Fix Pass
+
+**Date:** 2026-03-06
+**Status:** Patch Release
+
+### Overview
+
+Bug fix pass addressing runtime regressions discovered after the v5.0.0 CTranslate2 migration. All SLM inference (title generation, insight generation, text refinement) was silently failing. Manual transcript rename was a dead route. Model registry contained dead HuggingFace repos.
+
+### Fixed
+
+- **SLM inference `TypeError` (#42)** — `generate_batch()` requires `List[List[str]]` (string subword tokens), not `List[List[int]]` (integer token IDs). Both `refine()` and `generate_custom()` in `RefinementEngine` were passing `encoded.ids` instead of `encoded.tokens`. Fixed in `src/refinement/engine.py`.
+- **SLM output included full prompt (#43)** — `generate_batch()` defaults to `include_prompt_in_result=True`, causing decoded output to contain the entire ChatML prompt prefix. Title generation was returning `"system"` (the first line of the decoded prompt). Added `include_prompt_in_result=False` to both `generate_batch()` call sites.
+- **`rename_transcript` route unregistered (#44)** — The `POST /api/transcripts/{id}/rename` handler was defined in `src/api/transcripts.py` but never imported or added to the Litestar router in `src/api/app.py`. Every manual rename was silently 404-ing. Added to both the import block and the route list.
+- **Title edit cancelled by WebSocket refresh (#45)** — `TranscriptDetailPanel.svelte` had a `$effect` that reset `editingTitle = false` whenever the `entry` prop changed reference. A `transcript_updated` WebSocket event (e.g. from title gen completing) triggered `loadEntryDetail`, replacing `selectedEntry` with a new object and cancelling any in-progress rename. Fixed by comparing `entry.id` — edit state now resets only when navigating to a different transcript.
+- **Dead SLM model repos (#46)** — All four `Michael-Moo/` HuggingFace repos in the model registry returned 401 (account deleted or private). Replaced with verified public alternatives: `jncraton/Qwen3-1.7B-ct2-int8`, `jncraton/Qwen3-4B-ct2-int8`, `ctranslate2-4you/Qwen3-8B-ct2-AWQ`, `ctranslate2-4you/Qwen3-14B-ct2-AWQ`.
+- **Fake ASR fast-tier model ID (#47)** — Registry entry `faster-whisper-large-v3-Q5_0` referenced a GGUF quantization format that does not exist in CTranslate2. Replaced with `Zoont/faster-whisper-large-v3-turbo-int8-ct2`.
+- **`GET /api/models` `KeyError: 'filename'` (#48)** — `list_models()` in `src/api/system.py` was checking `info["filename"]`, a field that does not exist on CT2 directory models. Fixed to derive local path from `repo.split("/")[-1]` and check `model_file` inside the directory.
+- **`download_model` wrong function (#49)** — `download_model()` was calling `download_model_file()` with `model.filename`. CT2 models are directories; fixed to call `download_model_directory()` with `model.repo`.
+- **`ModelInfo` TypeScript interface stale (#50)** — Frontend `ModelInfo` interface had `filename: string` instead of `model_file: string`. Updated in `frontend/src/lib/api.ts`.
+- **HTTP client log noise (#51)** — `httpx`, `httpcore`, `huggingface_hub.utils._http`, `huggingface_hub.file_download`, and `huggingface_hub.repocard` were flooding stdout at DEBUG/INFO level during model downloads. Clamped to WARNING in `src/core/log_manager.py`.
+
+---
+
+## v5.0.0 — CTranslate2 Universal Backend Migration
+
+**Date:** 2025-07-12
+**Status:** Major Release
+
+### Overview
+
+Complete replacement of both inference backends — `pywhispercpp` (ASR) and `llama-cpp-python` (SLM) — with a unified CTranslate2-based stack. ASR now uses `faster-whisper` (CTranslate2 Whisper backend) and SLM uses `ctranslate2` Generator directly. This eliminates the libggml shared-library ordering hack, removes GGML/GGUF model format dependencies, and unifies the inference runtime.
+
+### Changed
+
+- **ASR backend**: `pywhispercpp` → `faster-whisper` (CTranslate2 Whisper). Models are now CT2-format directories from `deepdml/faster-whisper-large-v3-turbo-ct2` and `Systran/faster-whisper-large-v3`.
+- **SLM backend**: `llama-cpp-python` → `ctranslate2.Generator` + `tokenizers`. Models are CT2-format Qwen3 directories with `int8_float16` quantization.
+- **Model registry**: `ASRModel` and `SLMModel` dataclasses changed from single-file (`filename`) to directory-based (`repo` + `model_file`). GGML/GGUF formats replaced with CTranslate2 format.
+- **Provisioning**: ASR and SLM provisioning uses `snapshot_download()` for directories. VAD (Silero) remains as single ONNX file via `hf_hub_download()`.
+- **GPU detection**: `pywhispercpp.model.Model.system_info()` → `ctranslate2.get_cuda_device_count()`.
+- **initial_prompt**: Re-enabled for ASR transcription — faster-whisper handles prompt tokenization safely (no more SIGSEGV from pywhispercpp 1.4.1).
+- **SLM tokenization**: ChatML template applied manually via `_messages_to_chatml()`. Token-level stop conditions via `tokenizer.token_to_id()`.
+- **Dependencies**: `pywhispercpp>=1.4.0` and `llama-cpp-python>=0.3.0` replaced with `ctranslate2>=4.5.0`, `faster-whisper>=1.1.0`, and `tokenizers>=0.20.0`.
+
+### Removed
+
+- **libggml ordering hack**: The synchronous `import llama_cpp` pre-import in `ApplicationCoordinator` startup is no longer needed. CTranslate2 has no shared-library conflicts.
 
 ---
 

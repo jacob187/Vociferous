@@ -107,7 +107,7 @@ class RecordingSession:
         return self._is_recording
 
     def load_asr_model(self) -> None:
-        """Warm-load the whisper.cpp model and emit engine_status events."""
+        """Warm-load the Whisper model (faster-whisper/CTranslate2) and emit engine_status events."""
         settings = self._settings_provider()
         try:
             from src.services.transcription_service import create_local_model
@@ -146,9 +146,10 @@ class RecordingSession:
 
             settings = self._settings_provider()
             model_id = settings.model.model
-            asr_model = get_asr_model(model_id) or ASR_MODELS.get("large-v3-turbo-q5_0")
+            asr_model = get_asr_model(model_id) or ASR_MODELS.get("large-v3-turbo-int8")
             if asr_model:
-                model_path = ResourceManager.get_user_cache_dir("models") / asr_model.filename
+                local_dir_name = asr_model.repo.split("/")[-1]
+                model_path = ResourceManager.get_user_cache_dir("models") / local_dir_name / asr_model.model_file
                 if not model_path.exists():
                     self._emit(
                         "transcription_error",
@@ -222,7 +223,19 @@ class RecordingSession:
         try:
             # Lazy-load ASR model if warm load failed at startup
             if self._asr_model is None:
-                self._asr_model = create_local_model(settings)
+                logger.info("ASR model not loaded — attempting lazy recovery...")
+                try:
+                    self._asr_model = create_local_model(settings)
+                except Exception as model_err:
+                    logger.error("ASR model failed to load: %s", model_err)
+                    self._emit("engine_status", {"asr": "unavailable"})
+                    self._emit(
+                        "transcription_error",
+                        {
+                            "message": "Speech recognition model failed to load. Check GPU memory or switch to a smaller model in Settings.",
+                        },
+                    )
+                    return
 
             # Lazy-create the AudioPipeline (holds cached Silero VAD session)
             if self._audio_pipeline is None:

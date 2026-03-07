@@ -52,6 +52,24 @@ from src.provisioning.requirements import (
 class TestModelRegistry:
     """Catalog integrity and lookup behaviour."""
 
+    # --- Default model canaries (break if someone renames defaults) ---
+
+    def test_default_asr_model_exists(self):
+        """The settings default ASR model must exist in the catalog."""
+        assert "large-v3-turbo-int8" in ASR_MODELS
+        m = ASR_MODELS["large-v3-turbo-int8"]
+        assert isinstance(m, ASRModel)
+        assert m.tier == "fast"
+
+    def test_default_slm_model_exists(self):
+        """The settings default SLM model must exist in the catalog."""
+        assert "qwen4b" in SLM_MODELS
+        m = SLM_MODELS["qwen4b"]
+        assert isinstance(m, SLMModel)
+        assert m.quant == "int8"
+
+    # --- Catalog-wide checks ---
+
     def test_asr_catalog_not_empty(self):
         assert len(ASR_MODELS) > 0
 
@@ -69,30 +87,29 @@ class TestModelRegistry:
     def test_asr_models_have_required_fields(self):
         for model in ASR_MODELS.values():
             assert model.name
-            assert model.filename
             assert model.repo
+            assert model.model_file  # CT2 directory primary binary
             assert model.size_mb > 0
             assert model.tier in ("fast", "balanced", "quality")
 
     def test_slm_models_have_required_fields(self):
         for model in SLM_MODELS.values():
             assert model.name
-            assert model.filename
             assert model.repo
+            assert model.model_file  # CT2 directory primary binary
             assert model.size_mb > 0
             assert model.tier in ("fast", "balanced", "quality", "pro")
             assert model.quant  # non-empty quant string
 
-    def test_asr_filenames_are_ggml(self):
-        """ASR models must be GGML binaries."""
+    def test_asr_model_files_are_ct2(self):
+        """ASR CT2 models use model.bin as the primary binary."""
         for model in ASR_MODELS.values():
-            assert model.filename.startswith("ggml-"), model.filename
-            assert model.filename.endswith(".bin"), model.filename
+            assert model.model_file == "model.bin", model.model_file
 
-    def test_slm_filenames_are_gguf(self):
-        """SLM models must be GGUF files."""
+    def test_slm_model_files_are_ct2(self):
+        """SLM CT2 models use model.bin as the primary binary."""
         for model in SLM_MODELS.values():
-            assert model.filename.endswith(".gguf"), model.filename
+            assert model.model_file == "model.bin", model.model_file
 
     def test_get_asr_model_found(self):
         key = next(iter(ASR_MODELS))
@@ -124,22 +141,22 @@ class TestModelRegistry:
         for entry in catalog["asr"].values():
             assert isinstance(entry, dict)
             assert "id" in entry
-            assert "filename" in entry
+            assert "model_file" in entry
         for entry in catalog["slm"].values():
             assert isinstance(entry, dict)
             assert "id" in entry
-            assert "filename" in entry
+            assert "model_file" in entry
 
     def test_models_are_frozen(self):
         model = next(iter(ASR_MODELS.values()))
         with pytest.raises(AttributeError):
             model.name = "hacked"
 
-    def test_no_duplicate_filenames_within_type(self):
-        asr_filenames = [m.filename for m in ASR_MODELS.values()]
-        assert len(asr_filenames) == len(set(asr_filenames)), "Duplicate ASR filenames"
-        slm_filenames = [m.filename for m in SLM_MODELS.values()]
-        assert len(slm_filenames) == len(set(slm_filenames)), "Duplicate SLM filenames"
+    def test_no_duplicate_repos_within_type(self):
+        # Note: some CT2 ASR models may share a repo (e.g. turbo variants)
+        # so we just check SLM repos are unique
+        slm_repos = [m.repo for m in SLM_MODELS.values()]
+        assert len(slm_repos) == len(set(slm_repos)), "Duplicate SLM repos"
 
     def test_no_duplicate_repos_per_asr(self):
         """All ASR models currently come from the same repo — sanity check."""
@@ -152,24 +169,24 @@ class TestModelRegistry:
         assert sizes == sorted(sizes), "ASR models not in ascending size order"
 
     def test_asr_sha256_format(self):
-        """All ASR models must have valid 64-char hex SHA-256 hashes."""
+        """ASR models with sha256 set must have valid 64-char hex hashes."""
         import re
 
         for key, model in ASR_MODELS.items():
-            assert model.sha256 is not None, f"ASR model '{key}' missing sha256"
-            assert re.fullmatch(r"[0-9a-f]{64}", model.sha256), (
-                f"ASR model '{key}' has malformed sha256: {model.sha256!r}"
-            )
+            if model.sha256 is not None:
+                assert re.fullmatch(r"[0-9a-f]{64}", model.sha256), (
+                    f"ASR model '{key}' has malformed sha256: {model.sha256!r}"
+                )
 
     def test_slm_sha256_format(self):
-        """All SLM models must have valid 64-char hex SHA-256 hashes."""
+        """SLM models with sha256 set must have valid 64-char hex hashes."""
         import re
 
         for key, model in SLM_MODELS.items():
-            assert model.sha256 is not None, f"SLM model '{key}' missing sha256"
-            assert re.fullmatch(r"[0-9a-f]{64}", model.sha256), (
-                f"SLM model '{key}' has malformed sha256: {model.sha256!r}"
-            )
+            if model.sha256 is not None:
+                assert re.fullmatch(r"[0-9a-f]{64}", model.sha256), (
+                    f"SLM model '{key}' has malformed sha256: {model.sha256!r}"
+                )
 
     def test_vad_model_entry(self):
         """SILERO_VAD constant has required fields and valid sha256."""
@@ -432,46 +449,49 @@ class TestIntegrityVerification:
 
 
 class TestProvisionWrappers:
-    """Thin wrappers that delegate to download_model_file.
+    """Thin wrappers that delegate to download_model_directory/download_model_file.
 
     _verify_integrity is patched out because these tests focus on
     delegation behaviour, not SHA-256 verification (tested above).
-    The models in the registry now carry non-None sha256 values, so
-    without the patch the mock paths would trigger file-not-found.
+    ASR and SLM models now use snapshot_download() via download_model_directory().
+    VAD still uses hf_hub_download() via download_model_file().
     """
 
     HF_PATCH = "huggingface_hub.hf_hub_download"
+    SNAPSHOT_PATCH = "huggingface_hub.snapshot_download"
     VERIFY_PATCH = "src.provisioning.core._verify_integrity"
 
     @patch(VERIFY_PATCH)
-    @patch(HF_PATCH)
-    def test_provision_asr_delegates(self, mock_hf: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
+    @patch(SNAPSHOT_PATCH)
+    def test_provision_asr_delegates(self, mock_snapshot: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
         model = next(iter(ASR_MODELS.values()))
-        mock_hf.return_value = str(tmp_path / model.filename)
+        local_dir_name = model.repo.split("/")[-1]
+        expected_dir = tmp_path / local_dir_name
+        mock_snapshot.return_value = str(expected_dir)
 
         result = provision_asr_model(model, tmp_path)
 
-        mock_hf.assert_called_once_with(
+        mock_snapshot.assert_called_once_with(
             repo_id=model.repo,
-            filename=model.filename,
-            local_dir=str(tmp_path),
+            local_dir=str(expected_dir),
         )
-        assert result == tmp_path / model.filename
+        assert result == expected_dir
 
     @patch(VERIFY_PATCH)
-    @patch(HF_PATCH)
-    def test_provision_slm_delegates(self, mock_hf: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
+    @patch(SNAPSHOT_PATCH)
+    def test_provision_slm_delegates(self, mock_snapshot: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
         model = next(iter(SLM_MODELS.values()))
-        mock_hf.return_value = str(tmp_path / model.filename)
+        local_dir_name = model.repo.split("/")[-1]
+        expected_dir = tmp_path / local_dir_name
+        mock_snapshot.return_value = str(expected_dir)
 
         result = provision_slm_model(model, tmp_path)
 
-        mock_hf.assert_called_once_with(
+        mock_snapshot.assert_called_once_with(
             repo_id=model.repo,
-            filename=model.filename,
-            local_dir=str(tmp_path),
+            local_dir=str(expected_dir),
         )
-        assert result == tmp_path / model.filename
+        assert result == expected_dir
 
     @patch(VERIFY_PATCH)
     @patch(HF_PATCH)
@@ -488,10 +508,11 @@ class TestProvisionWrappers:
         assert result == tmp_path / SILERO_VAD.filename
 
     @patch(VERIFY_PATCH)
-    @patch(HF_PATCH)
-    def test_provision_asr_with_callback(self, mock_hf: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
+    @patch(SNAPSHOT_PATCH)
+    def test_provision_asr_with_callback(self, mock_snapshot: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
         model = next(iter(ASR_MODELS.values()))
-        mock_hf.return_value = str(tmp_path / model.filename)
+        local_dir_name = model.repo.split("/")[-1]
+        mock_snapshot.return_value = str(tmp_path / local_dir_name)
         cb = MagicMock()
 
         provision_asr_model(model, tmp_path, progress_callback=cb)
@@ -499,10 +520,11 @@ class TestProvisionWrappers:
         assert cb.call_count >= 2
 
     @patch(VERIFY_PATCH)
-    @patch(HF_PATCH)
-    def test_provision_slm_with_callback(self, mock_hf: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
+    @patch(SNAPSHOT_PATCH)
+    def test_provision_slm_with_callback(self, mock_snapshot: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
         model = next(iter(SLM_MODELS.values()))
-        mock_hf.return_value = str(tmp_path / model.filename)
+        local_dir_name = model.repo.split("/")[-1]
+        mock_snapshot.return_value = str(tmp_path / local_dir_name)
         cb = MagicMock()
 
         provision_slm_model(model, tmp_path, progress_callback=cb)
@@ -510,18 +532,18 @@ class TestProvisionWrappers:
         assert cb.call_count >= 2
 
     @patch(VERIFY_PATCH)
-    @patch(HF_PATCH)
-    def test_provision_asr_propagates_error(self, mock_hf: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
-        mock_hf.side_effect = Exception("fail")
+    @patch(SNAPSHOT_PATCH)
+    def test_provision_asr_propagates_error(self, mock_snapshot: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
+        mock_snapshot.side_effect = Exception("fail")
         model = next(iter(ASR_MODELS.values()))
 
         with pytest.raises(ProvisioningError):
             provision_asr_model(model, tmp_path)
 
     @patch(VERIFY_PATCH)
-    @patch(HF_PATCH)
-    def test_provision_slm_propagates_error(self, mock_hf: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
-        mock_hf.side_effect = Exception("fail")
+    @patch(SNAPSHOT_PATCH)
+    def test_provision_slm_propagates_error(self, mock_snapshot: MagicMock, _mock_verify: MagicMock, tmp_path: Path):
+        mock_snapshot.side_effect = Exception("fail")
         model = next(iter(SLM_MODELS.values()))
 
         with pytest.raises(ProvisioningError):
@@ -597,5 +619,5 @@ class TestRequirements:
 
     def test_required_dependencies_contains_core_packages(self):
         """Sanity check: key runtime deps are in the list."""
-        for pkg in ("pywhispercpp", "huggingface_hub", "numpy"):
+        for pkg in ("ctranslate2", "huggingface_hub", "numpy"):
             assert pkg in REQUIRED_DEPENDENCIES, f"Expected '{pkg}' in requirements"

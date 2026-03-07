@@ -8,6 +8,7 @@ code paths including background thread logic with mocked dependencies.
 from __future__ import annotations
 
 import threading
+from collections.abc import Generator
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -17,14 +18,13 @@ import pytest
 from src.database.db import TranscriptDB
 from src.services.slm_types import SLMState
 
-
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture()
-def db(tmp_path: Path) -> TranscriptDB:
+def db(tmp_path: Path) -> Generator[TranscriptDB, None, None]:
     database = TranscriptDB(db_path=tmp_path / "handler_test.db")
     yield database
     database.close()
@@ -419,14 +419,11 @@ class TestRecordingSessionLifecycle:
         assert session.thread is None
 
     def test_load_asr_model_success_emits_ready(self, events, tmp_path):
-        from src.core.settings import VociferousSettings
-
         session = self._make_session(events_list=events)
 
-        with patch("src.core.handlers.recording_handlers.RecordingSession._RecordingSession__class__", create=True):
-            with patch("src.services.transcription_service.create_local_model") as mock_create:
-                mock_create.return_value = MagicMock()
-                session.load_asr_model()
+        with patch("src.services.transcription_service.create_local_model") as mock_create:
+            mock_create.return_value = MagicMock()
+            session.load_asr_model()
 
         ready = _events_of(events, "engine_status")
         assert len(ready) == 1

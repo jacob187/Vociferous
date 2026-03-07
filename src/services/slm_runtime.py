@@ -1,9 +1,9 @@
 """
 SLM Runtime - Lightweight Inference Service.
 
-Manages the lifecycle of a GGUF-based refinement model:
-1. Loading an already provisioned GGUF model from disk.
-2. Running inference via RefinementEngine (llama-cpp-python).
+Manages the lifecycle of a CTranslate2 Generator-based refinement model:
+1. Loading an already provisioned CT2 model from disk.
+2. Running inference via RefinementEngine (ctranslate2 + tokenizers).
 3. Managing lifecycle (Enable/Disable/Unload).
 """
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class SLMRuntime:
     """
     Runtime service for Small Language Model refinement.
-    Assumes GGUF models are already provisioned in the cache.
+    Assumes CT2 model directories are already provisioned in the cache.
     """
 
     def __init__(
@@ -76,7 +76,7 @@ class SLMRuntime:
         self.state = SLMState.DISABLED
 
     def _load_model_task(self) -> None:
-        """Background task to load the GGUF model."""
+        """Background task to load the CT2 Generator model."""
         try:
             s = self._settings_provider()
             model_id = s.refinement.model_id
@@ -91,17 +91,19 @@ class SLMRuntime:
                 raise ValueError(f"Unknown SLM model_id: {model_id}")
 
             cache_dir = ResourceManager.get_user_cache_dir("models")
-            model_path = cache_dir / slm_model.filename
+            # CT2 models are directories named after the repo slug
+            local_dir_name = slm_model.repo.split("/")[-1]
+            model_dir = cache_dir / local_dir_name
 
-            if not model_path.exists():
+            if not (model_dir / slm_model.model_file).exists():
                 raise FileNotFoundError(
-                    f"GGUF model file not found: {model_path}. Please run provisioning to download the model."
+                    f"CT2 model directory not found: {model_dir}. Please run provisioning to download the model."
                 )
 
             if not RefinementEngine:
-                raise ImportError("RefinementEngine not available (llama-cpp-python missing).")
+                raise ImportError("RefinementEngine not available (ctranslate2 missing).")
 
-            logger.info("Loading SLM from %s...", model_path)
+            logger.info("Loading SLM from %s...", model_dir)
 
             # Build level data from settings
             levels: dict[int | str, dict[str, Any]] = {}
@@ -115,7 +117,7 @@ class SLMRuntime:
                 }
 
             self._engine = RefinementEngine(
-                model_path=model_path,
+                model_path=model_dir,
                 system_prompt=s.refinement.system_prompt,
                 invariants=s.refinement.invariants,
                 levels=levels,

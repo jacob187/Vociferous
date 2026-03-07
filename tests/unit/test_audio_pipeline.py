@@ -2,8 +2,10 @@
 Tests for the AudioPipeline preprocessing stages and VAD integration.
 
 Covers:
-  - Stage isolation: normalize, highpass, noise gate, extract speech
+  - Stage isolation: normalize, highpass, extract speech
   - VAD classify: mock ONNX session with Silero v5 contract
+  - Hysteresis: two-threshold state machine prevents mid-word cutoffs
+  - Inter-segment silence: low-level noise insertion between segments
   - Full pipeline: end-to-end with mocked VAD
   - Edge cases: empty, silence, single-chunk
 
@@ -116,29 +118,7 @@ class TestHighpass:
 
 
 # ======================================================================
-# Stage 4: Noise gate
-# ======================================================================
-
-
-class TestNoiseGate:
-    """Fine gate zeros frames below threshold while preserving speech."""
-
-    def test_very_quiet_frames_zeroed(self):
-        pipe = AudioPipeline()
-        # Signal well below gate threshold (-52 dBFS ≈ 0.0025 linear)
-        quiet = np.full(512, 0.0001, dtype=np.float32)
-        result = pipe._noise_gate(quiet)
-        assert np.allclose(result[:512], 0.0)
-
-    def test_loud_frames_preserved(self):
-        pipe = AudioPipeline()
-        loud = np.full(512, 0.1, dtype=np.float32)
-        result = pipe._noise_gate(loud)
-        assert np.array_equal(result[:512], loud[:512])
-
-
-# ======================================================================
-# Stage 5: VAD classification (mocked ONNX)
+# Stage 4: VAD classification (mocked ONNX)
 # ======================================================================
 
 
@@ -213,12 +193,12 @@ class TestVADClassify:
 
 
 # ======================================================================
-# Stage 6: Speech extraction
+# Stage 5: Speech extraction (hysteresis + asymmetric padding)
 # ======================================================================
 
 
 class TestExtractSpeech:
-    """_extract_speech segment detection and merging."""
+    """_extract_speech segment detection, hysteresis, merging, and silence insertion."""
 
     def test_all_speech_returns_full_audio(self):
         pipe = AudioPipeline()
@@ -242,24 +222,106 @@ class TestExtractSpeech:
         assert result is None
 
     def test_short_speech_filtered_out(self):
-        """Segments shorter than MIN_SPEECH_CHUNKS are discarded."""
+        """Segments shorter than MIN_SPEECH_CHUNKS (8) are discarded."""
         pipe = AudioPipeline()
-        n_chunks = 20
+        n_chunks = 40
         audio = np.random.randn(n_chunks * 512).astype(np.float32)
-        # Only 1 speech chunk — below MIN_SPEECH_CHUNKS (3)
-        probs = [0.1] * 9 + [0.9] + [0.1] * 10
+        # Only 5 speech chunks — below MIN_SPEECH_CHUNKS (8)
+        probs = [0.1] * 15 + [0.9] * 5 + [0.1] * 20
         result = pipe._extract_speech(audio, probs)
         assert result is None
 
+    def test_sufficient_speech_kept(self):
+        """Segments >= MIN_SPEECH_CHUNKS (8) are preserved."""
+        pipe = AudioPipeline()
+        n_chunks = 40
+        audio = np.random.randn(n_chunks * 512).astype(np.float32)
+        # 10 speech chunks — above MIN_SPEECH_CHUNKS (8)
+        probs = [0.1] * 10 + [0.9] * 10 + [0.1] * 20
+        result = pipe._extract_speech(audio, probs)
+        assert result is not None
+
     def test_gap_merging_preserves_pauses(self):
-        """Short silence gaps between speech segments get merged."""
+        """Short silence gaps between speech segments get merged.
+
+        With _MIN_SILENCE_CHUNKS=47, a gap of 20 chunks (~640ms) should
+        definitely be merged into a single segment.
+        """
+        pipe = AudioPipeline()
+        n_chunks = 80
+        audio = np.random.randn(n_chunks * 512).astype(np.float32)
+        # Speech — short gap (20 chunks < MIN_SILENCE_CHUNKS=47) — speech
+        probs = [0.9] * 10 + [0.1] * 20 + [0.9] * 10 + [0.1] * 40
+        result = pipe._extract_speech(audio, probs)
+        assert result is not None
+
+    def test_hysteresis_prevents_mid_word_cutoff(self):
+        """Probability dip between thresholds should NOT end speech segment.
+
+        A prob of 0.40 is below the entry threshold (0.45) but above the
+        exit threshold (0.35), so once in speech state it stays in speech.
+        """
         pipe = AudioPipeline()
         n_chunks = 30
         audio = np.random.randn(n_chunks * 512).astype(np.float32)
-        # Speech — short gap (< MIN_SILENCE_CHUNKS=12) — speech
-        probs = [0.9] * 5 + [0.1] * 5 + [0.9] * 5 + [0.1] * 15
+        # Clear speech → dip to 0.40 (above exit 0.35) → back to speech
+        probs = [0.9] * 10 + [0.40] * 5 + [0.9] * 10 + [0.1] * 5
         result = pipe._extract_speech(audio, probs)
         assert result is not None
+        # Should get ONE segment (hysteresis keeps it together)
+        # The 0.40 dip doesn't break it because it's above exit threshold
+
+    def test_hysteresis_allows_exit_below_exit_threshold(self):
+        """Prob below exit threshold (0.35) DOES end the speech segment."""
+        pipe = AudioPipeline()
+        n_chunks = 60
+        audio = np.random.randn(n_chunks * 512).astype(np.float32)
+        # Speech (10) → deep silence (0.2, below exit) → long silence
+        probs = [0.9] * 10 + [0.2] * 50
+        result = pipe._extract_speech(audio, probs)
+        assert result is not None  # 10 chunks >= MIN_SPEECH_CHUNKS (8)
+
+    def test_asymmetric_padding(self):
+        """Pre-roll (7 chunks) and post-roll (13 chunks) are different."""
+        pipe = AudioPipeline()
+        # Enough chunks that padding won't hit array boundaries
+        n_chunks = 60
+        audio = np.random.randn(n_chunks * 512).astype(np.float32)
+        # Speech in the middle: chunks 20-29 (10 chunks of speech)
+        probs = [0.1] * 20 + [0.9] * 10 + [0.1] * 30
+        result = pipe._extract_speech(audio, probs)
+        assert result is not None
+        # Expected: pre_pad=7, post_pad=13 → extract chunks 13-42
+        # That's 30 chunks × 512 = 15360 samples
+        expected_chunks = 10 + 7 + 13  # speech + pre + post
+        expected_samples = expected_chunks * 512
+        assert len(result) == expected_samples
+
+    def test_inter_segment_silence_inserted(self):
+        """When segments don't merge, low-level noise is inserted between them."""
+        pipe = AudioPipeline()
+        # Two speech segments with a huge gap (>= MIN_SILENCE_CHUNKS=47)
+        n_chunks = 120
+        audio = np.ones(n_chunks * 512, dtype=np.float32) * 0.1
+        probs = [0.9] * 10 + [0.1] * 50 + [0.9] * 10 + [0.1] * 50
+        result = pipe._extract_speech(audio, probs)
+        assert result is not None
+        # Should be longer than just the two speech segments because of
+        # the 300ms (~4800 samples) silence insert between them
+        silence_samples = int(300 * 16000 / 1000)
+        # Two segments with padding + silence insert
+        min_expected = (10 + 10) * 512 + silence_samples
+        assert len(result) > min_expected
+
+    def test_single_segment_no_silence_insert(self):
+        """Single segment should have no silence inserted."""
+        pipe = AudioPipeline()
+        n_chunks = 30
+        audio = np.random.randn(n_chunks * 512).astype(np.float32)
+        probs = [0.9] * 10 + [0.1] * 20
+        result = pipe._extract_speech(audio, probs)
+        assert result is not None
+        # No inter-segment silence for a single segment
 
 
 # ======================================================================

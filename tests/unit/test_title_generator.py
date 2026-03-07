@@ -8,6 +8,7 @@ and edge-case handling. Uses mock SLM runtime and in-memory DB.
 from __future__ import annotations
 
 import threading
+from collections.abc import Generator
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -19,14 +20,13 @@ from src.core.title_generator import TitleGenerator
 from src.database.db import TranscriptDB
 from src.services.slm_types import SLMState
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture()
-def db(tmp_path: Path) -> TranscriptDB:
+def db(tmp_path: Path) -> Generator[TranscriptDB, None, None]:
     database = TranscriptDB(db_path=tmp_path / "title_test.db")
     yield database
     database.close()

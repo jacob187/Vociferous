@@ -122,7 +122,7 @@ class TestIntentDispatchErrors:
         assert resp.status_code == 400
 
     def test_intent_with_extra_fields(self, api):
-        """Extra fields should be silently ignored or cause a 400."""
+        """Extra fields on a frozen dataclass intent → TypeError → 400."""
         client, coord, _ = api
         t = coord.db.add_transcript(raw_text="extra fields test", duration_ms=100)
 
@@ -134,8 +134,8 @@ class TestIntentDispatchErrors:
                 "extra_nonsense": "should_be_ignored",
             },
         )
-        # Either 201 (ignored) or 400 (strict) — both are acceptable
-        assert resp.status_code in (201, 400)
+        # Dataclass intents reject unknown kwargs → TypeError → 400
+        assert resp.status_code == 400
 
     def test_empty_json_body(self, api):
         """Empty JSON body should return 400."""
@@ -177,16 +177,16 @@ class TestTranscriptErrors:
         """GET transcript with negative id → 404."""
         client, _, _ = api
         resp = client.get("/api/transcripts/-1")
-        # Route may not match (invalid path) or return 404
-        assert resp.status_code in (404, 400)
+        assert resp.status_code == 404
 
     def test_delete_nonexistent_transcript(self, api):
-        """DELETE a non-existent transcript still returns 200."""
+        """DELETE a non-existent transcript → 200 but no event emitted."""
         client, coord, events = api
         resp = client.delete("/api/transcripts/99999")
         assert resp.status_code == 200
-        # The handler still dispatches (it doesn't check existence first)
         assert resp.json()["deleted"] is True
+        # Handler checks DB return — no event for ghost IDs
+        assert len(events.of_type("transcript_deleted")) == 0
 
     def test_search_empty_query(self, api):
         """Search with empty query should return results (match all)."""
@@ -238,17 +238,19 @@ class TestProjectErrors:
     """Error responses for project endpoints."""
 
     def test_create_project_missing_name(self, api):
-        """POST /api/projects without 'name' should fail."""
+        """POST /api/projects without 'name' → 400."""
         client, _, _ = api
         resp = client.post("/api/projects", json={"color": "#ff0000"})
-        assert resp.status_code in (400, 500)  # KeyError or validation
+        assert resp.status_code == 400
 
     def test_create_project_empty_name(self, api):
-        """Creating a project with empty name — implementation-dependent."""
+        """Creating a project with empty/whitespace name → 400."""
         client, coord, _ = api
         resp = client.post("/api/projects", json={"name": ""})
-        # This might succeed (empty string is valid) or fail
-        assert resp.status_code in (201, 200, 400)
+        assert resp.status_code == 400
+
+        resp2 = client.post("/api/projects", json={"name": "   "})
+        assert resp2.status_code == 400
 
     def test_delete_nonexistent_project(self, api):
         """DELETE a non-existent project — still returns 200."""
@@ -272,11 +274,11 @@ class TestConfigErrors:
         assert resp.status_code == 200
 
     def test_update_config_unknown_key(self, api):
-        """PUT /api/config with unknown top-level key."""
+        """PUT /api/config with unknown top-level key → 200 (silently dropped)."""
         client, _, _ = api
         resp = client.put("/api/config", json={"nonexistent_section": True})
-        # Should either ignore unknown keys or return error
-        assert resp.status_code in (200, 400, 500)
+        # Settings model uses extra="ignore" — unknown keys are silently dropped
+        assert resp.status_code == 200
 
     def test_get_config_returns_all_sections(self, api):
         """GET /api/config must include model, recording, refinement."""

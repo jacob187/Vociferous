@@ -6,6 +6,7 @@ Pure computation — real DB with known data, no mocks needed beyond the DB.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -13,14 +14,13 @@ import pytest
 from src.core.usage_stats import compute_usage_stats
 from src.database.db import TranscriptDB
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture()
-def db(tmp_path: Path) -> TranscriptDB:
+def db(tmp_path: Path) -> Generator[TranscriptDB, None, None]:
     database = TranscriptDB(db_path=tmp_path / "stats_test.db")
     yield database
     database.close()

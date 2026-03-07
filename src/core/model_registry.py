@@ -1,7 +1,8 @@
 """
-Model Registry — GGUF/GGML model catalog for Vociferous v4.0.
+Model Registry — CTranslate2 model catalog for Vociferous v5.0.
 
-Replaces CTranslate2 repo references with direct GGUF/GGML URLs.
+All ASR models are CTranslate2-format Whisper directories (faster-whisper compatible).
+All SLM models are CTranslate2-format Generator directories.
 """
 
 from __future__ import annotations
@@ -11,28 +12,31 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class ASRModel:
-    """A whisper.cpp GGML model entry."""
+    """A CTranslate2 Whisper model entry (directory-based)."""
 
     id: str
     name: str
-    filename: str
     repo: str
     size_mb: int
     tier: str  # fast, balanced, quality
+    # The primary model binary inside the CT2 directory, used for
+    # existence checks. For CT2 Whisper this is always "model.bin".
+    model_file: str = "model.bin"
     sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class SLMModel:
-    """A llama.cpp GGUF model entry."""
+    """A CTranslate2 Generator model entry (directory-based)."""
 
     id: str
     name: str
-    filename: str
     repo: str
     size_mb: int
     tier: str  # fast, balanced, quality, pro
     quant: str
+    # The primary model binary inside the CT2 directory.
+    model_file: str = "model.bin"
     sha256: str | None = None
 
 
@@ -48,80 +52,71 @@ class VADModel:
     sha256: str | None = None
 
 
-# --- ASR Models (whisper.cpp GGML) ---
+# --- ASR Models (CTranslate2 Whisper — faster-whisper compatible) ---
+#
+# These are pre-converted CT2 directories downloaded via snapshot_download().
+# The repo IS the model directory — no single-file download needed.
 
 ASR_MODELS: dict[str, ASRModel] = {
-    "large-v3-turbo-q5_0": ASRModel(
-        id="large-v3-turbo-q5_0",
-        name="Whisper Large v3 Turbo (Q5)",
-        filename="ggml-large-v3-turbo-q5_0.bin",
-        repo="ggerganov/whisper.cpp",
-        size_mb=547,
+    "large-v3-turbo-int8": ASRModel(
+        id="large-v3-turbo-int8",
+        name="Whisper Large v3 Turbo (INT8)",
+        repo="Zoont/faster-whisper-large-v3-turbo-int8-ct2",
+        size_mb=780,
         tier="fast",
-        sha256="394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
     ),
     "large-v3-turbo": ASRModel(
         id="large-v3-turbo",
         name="Whisper Large v3 Turbo",
-        filename="ggml-large-v3-turbo.bin",
-        repo="ggerganov/whisper.cpp",
-        size_mb=1500,
+        repo="deepdml/faster-whisper-large-v3-turbo-ct2",
+        size_mb=1547,
         tier="balanced",
-        sha256="1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69",
     ),
     "large-v3": ASRModel(
         id="large-v3",
         name="Whisper Large v3",
-        filename="ggml-large-v3.bin",
-        repo="ggerganov/whisper.cpp",
-        size_mb=3100,
+        repo="Systran/faster-whisper-large-v3",
+        size_mb=2948,
         tier="quality",
-        sha256="64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2",
     ),
 }
 
-# --- SLM Models (llama.cpp GGUF) ---
+# --- SLM Models (CTranslate2 Generator — Qwen3) ---
+#
+# Pre-converted CT2 directories. Downloaded via snapshot_download().
 
 SLM_MODELS: dict[str, SLMModel] = {
     "qwen1.7b": SLMModel(
         id="qwen1.7b",
         name="Qwen3 1.7B",
-        filename="Qwen3-1.7B-Q8_0.gguf",
-        repo="Qwen/Qwen3-1.7B-GGUF",
-        size_mb=1800,
+        repo="jncraton/Qwen3-1.7B-ct2-int8",
+        size_mb=1661,
         tier="fast",
-        quant="Q8_0",
-        sha256="061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+        quant="int8",
     ),
     "qwen4b": SLMModel(
         id="qwen4b",
         name="Qwen3 4B",
-        filename="Qwen3-4B-Q4_K_M.gguf",
-        repo="Qwen/Qwen3-4B-GGUF",
-        size_mb=2500,
+        repo="jncraton/Qwen3-4B-ct2-int8",
+        size_mb=3858,
         tier="balanced",
-        quant="Q4_K_M",
-        sha256="7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+        quant="int8",
     ),
     "qwen8b": SLMModel(
         id="qwen8b",
         name="Qwen3 8B",
-        filename="Qwen3-8B-Q4_K_M.gguf",
-        repo="Qwen/Qwen3-8B-GGUF",
-        size_mb=5030,
+        repo="ctranslate2-4you/Qwen3-8B-ct2-AWQ",
+        size_mb=5835,
         tier="quality",
-        quant="Q4_K_M",
-        sha256="d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        quant="awq",
     ),
     "qwen14b": SLMModel(
         id="qwen14b",
         name="Qwen3 14B",
-        filename="Qwen3-14B-Q4_K_M.gguf",
-        repo="Qwen/Qwen3-14B-GGUF",
-        size_mb=8500,
+        repo="ctranslate2-4you/Qwen3-14B-ct2-AWQ",
+        size_mb=9534,
         tier="pro",
-        quant="Q4_K_M",
-        sha256="500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0",
+        quant="awq",
     ),
 }
 

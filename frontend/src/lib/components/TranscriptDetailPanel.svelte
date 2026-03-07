@@ -32,11 +32,21 @@
     let retitling = $state(false);
     let copied = $state(false);
 
-    /* Reset transient state when the displayed entry changes */
+    /* Reset transient state only when navigating to a DIFFERENT transcript (ID changes).
+     * Refreshing the same entry via WebSocket (new object, same ID) must NOT cancel
+     * any in-progress title edit. */
+    let _lastEntryId: number | null = null;
     $effect(() => {
-        void entry.id;
-        editingTitle = false;
-        copied = false;
+        const id = entry.id;
+        if (_lastEntryId === null) {
+            _lastEntryId = id;
+            return;
+        }
+        if (id !== _lastEntryId) {
+            _lastEntryId = id;
+            editingTitle = false;
+            copied = false;
+        }
     });
 
     /* ===== Derived ===== */

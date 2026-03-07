@@ -1,7 +1,7 @@
 """
 Refinement Engine unit tests.
 
-Tests the pure logic without loading an actual GGUF model:
+Tests the pure logic without loading an actual CT2 model:
 - Output parsing (_parse_output): think blocks, leak tokens, edge cases
 - Prompt formatting (_format_prompt): level selection, invariants, user instructions
 - Dynamic token calculation (_calculate_dynamic_max_tokens)
@@ -26,7 +26,7 @@ def _make_engine(
     """
     Create a RefinementEngine instance without loading a model.
 
-    Bypasses __init__ (which requires a real GGUF file) and sets
+    Bypasses __init__ (which requires a real CT2 directory) and sets
     only the attributes needed for prompt/output logic.
     """
     engine = object.__new__(RefinementEngine)
@@ -55,7 +55,12 @@ def _make_engine(
             "directive": "Clear and neutral.",
         },
     }
-    engine.llm = None
+    # CT2 engine attributes (not used by pure-logic tests)
+    engine.generator = None
+    engine.tokenizer = None
+    engine._end_tokens = []
+    engine._im_end_id = None
+    engine._eos_id = None
     return engine
 
 

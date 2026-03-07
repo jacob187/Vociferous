@@ -149,8 +149,29 @@ class LogManager:
             console_handler.setFormatter(formatter)
             root_logger.addHandler(console_handler)
 
+        # Silence chatty third-party loggers that are not useful at INFO level.
+        # httpx logs every HTTP request; huggingface_hub logs each file HEAD/GET
+        # during snapshot_download(). Both are noise unless actively debugging.
+        for noisy_logger in (
+            "httpx",
+            "httpcore",
+            "huggingface_hub.utils._http",
+            "huggingface_hub.file_download",
+            "huggingface_hub.repocard",
+        ):
+            logging.getLogger(noisy_logger).setLevel(logging.WARNING)
+
         logger.info(f"LogManager initialized. Level: {log_level}, Structured: {structured}")
         logger.info(f"Log file: {LOG_FILE}")
+
+    def set_console_level(self, level: int) -> None:
+        """Override the console handler's log level (e.g. for --verbose flag)."""
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, RotatingFileHandler):
+                handler.setLevel(level)
+                logger.debug("Console log level set to %s", logging.getLevelName(level))
+                return
 
     def log_exception(
         self,

@@ -6,10 +6,11 @@ import importlib.util
 import sys
 from typing import List, Tuple
 
-# Core runtime dependencies (v4.0 — GGUF/GGML stack)
+# Core runtime dependencies (v5.0 — CTranslate2 stack)
 REQUIRED_DEPENDENCIES = [
-    "pywhispercpp",
-    "llama_cpp",
+    "ctranslate2",
+    "faster_whisper",
+    "tokenizers",
     "numpy",
     "sounddevice",
     "onnxruntime",

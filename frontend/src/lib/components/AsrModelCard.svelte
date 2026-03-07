@@ -135,7 +135,7 @@
                     {/if}
                 </div>
                 <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] italic">
-                    ASR GPU acceleration requires pywhispercpp compiled with GGML_CUDA=1.
+                    ASR GPU acceleration requires CTranslate2 with CUDA support.
                 </span>
                 {#if health.gpu?.whisper_backends && health.gpu.whisper_backends !== "unavailable"}
                     <button
@@ -179,8 +179,8 @@
                     />
                 </div>
                 <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] italic"
-                    >Preference for ASR backend selection. Requires engine restart after saving; if unsupported by your
-                    whisper build, automatic fallback is used.</span
+                    >Preference for ASR backend selection. Requires engine restart after saving; CTranslate2
+                    automatically detects CUDA availability.</span
                 >
             </div>
         </div>
@@ -204,8 +204,8 @@
                     }}
                 />
                 <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] italic"
-                    >CPU threads for whisper.cpp inference. Used when running on CPU paths. Default 4. Higher values use
-                    more cores but may improve speed.</span
+                    >CPU threads for CTranslate2 Whisper inference. Used when running on CPU paths. Default 4. Higher
+                    values use more cores but may improve speed.</span
                 >
             </div>
         </div>

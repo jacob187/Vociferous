@@ -200,7 +200,7 @@ export function updateConfig(updates: Record<string, unknown>): Promise<Record<s
 export interface ModelInfo {
     id: string;
     name: string;
-    filename: string;
+    model_file: string;
     repo: string;
     size_mb: number;
     tier: string;

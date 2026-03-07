@@ -32,18 +32,26 @@ class ModelSettings(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    model: str = "large-v3-turbo-q5_0"
-    device: str = "auto"  # Legacy field — GPU is compile-time for whisper.cpp
+    model: str = "large-v3-turbo-int8"
+    device: str = "auto"  # faster-whisper resolves device at model load time
     language: str = "en"
     n_threads: int = 4
-    # Stylistic anchor for the Whisper decoder.  This text is prepended to
-    # the decoder's token context before each chunk.  At higher temperatures
-    # (triggered by Whisper's quality-based fallback), punctuation and
-    # capitalisation degrade because they aren't acoustically encoded — the
-    # model learned them from training transcripts.  A well-punctuated prompt
-    # biases every decoding pass, including fallback passes, toward properly
-    # formatted output.  Empty string disables the prompt entirely.
-    initial_prompt: str = "Hello. This is a voice transcription."
+    # Stylistic anchor for the CTranslate2 Whisper decoder.  This text is
+    # tokenized and passed as prompt tokens before each audio chunk.
+    # Combined with condition_on_previous_text=False, this prompt becomes
+    # the ONLY context for EVERY chunk — preventing autoregressive drift
+    # into "no-punctuation mode" while blocking the hallucination feedback
+    # loop.  The prompt must demonstrate the desired formatting: proper
+    # capitalization, varied punctuation marks, and natural sentence
+    # structure.  Empty string disables the prompt entirely (NOT recommended).
+    #
+    # CTranslate2 Whisper handles prompt tokens safely via deep-copy to
+    # std::vector<int> — no dangling pointer issues.
+    initial_prompt: str = (
+        "Hello, welcome. This is a properly punctuated and capitalized "
+        "transcription. The speaker is clear, and the text should include "
+        "commas, periods, and question marks where appropriate."
+    )
 
 
 class RecordingSettings(BaseModel):
@@ -130,8 +138,8 @@ class RefinementSettings(BaseModel):
 
     enabled: bool = True
     model_id: str = "qwen14b"
-    n_gpu_layers: int = -1  # -1 = offload all layers to GPU, 0 = CPU only
-    n_ctx: int = 32768  # Context window size for llama.cpp (Qwen3 trains at 40960)
+    n_gpu_layers: int = -1  # -1 = full GPU (CT2 device="cuda"), 0 = CPU only
+    n_ctx: int = 32768  # Context window size (preserved for backward compat; CT2 uses model config)
     system_prompt: str = "You are a professional editor and proofreader."
     invariants: list[str] = Field(
         default_factory=lambda: [
@@ -244,6 +252,7 @@ class VociferousSettings(BaseSettings):
     model_config = {
         "env_prefix": "VOCIFEROUS_",
         "env_nested_delimiter": "__",
+        "extra": "ignore",  # silently drop unknown keys from old settings files on load
     }
 
 

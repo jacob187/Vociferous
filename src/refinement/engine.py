@@ -1,8 +1,9 @@
 """
-Refinement Engine using llama-cpp-python (llama.cpp).
+Refinement Engine using CTranslate2 Generator.
 
-Wraps a GGUF model to provide a simple refine() interface for text cleanup.
-Uses instruction-following (ChatML) prompting with layered enforcement.
+Wraps a CTranslate2-format model to provide a simple refine() interface for
+text cleanup. Uses instruction-following (ChatML) prompting with layered
+enforcement. Tokenization is handled by the HuggingFace `tokenizers` library.
 """
 
 import logging
@@ -25,9 +26,10 @@ class GenerationResult:
 
 class RefinementEngine:
     """
-    Refinement Engine using llama-cpp-python.
+    Refinement Engine using CTranslate2 Generator.
 
-    Loads a GGUF model and provides refine/generate_custom interfaces.
+    Loads a CT2-format model and provides refine/generate_custom interfaces.
+    Tokenization uses the HuggingFace `tokenizers` library (Rust-based, no PyTorch).
     """
 
     # Constants for dynamic scaling
@@ -35,9 +37,6 @@ class RefinementEngine:
     MIN_PADDING_TOKENS = 150
     SCALING_FACTOR = 0.5
     # Fixed thinking budget: reserved exclusively for <think> reasoning overhead.
-    # This is separate from the output budget so thinking never cannibalizes the
-    # final answer.  2048 tokens ≈ ~1500 words of internal reasoning — enough for
-    # Qwen3 to think through even complex multi-sentence transcripts.
     THINKING_BUDGET_TOKENS = 2048
 
     def __init__(
@@ -53,32 +52,53 @@ class RefinementEngine:
         Initialize the Refinement engine.
 
         Args:
-            model_path: Path to the GGUF model file.
+            model_path: Path to the CT2 model directory.
             system_prompt: Fallback system identity.
             invariants: Global rules prepended to every prompt.
             levels: Layered definitions for refinement levels (0-4).
-            n_gpu_layers: GPU layers to offload (-1 = all, 0 = CPU only).
-            n_ctx: Context window size.
+            n_gpu_layers: GPU layers to offload (-1 = all/cuda, 0 = CPU only).
+            n_ctx: Context window size (preserved for API compat; CT2 uses model config).
         """
-        from llama_cpp import Llama
+        import ctranslate2
+        from tokenizers import Tokenizer
 
         model_path = Path(model_path)
         if not model_path.exists():
-            raise FileNotFoundError(f"Model file not found: {model_path}")
+            raise FileNotFoundError(f"Model directory not found: {model_path}")
 
         self.system_prompt = system_prompt
         self.invariants = invariants or []
         self.levels = levels or {}
 
-        logger.info("Loading GGUF model from %s...", model_path)
+        # Map n_gpu_layers to CT2 device
+        if n_gpu_layers == 0:
+            ct2_device = "cpu"
+        else:
+            try:
+                ct2_device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
+            except Exception:
+                ct2_device = "cpu"
+
+        logger.info("Loading CT2 Generator model from %s (device=%s)...", model_path, ct2_device)
         start_time = time.perf_counter()
 
-        self.llm = Llama(
-            model_path=str(model_path),
-            n_gpu_layers=n_gpu_layers,
-            n_ctx=n_ctx,
-            verbose=False,
+        self.generator = ctranslate2.Generator(
+            str(model_path),
+            device=ct2_device,
         )
+
+        # Load tokenizer from the model directory
+        tokenizer_path = model_path / "tokenizer.json"
+        if not tokenizer_path.exists():
+            raise FileNotFoundError(
+                f"tokenizer.json not found in {model_path}. CT2 model directories must include the tokenizer."
+            )
+        self.tokenizer = Tokenizer.from_file(str(tokenizer_path))
+
+        # Pre-resolve special token IDs for stop conditions
+        self._im_end_id = self.tokenizer.token_to_id("<|im_end|>")
+        self._eos_id = self.tokenizer.token_to_id("<|endoftext|>")
+        self._end_tokens = [tid for tid in [self._im_end_id, self._eos_id] if tid is not None]
 
         load_time = time.perf_counter() - start_time
         logger.info("Refinement Engine loaded in %.2fs", load_time)
@@ -86,17 +106,13 @@ class RefinementEngine:
     def _calculate_dynamic_max_tokens(self, input_token_count: int, use_thinking: bool = False) -> int:
         """Calculate max new tokens, keeping thinking budget separate from output budget.
 
-        llama.cpp's max_tokens is a single pool covering ALL generated tokens —
-        thinking blocks AND the final answer.  To prevent the model's reasoning
-        from cannibalizing the output, we allocate budgets independently:
+        CTranslate2's max_length applies to ALL generated tokens — thinking
+        blocks AND the final answer.  To prevent the model's reasoning from
+        cannibalizing the output, we allocate budgets independently:
 
             output_budget  = input_tokens + padding  (scales with text length)
             thinking_budget = THINKING_BUDGET_TOKENS  (fixed, thinking mode only)
             total           = output_budget + thinking_budget
-
-        The thinking budget is a fixed constant so shorter inputs still get the
-        full reasoning room they need.  The <think> blocks are stripped by
-        _parse_output() before the text reaches the user.
         """
         base_count = max(1, input_token_count)
         output_budget = base_count + max(self.MIN_PADDING_TOKENS, int(base_count * self.SCALING_FACTOR))
@@ -259,6 +275,20 @@ Text:
             {"role": "user", "content": user_content},
         ]
 
+    def _messages_to_chatml(self, messages: list[dict[str, str]]) -> str:
+        """Convert a list of chat messages to a ChatML-formatted string.
+
+        CTranslate2 Generator works at the token level — no built-in chat
+        template support.  We apply the ChatML template ourselves, then
+        tokenize, then generate.
+        """
+        parts: list[str] = []
+        for msg in messages:
+            parts.append(f"<|im_start|>{msg['role']}\n{msg['content']}<|im_end|>")
+        # Add the assistant turn start so the model knows to generate the response
+        parts.append("<|im_start|>assistant\n")
+        return "\n".join(parts)
+
     def refine(
         self,
         text: str,
@@ -287,29 +317,37 @@ Text:
 
         messages = self._format_prompt(text, user_instructions, use_thinking=use_thinking)
 
-        # Estimate input tokens for dynamic max calculation
-        prompt_text = " ".join(m["content"] for m in messages)
-        input_count = len(prompt_text.split()) * 2  # rough estimate
-        max_new_tokens = self._calculate_dynamic_max_tokens(input_count, use_thinking=use_thinking)
+        # Tokenize the ChatML-formatted prompt
+        chatml_string = self._messages_to_chatml(messages)
+        encoded = self.tokenizer.encode(chatml_string)
+        prompt_tokens = encoded.tokens  # CT2 generate_batch() expects List[str], not int IDs
+
+        # Calculate dynamic max tokens based on input size
+        max_new_tokens = self._calculate_dynamic_max_tokens(len(prompt_tokens), use_thinking=use_thinking)
 
         logger.debug(
-            "Refining ~%d estimated tokens (thinking=%s) with limit of %d new tokens.",
-            input_count,
+            "Refining %d prompt tokens (thinking=%s) with limit of %d new tokens.",
+            len(prompt_tokens),
             use_thinking,
             max_new_tokens,
         )
 
-        response = self.llm.create_chat_completion(
-            messages=messages,  # type: ignore[arg-type]
-            max_tokens=max_new_tokens,
-            temperature=max(temperature, 0.01),  # llama.cpp needs >0
-            top_p=top_p,
-            top_k=top_k,
-            repeat_penalty=1.0,
-            stop=["<|im_end|>", "<|endoftext|>"],
+        # CT2 needs temperature > 0 for sampling
+        effective_temp = max(temperature, 0.01)
+
+        results = self.generator.generate_batch(
+            [prompt_tokens],
+            max_length=max_new_tokens,
+            sampling_temperature=effective_temp,
+            sampling_topp=top_p,
+            sampling_topk=top_k,
+            repetition_penalty=1.0,
+            end_token=self._end_tokens,
+            include_prompt_in_result=False,
         )
 
-        output_text = response["choices"][0]["message"]["content"]  # type: ignore[index]
+        output_ids = results[0].sequences_ids[0]
+        output_text = self.tokenizer.decode(output_ids)
         result = self._parse_output(output_text)
 
         # Fallback: if model emitted only <think> reasoning with no final content,
@@ -347,13 +385,21 @@ Text:
             {"role": "user", "content": f"/no_think\n\n{user_prompt}"},
         ]
 
-        response = self.llm.create_chat_completion(
-            messages=messages,  # type: ignore[arg-type]
-            max_tokens=max_tokens,
-            temperature=max(temperature, 0.01),
-            top_k=50 if temperature > 0 else 1,
-            stop=["<|im_end|>", "<|endoftext|>"],
+        chatml_string = self._messages_to_chatml(messages)
+        encoded = self.tokenizer.encode(chatml_string)
+        prompt_tokens = encoded.tokens  # CT2 generate_batch() expects List[str], not int IDs
+
+        effective_temp = max(temperature, 0.01)
+
+        results = self.generator.generate_batch(
+            [prompt_tokens],
+            max_length=max_tokens,
+            sampling_temperature=effective_temp,
+            sampling_topk=50 if temperature > 0 else 1,
+            end_token=self._end_tokens,
+            include_prompt_in_result=False,
         )
 
-        output_text = response["choices"][0]["message"]["content"]  # type: ignore[index]
+        output_ids = results[0].sequences_ids[0]
+        output_text = self.tokenizer.decode(output_ids)
         return self._parse_output(output_text)

@@ -1,8 +1,7 @@
 """
 Vociferous Model Provisioning CLI.
 
-v4.0: Downloads pre-quantized GGUF/GGML models directly from HuggingFace.
-No more CTranslate2 conversion pipeline.
+v5.0: Downloads pre-converted CTranslate2 model directories from HuggingFace.
 """
 
 import logging
@@ -43,20 +42,22 @@ def list_models():
     cache_dir = _get_cache_dir()
     print(f"\nModel Directory: {cache_dir}\n")
 
-    print("=== ASR Models (whisper.cpp GGML) ===")
+    print("=== ASR Models (CTranslate2 Whisper) ===")
     print(f"{'ID':<25} {'Name':<30} {'Size':<10} {'Status':<10}")
     print("-" * 75)
     for model_id, model in ASR_MODELS.items():
-        path = cache_dir / model.filename
-        status = "INSTALLED" if path.exists() else "MISSING"
+        local_dir_name = model.repo.split("/")[-1]
+        model_dir = cache_dir / local_dir_name
+        status = "INSTALLED" if (model_dir / model.model_file).exists() else "MISSING"
         print(f"{model_id:<25} {model.name:<30} {model.size_mb}MB{'':<5} {status:<10}")
 
-    print("\n=== SLM Models (llama.cpp GGUF) ===")
+    print("\n=== SLM Models (CTranslate2 Generator) ===")
     print(f"{'ID':<25} {'Name':<30} {'Size':<10} {'Status':<10}")
     print("-" * 75)
     for model_id, model in SLM_MODELS.items():
-        path = cache_dir / model.filename
-        status = "INSTALLED" if path.exists() else "MISSING"
+        local_dir_name = model.repo.split("/")[-1]
+        model_dir = cache_dir / local_dir_name
+        status = "INSTALLED" if (model_dir / model.model_file).exists() else "MISSING"
         print(f"{model_id:<25} {model.name:<30} {model.size_mb}MB{'':<5} {status:<10}")
 
     print("\n=== VAD Models (ONNX) ===")
@@ -89,7 +90,7 @@ def check():
 
 @app.command()
 def install(
-    model_id: str = typer.Argument(..., help="ID of the model to install (e.g., large-v3-turbo-q5_0, qwen4b)"),
+    model_id: str = typer.Argument(..., help="ID of the model to install (e.g., large-v3-turbo-int8, qwen4b)"),
     force: bool = typer.Option(False, "--force", "-f", help="Re-download even if already present"),
 ):
     """Download and install a specific model."""
@@ -111,16 +112,18 @@ def install(
 
     try:
         if asr_model:
-            target = cache_dir / asr_model.filename
+            local_dir_name = asr_model.repo.split("/")[-1]
+            target = cache_dir / local_dir_name / asr_model.model_file
             if target.exists() and not force:
-                logger.info("Model '%s' already installed at %s", model_id, target)
+                logger.info("Model '%s' already installed at %s", model_id, target.parent)
                 logger.info("Use --force to re-download.")
                 return
             provision_asr_model(asr_model, cache_dir, progress_callback=on_progress)
         elif slm_model:
-            target = cache_dir / slm_model.filename
+            local_dir_name = slm_model.repo.split("/")[-1]
+            target = cache_dir / local_dir_name / slm_model.model_file
             if target.exists() and not force:
-                logger.info("Model '%s' already installed at %s", model_id, target)
+                logger.info("Model '%s' already installed at %s", model_id, target.parent)
                 logger.info("Use --force to re-download.")
                 return
             provision_slm_model(slm_model, cache_dir, progress_callback=on_progress)

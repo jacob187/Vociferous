@@ -35,8 +35,8 @@ class ApplicationCoordinator:
     - Settings (already initialized before construction)
     - Database
     - CommandBus + EventBus
-    - Transcription model (pywhispercpp)
-    - SLM runtime (llama-cpp-python refinement)
+    - Transcription model (CTranslate2 Whisper)
+    - SLM runtime (CTranslate2 Generator refinement)
     - Audio service
     - Input handler
     - Litestar API server
@@ -85,7 +85,7 @@ class ApplicationCoordinator:
         7. Start API server (background thread)
         8. Open pywebview window (blocks until closed)
         """
-        logger.info("Starting Vociferous v4.4...")
+        logger.info("Starting Vociferous v5.0...")
 
         # 1. Database
         from src.database.db import TranscriptDB
@@ -93,10 +93,7 @@ class ApplicationCoordinator:
         self.db = TranscriptDB()
         logger.info("Database initialized (%d transcripts)", self.db.transcript_count())
 
-        # 2. Recording session (created here; ASR model loaded AFTER SLM init
-        #    to guarantee llama_cpp is imported before pywhispercpp — both bundle
-        #    private libggml.so copies and whisper's ggml CUDA init corrupts global
-        #    state that llama.cpp then walks into if it loads second).
+        # 2. Recording session (created here; ASR model loaded after SLM init).
         from src.core.handlers.recording_handlers import RecordingSession
 
         self.recording_session = RecordingSession(
@@ -110,10 +107,7 @@ class ApplicationCoordinator:
             title_generator_provider=lambda: self.title_generator,
         )
 
-        # 3. SLM runtime — MUST come before load_asr_model() so that llama_cpp
-        #    is imported (and its libggml.so resolved) before pywhispercpp's
-        #    ggml_cuda_init() runs.  The pre-import below is synchronous so the
-        #    ordering is guaranteed even though the actual model load is async.
+        # 3. SLM runtime (CTranslate2 Generator).
         self._init_slm_runtime()
 
         # 3b. Insight manager (lazy background SLM insight for idle screen)
@@ -125,7 +119,7 @@ class ApplicationCoordinator:
         # 3d. Title generator (auto-title transcripts via SLM)
         self._init_title_generator()
 
-        # 3e. Load ASR model — AFTER llama_cpp has been imported above.
+        # 3e. Load ASR model (CTranslate2 Whisper).
         self.recording_session.load_asr_model()
 
         # 4. Audio service with event callbacks
@@ -232,23 +226,7 @@ class ApplicationCoordinator:
     # --- Service Initialization ---
 
     def _init_slm_runtime(self) -> None:
-        """Initialize the SLM refinement runtime if enabled.
-
-        IMPORTANT: This method must be called before load_asr_model().
-        Both llama-cpp-python and pywhispercpp bundle private copies of libggml.
-        The library whose ggml_cuda_init() runs FIRST wins the global CUDA
-        allocator state; if whisper's ggml runs first, llama's subsequent init
-        segfaults.  Pre-importing llama_cpp here (synchronously, in the main
-        thread) before pywhispercpp is ever touched guarantees the correct order.
-        """
-        # Pre-import llama_cpp synchronously so its libggml.so is resolved in the
-        # dynamic linker BEFORE pywhispercpp's libggml.so ever loads.  The actual
-        # model weights are still loaded asynchronously via enable() below.
-        try:
-            import llama_cpp as _llama_cpp_preload  # noqa: F401
-        except ImportError:
-            pass  # llama-cpp-python not installed; SLM will be unavailable
-
+        """Initialize the SLM refinement runtime if enabled."""
         try:
             from src.services.slm_runtime import SLMRuntime
 
@@ -615,7 +593,7 @@ class ApplicationCoordinator:
                 return
 
             try:
-                config = uvicorn.Config(app, log_level="warning")
+                config = uvicorn.Config(app, log_level="warning", log_config=None)
                 server = uvicorn.Server(config)
                 self._uvicorn_server = server
                 # Pass our pre-bound socket; uvicorn skips its own bind.

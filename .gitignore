@@ -83,9 +83,7 @@ __pypackages__/
 # Docs: Generated or Non-Source Material
 # =========================
 
-docs/agent_reports/
-docs/wiki/phase2/
-old-vociferous/
+docs/agent_resources/
 
 # =========================
 # Tests: Generated Artifacts

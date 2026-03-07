@@ -1,8 +1,8 @@
 """
-Transcription module using pywhispercpp (whisper.cpp).
+Transcription module using faster-whisper (CTranslate2 Whisper backend).
 
-Provides speech-to-text via OpenAI Whisper GGML models loaded through
-the whisper.cpp C++ library with Python bindings.
+Provides speech-to-text via OpenAI Whisper models loaded through
+the faster-whisper library, which wraps CTranslate2 for inference.
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import re
 import time
-from inspect import signature
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -30,128 +29,66 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_model_path(settings: VociferousSettings) -> Path:
-    """Resolve the filesystem path to the currently configured GGML model file."""
+    """Resolve the filesystem path to the currently configured CT2 Whisper model directory."""
     model_id = settings.model.model
     asr_model = get_asr_model(model_id)
 
     if asr_model is None:
         # Fallback to default
-        model_id = "large-v3-turbo-q5_0"
+        model_id = "large-v3-turbo-int8"
         asr_model = ASR_MODELS[model_id]
 
     cache_dir = ResourceManager.get_user_cache_dir("models")
-    model_path = cache_dir / asr_model.filename
+    # CT2 models are directories named after the repo slug
+    local_dir_name = asr_model.repo.split("/")[-1]
+    model_dir = cache_dir / local_dir_name
 
-    if not model_path.exists():
-        raise EngineError(f"ASR model file not found: {model_path}. Run provisioning to download '{model_id}'.")
+    if not (model_dir / asr_model.model_file).exists():
+        raise EngineError(f"ASR model directory not found: {model_dir}. Run provisioning to download '{model_id}'.")
 
-    return model_path
+    return model_dir
 
 
 def create_local_model(settings: VociferousSettings):
     """
-    Create and return a pywhispercpp Model instance.
+    Create and return a faster-whisper WhisperModel instance.
 
-    Loads the GGML model file from the cache directory.
+    Loads the CTranslate2-format model directory from the cache.
+    faster-whisper wraps ctranslate2 and provides the full transcription
+    pipeline: audio preprocessing, tokenization, and segment extraction.
     """
-    from pywhispercpp.model import Model
+    from faster_whisper import WhisperModel
 
-    model_path = _resolve_model_path(settings)
+    model_dir = _resolve_model_path(settings)
     n_threads = settings.model.n_threads
     device_pref = (settings.model.device or "auto").strip().lower()
+
+    # Map device preference to faster-whisper device string
+    if device_pref == "gpu":
+        fw_device = "cuda"
+    elif device_pref == "cpu":
+        fw_device = "cpu"
+    else:
+        fw_device = "auto"
+
     logger.info(
-        "Loading whisper.cpp model from %s (n_threads=%d, device=%s)...",
-        model_path,
+        "Loading faster-whisper model from %s (cpu_threads=%d, device=%s)...",
+        model_dir,
         n_threads,
-        device_pref,
+        fw_device,
     )
 
     start = time.perf_counter()
 
     try:
-        init_kwargs: dict[str, object] = {
-            "n_threads": n_threads,
-            "print_realtime": False,
-            "print_progress": False,
-            # ── Anti-hallucination / anti-repetition settings ──
-            # Reduce max context tokens fed back to decoder. Default 16384
-            # causes the model to fixate on its own prior output and loop.
-            # 64 retains enough context for coherent output without looping.
-            "n_max_text_ctx": 64,
-            # Raise entropy threshold so repetitive/low-entropy segments get
-            # rejected and re-sampled at higher temperature (default 2.4).
-            "entropy_thold": 2.8,
-            # ── Break the feedback loop ──
-            # Prevent the decoder from using its own prior output as context
-            # for subsequent 30-second chunks. This is THE critical defense:
-            # without it, hallucinated text on a silent chunk gets fed back
-            # as prompt for the next chunk, priming the decoder to repeat
-            # the same garbage. For a dictation app, cross-chunk context
-            # coherence is not worth the catastrophic failure mode.
-            "no_context": True,
-            # Lower no-speech threshold (default 0.6). Segments where
-            # whisper's own model thinks prob(no_speech) > 0.5 get
-            # suppressed at the decoder level — before they ever become text.
-            "no_speech_thold": 0.5,
-        }
-
-        # params_sampling_strategy is a named __init__ arg, not a **params kwarg.
-        # 1 = BEAM_SEARCH — better decoding quality than greedy.
-        constructor_kwargs: dict[str, object] = {
-            "params_sampling_strategy": 1,
-        }
-
-        # beam_search config — only meaningful with beam search strategy.
-        whisper_params: dict[str, object] = {
-            "beam_search": {"beam_size": 5, "patience": -1.0},
-        }
-
-        try:
-            supported_kwargs = set(signature(Model.__init__).parameters.keys())
-        except Exception:
-            supported_kwargs = set()
-
-        if device_pref in {"cpu", "gpu"} and supported_kwargs:
-            if device_pref == "cpu" and "no_gpu" in supported_kwargs:
-                init_kwargs["no_gpu"] = True
-            elif device_pref == "gpu" and "use_gpu" in supported_kwargs:
-                init_kwargs["use_gpu"] = True
-            elif device_pref == "gpu" and "no_gpu" in supported_kwargs:
-                init_kwargs["no_gpu"] = False
-            else:
-                logger.info(
-                    "Device preference '%s' requested but pywhispercpp does not expose a matching init flag; using default backend selection.",
-                    device_pref,
-                )
-
-        # Merge constructor-level args (positional/keyword params of __init__)
-        # and whisper params (**params kwargs) into init_kwargs.
-        # Only include constructor kwargs the signature actually accepts.
-        for k, v in constructor_kwargs.items():
-            if k in supported_kwargs:
-                init_kwargs[k] = v
-            else:
-                logger.debug("Skipping unsupported constructor arg: %s", k)
-
-        # Whisper params go through _set_params → setattr on the C struct.
-        # Probe each one against the PARAMS_SCHEMA and skip if the C binding
-        # doesn't actually expose the attribute (schema/binding mismatches).
-        try:
-            from pywhispercpp.constants import PARAMS_SCHEMA
-
-            valid_params = set(PARAMS_SCHEMA.keys())
-        except Exception:
-            valid_params = set()
-
-        for k, v in whisper_params.items():
-            if not valid_params or k in valid_params:
-                init_kwargs[k] = v
-            else:
-                logger.debug("Skipping unsupported whisper param: %s", k)
-
-        model = Model(str(model_path), **init_kwargs)
+        model = WhisperModel(
+            str(model_dir),
+            device=fw_device,
+            cpu_threads=n_threads,
+            local_files_only=True,
+        )
     except Exception as e:
-        raise EngineError(f"Failed to load whisper.cpp model: {e}") from e
+        raise EngineError(f"Failed to load faster-whisper model: {e}") from e
 
     elapsed = time.perf_counter() - start
     logger.info("Whisper model loaded in %.2fs", elapsed)
@@ -166,15 +103,15 @@ def transcribe(
     audio_pipeline: AudioPipeline | None = None,
 ) -> tuple[str, int]:
     """
-    Transcribe audio data to text using pywhispercpp.
+    Transcribe audio data to text using faster-whisper (CTranslate2 backend).
 
-    Runs the AudioPipeline (normalize → highpass → gate → Silero VAD) to
-    strip silence and extract speech, then feeds clean float32 to whisper.
+    Runs the AudioPipeline (normalize → highpass → Silero VAD) to
+    strip silence and extract speech, then feeds clean float32 to Whisper.
 
     Args:
         audio_data: Raw audio samples (int16, 16kHz mono).
         settings: Current application settings.
-        local_model: A pywhispercpp.Model instance (created if None).
+        local_model: A faster_whisper.WhisperModel instance (created if None).
         audio_pipeline: Reusable AudioPipeline instance (created if None).
 
     Returns:
@@ -189,9 +126,6 @@ def transcribe(
     language = settings.model.language or "en"
 
     # ── Audio pre-processing: Silero VAD pipeline ──
-    # Replace the old four-function gauntlet (leading trim, internal strip,
-    # trailing trim, silence guard) with a single neural VAD pass that
-    # produces clean float32 speech or None.
     if audio_pipeline is None:
         from src.services.audio_pipeline import AudioPipeline
 
@@ -203,7 +137,6 @@ def transcribe(
         logger.info("AudioPipeline detected no speech; skipping transcription")
         return "", 0
 
-    # Pipeline already returns float32 in [-1, 1] — feed directly to whisper
     try:
         audio_float: NDArray[np.float32] = clean_audio
 
@@ -216,29 +149,42 @@ def transcribe(
             estimated_audio_seconds,
         )
 
-        # pywhispercpp transcribe returns a list of Segment objects.
-        # NOTE: initial_prompt is intentionally NOT passed here.
-        # pywhispercpp 1.4.1 has a dangling pointer bug: _set_params() stores a
-        # raw const char* to the Python str's internal buffer, but that object
-        # may be GC'd before whisper_full() dereferences the pointer → SIGSEGV.
-        # The setting is preserved in ModelSettings for future use once the
-        # pywhispercpp binding is fixed upstream.
-        transcribe_kwargs: dict[str, object] = {"language": language}
+        # Flush the log so we know exactly how far we got if something crashes.
+        for handler in logging.getLogger().handlers:
+            handler.flush()
 
-        segments = local_model.transcribe(audio_float, **transcribe_kwargs)
+        # ── faster-whisper inference ──
+        initial_prompt = settings.model.initial_prompt or None
 
-        transcription = _merge_segment_texts([seg.text for seg in segments])
+        segments_iter, info = local_model.transcribe(
+            audio_float,
+            language=language,
+            initial_prompt=initial_prompt,
+            beam_size=5,
+            patience=1.0,
+            repetition_penalty=1.0,
+            no_speech_threshold=0.5,
+            condition_on_previous_text=False,
+        )
 
-        # Compute speech duration from segment timestamps.
-        # Segment.t0 and .t1 are in centiseconds (10ms units).
-        if segments:
-            speech_duration_ms = int(segments[-1].t1 * 10) - int(segments[0].t0 * 10)
-        else:
-            speech_duration_ms = 0
+        # Consume the segment iterator and extract text
+        segment_texts: list[str] = []
+        total_duration_ms = 0
+        for seg in segments_iter:
+            segment_texts.append(seg.text)
+            total_duration_ms = int(seg.end * 1000)
+
+        transcription = _merge_segment_texts(segment_texts)
+
+        # Compute speech duration from the last segment end
+        speech_duration_ms = total_duration_ms if total_duration_ms > 0 else 0
 
         elapsed = time.perf_counter() - start
         logger.info(
-            "Transcription completed in %.2fs (%d segments, speech=%dms)", elapsed, len(segments), speech_duration_ms
+            "Transcription completed in %.2fs (%d segments, speech=%dms)",
+            elapsed,
+            len(segment_texts),
+            speech_duration_ms,
         )
 
         return post_process_transcription(transcription, settings), speech_duration_ms

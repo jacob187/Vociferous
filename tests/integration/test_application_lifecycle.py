@@ -120,6 +120,7 @@ class TestHandlerRegistration:
         """Every intent defined in the coordinator must have a handler."""
         from src.core.intents.definitions import (
             AssignProjectIntent,
+            BatchRetitleIntent,
             BeginRecordingIntent,
             CancelRecordingIntent,
             ClearTranscriptsIntent,
@@ -131,6 +132,7 @@ class TestHandlerRegistration:
             RefineTranscriptIntent,
             RenameTranscriptIntent,
             RestartEngineIntent,
+            RetitleTranscriptIntent,
             StopRecordingIntent,
             ToggleRecordingIntent,
             UpdateConfigIntent,
@@ -154,6 +156,8 @@ class TestHandlerRegistration:
             AssignProjectIntent,
             UpdateConfigIntent,
             RestartEngineIntent,
+            BatchRetitleIntent,
+            RetitleTranscriptIntent,
         ]
 
         for intent_cls in expected_intents:

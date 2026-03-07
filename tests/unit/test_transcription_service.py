@@ -1,63 +1,12 @@
-"""Tests for transcription service post-processing and audio pipeline stages."""
+"""Tests for transcription service post-processing and transcribe()."""
+
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
-from src.core.settings import get_settings
-from src.services.audio_pipeline import AudioPipeline
-from src.services.transcription_service import _merge_segment_texts, post_process_transcription
-
-
-class TestAudioPipelineStages:
-    """Unit tests for AudioPipeline pre-processing stages (no ONNX model needed)."""
-
-    def test_dead_silence_returns_none(self):
-        """Pipeline.process short-circuits on all-zero audio."""
-        pipeline = AudioPipeline(sample_rate=16000)
-        audio = np.zeros(16000, dtype=np.int16)
-        result = pipeline.process(audio)
-        assert result is None
-
-    def test_empty_audio_returns_none(self):
-        pipeline = AudioPipeline(sample_rate=16000)
-        audio = np.array([], dtype=np.int16)
-        result = pipeline.process(audio)
-        assert result is None
-
-    def test_rms_normalize_scales_quiet_audio(self):
-        pipeline = AudioPipeline(sample_rate=16000)
-        quiet = np.full(1000, 10, dtype=np.float32) / 32768.0  # very quiet
-        normalised = pipeline._rms_normalize(quiet)
-        new_rms = float(np.sqrt(np.mean(normalised**2)))
-        assert new_rms > float(np.sqrt(np.mean(quiet**2)))
-
-    def test_rms_normalize_clamps_gain(self):
-        """Gain is clamped to 10× — near-silent audio doesn't explode."""
-        pipeline = AudioPipeline(sample_rate=16000)
-        near_zero = np.full(1000, 1e-6, dtype=np.float32)
-        normalised = pipeline._rms_normalize(near_zero)
-        assert np.all(np.abs(normalised) <= 1.0)
-
-    def test_highpass_removes_dc_offset(self):
-        pipeline = AudioPipeline(sample_rate=16000)
-        # DC offset + a 440Hz tone
-        t = np.linspace(0, 1.0, 16000, endpoint=False, dtype=np.float32)
-        signal = 0.3 + 0.1 * np.sin(2 * np.pi * 440 * t)
-        filtered = pipeline._highpass(signal.astype(np.float32))
-        # DC component should be attenuated significantly
-        assert abs(float(np.mean(filtered[1000:]))) < 0.05
-
-    def test_noise_gate_zeros_quiet_frames(self):
-        pipeline = AudioPipeline(sample_rate=16000)
-        # One chunk of silence, one chunk of speech-level signal
-        chunk = AudioPipeline._CHUNK_SIZE
-        silence = np.full(chunk, 1e-5, dtype=np.float32)
-        speech = np.full(chunk, 0.1, dtype=np.float32)
-        audio = np.concatenate([silence, speech])
-        gated = pipeline._noise_gate(audio)
-        # First chunk should be zeroed, second should survive
-        assert float(np.max(np.abs(gated[:chunk]))) == 0.0
-        assert float(np.max(np.abs(gated[chunk:]))) > 0.0
+from src.core.settings import ModelSettings, get_settings
+from src.services.transcription_service import _merge_segment_texts, post_process_transcription, transcribe
 
 
 class TestPostProcessTranscription:
@@ -189,3 +138,62 @@ class TestPostProcessTranscription:
         once = post_process_transcription(raw, get_settings())
         twice = post_process_transcription(once, get_settings())
         assert once == twice
+
+
+# ── transcribe() kwarg verification ───────────────────────────────────────
+# faster-whisper (CTranslate2 backend): initial_prompt is now SAFE.
+# These tests verify the faster-whisper inference path passes the right parameters.
+
+
+class TestTranscribeKwargs:
+    """Verify transcribe() passes the correct kwargs to the faster-whisper model."""
+
+    @staticmethod
+    def _make_fake_model(text: str = "Hello world.") -> MagicMock:
+        """Return a mock faster-whisper WhisperModel that yields one segment."""
+        seg = MagicMock()
+        seg.text = text
+        seg.start = 0.0
+        seg.end = 1.0
+        info = MagicMock()
+        model = MagicMock()
+        model.transcribe.return_value = (iter([seg]), info)
+        return model
+
+    @staticmethod
+    def _make_fake_pipeline() -> MagicMock:
+        """Return a mock AudioPipeline that passes audio through."""
+        pipeline = MagicMock()
+        # process() must return valid float32 audio, not None
+        pipeline.process.side_effect = lambda audio, **kw: audio.astype(np.float32)
+        return pipeline
+
+    def test_initial_prompt_is_passed(self, fresh_settings):
+        """initial_prompt IS now passed (faster-whisper has no SIGSEGV bug)."""
+        model = self._make_fake_model()
+        pipeline = self._make_fake_pipeline()
+        audio = np.zeros(16000, dtype=np.int16)
+
+        transcribe(audio, fresh_settings, local_model=model, audio_pipeline=pipeline)
+
+        model.transcribe.assert_called_once()
+        _, kwargs = model.transcribe.call_args
+        assert "initial_prompt" in kwargs
+        assert kwargs["initial_prompt"] is not None
+
+    def test_language_always_passed(self, fresh_settings):
+        """Language kwarg is always present in faster-whisper transcribe() call."""
+        model = self._make_fake_model()
+        pipeline = self._make_fake_pipeline()
+        audio = np.zeros(16000, dtype=np.int16)
+
+        transcribe(audio, fresh_settings, local_model=model, audio_pipeline=pipeline)
+
+        _, kwargs = model.transcribe.call_args
+        assert kwargs["language"] == fresh_settings.model.language
+
+    def test_default_prompt_preserved_in_settings(self):
+        """Default initial_prompt still defined in settings."""
+        defaults = ModelSettings()
+        prompt = defaults.initial_prompt
+        assert len(prompt) > 20, "Prompt should be set for CTranslate2 quality"

@@ -87,18 +87,12 @@ echo "=========================================="
 echo "Installing dependencies"
 echo "=========================================="
 
-# GPU/CUDA Detection for Linux
+# Install dependencies via uv (CTranslate2/faster-whisper ship pre-built wheels with CUDA support)
 cd "$PROJECT_DIR"
+uv sync
 
 if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
-    echo "NVIDIA GPU detected. Enabling CUDA build flags."
-    echo "Building with CUDA support (this may take a few minutes)..."
-    # First sync all deps from lockfile
-    uv sync
-    # Then rebuild CUDA-critical packages from source with CUDA flags
-    CMAKE_ARGS="-DGGML_CUDA=on" uv pip install --reinstall --no-binary pywhispercpp,llama-cpp-python pywhispercpp llama-cpp-python
-else
-    uv sync
+    echo "✓ NVIDIA GPU detected — CUDA acceleration available via CTranslate2"
 fi
 echo "✓ Dependencies installed"
 
@@ -113,7 +107,7 @@ echo "=========================================="
 
 DEPS_OK=true
 
-for module in pywhispercpp webview sounddevice pydantic litestar llama_cpp; do
+for module in ctranslate2 faster_whisper tokenizers webview sounddevice pydantic litestar; do
     if "$VENV_PYTHON" -c "import $module" 2>/dev/null; then
         echo "✓ $module is available"
     else

@@ -1,8 +1,8 @@
 """
-Model Provisioning Core — Download GGUF/GGML models from HuggingFace.
+Model Provisioning Core — Download CTranslate2 model directories from HuggingFace.
 
-v4.0: No more CTranslate2 conversion pipeline. Models are pre-quantized
-GGUF/GGML files downloaded directly from HuggingFace repos.
+v5.0: CT2 models are directories (model.bin + config.json + tokenizer files).
+ASR and SLM provisioning uses snapshot_download(). VAD stays as single-file.
 """
 
 import hashlib
@@ -59,9 +59,11 @@ def download_model_file(
     """
     Download a single model file from a HuggingFace repository.
 
+    Used for VAD (ONNX single-file models). CT2 models use download_model_directory().
+
     Args:
-        repo_id: HuggingFace repo (e.g. 'ggerganov/whisper.cpp').
-        filename: File to download (e.g. 'ggml-large-v3-turbo-q5_0.bin').
+        repo_id: HuggingFace repo (e.g. 'deepghs/silero-vad-onnx').
+        filename: File to download (e.g. 'silero_vad.onnx').
         target_dir: Local directory for the downloaded file.
         progress_callback: Status callback (called with message strings).
         expected_sha256: If provided, verify the file after download.
@@ -107,22 +109,90 @@ def download_model_file(
         raise ProvisioningError(f"Failed to download {filename} from {repo_id}: {e}") from e
 
 
+def download_model_directory(
+    repo_id: str,
+    target_dir: Path,
+    progress_callback: ProgressCallback | None = None,
+    expected_sha256: str | None = None,
+    model_file: str = "model.bin",
+) -> Path:
+    """
+    Download a CTranslate2 model directory from a HuggingFace repository.
+
+    CT2 models are directories containing model.bin, config.json, tokenizer files, etc.
+    Uses snapshot_download() to fetch the entire repo as a local directory.
+
+    Args:
+        repo_id: HuggingFace repo (e.g. 'Systran/faster-whisper-large-v3').
+        target_dir: Parent directory where the model dir will be created.
+        progress_callback: Status callback (called with message strings).
+        expected_sha256: If provided, verify model.bin after download.
+        model_file: Name of the primary model binary for verification (default: 'model.bin').
+
+    Returns:
+        Path to the downloaded model directory.
+
+    Raises:
+        ProvisioningError: On download failure.
+        IntegrityError: On SHA-256 mismatch.
+    """
+    from huggingface_hub import snapshot_download
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    # Use the repo name (after '/') as the local directory name
+    local_dir_name = repo_id.split("/")[-1]
+    local_dir = target_dir / local_dir_name
+
+    if progress_callback:
+        progress_callback(f"Downloading CT2 model from {repo_id}...")
+
+    try:
+        downloaded_path = snapshot_download(
+            repo_id=repo_id,
+            local_dir=str(local_dir),
+        )
+        result = Path(downloaded_path)
+        logger.info("Downloaded CT2 model directory %s -> %s", repo_id, result)
+
+        # --- SHA-256 integrity check on the primary model binary ---
+        if expected_sha256:
+            model_bin = result / model_file
+            if model_bin.exists():
+                if progress_callback:
+                    progress_callback(f"Verifying integrity of {model_file}...")
+                _verify_integrity(model_bin, expected_sha256)
+                logger.info("SHA-256 verified for %s/%s", repo_id, model_file)
+            else:
+                logger.warning("Model file %s not found in %s — skipping SHA-256 check", model_file, result)
+
+        if progress_callback:
+            progress_callback(f"Downloaded {repo_id} successfully.")
+
+        return result
+
+    except IntegrityError:
+        raise
+    except Exception as e:
+        raise ProvisioningError(f"Failed to download CT2 model from {repo_id}: {e}") from e
+
+
 def provision_asr_model(
     model: ASRModel,
     cache_dir: Path,
     progress_callback: ProgressCallback | None = None,
 ) -> Path:
     """
-    Provision an ASR (whisper.cpp) model.
+    Provision an ASR (CTranslate2 Whisper) model.
 
-    Downloads the GGML file from the model's HuggingFace repo.
+    Downloads the CT2 model directory from the model's HuggingFace repo.
     """
-    return download_model_file(
+    return download_model_directory(
         repo_id=model.repo,
-        filename=model.filename,
         target_dir=cache_dir,
         progress_callback=progress_callback,
         expected_sha256=model.sha256,
+        model_file=model.model_file,
     )
 
 
@@ -132,16 +202,16 @@ def provision_slm_model(
     progress_callback: ProgressCallback | None = None,
 ) -> Path:
     """
-    Provision an SLM (llama.cpp) model.
+    Provision an SLM (CTranslate2 Generator) model.
 
-    Downloads the GGUF file from the model's HuggingFace repo.
+    Downloads the CT2 model directory from the model's HuggingFace repo.
     """
-    return download_model_file(
+    return download_model_directory(
         repo_id=model.repo,
-        filename=model.filename,
         target_dir=cache_dir,
         progress_callback=progress_callback,
         expected_sha256=model.sha256,
+        model_file=model.model_file,
     )
 
 

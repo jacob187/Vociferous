@@ -107,7 +107,7 @@ echo "Verifying critical dependencies"
 echo "=========================================="
 
 DEPS_OK=true
-for module in pywhispercpp webview sounddevice pydantic litestar llama_cpp; do
+for module in ctranslate2 faster_whisper tokenizers webview sounddevice pydantic litestar; do
     if "$VENV_PYTHON" -c "import $module" 2>/dev/null; then
         echo "✓ $module"
     else
@@ -134,7 +134,7 @@ echo "=========================================="
 ARCH=$(uname -m)
 if [[ "$ARCH" == "arm64" ]]; then
     echo "✓ Apple Silicon detected — Metal acceleration available"
-    echo "  llama.cpp and whisper.cpp will use Metal by default"
+    echo "  CTranslate2 will use Metal acceleration by default"
 else
     echo "ℹ Intel Mac detected — CPU inference only"
     echo "  (NVIDIA eGPU with CUDA is not supported on macOS)"

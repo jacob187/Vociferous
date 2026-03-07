@@ -5,11 +5,16 @@ Starts Litestar API server + pywebview native window.
 Replaces PyQt6 QApplication bootstrap.
 """
 
+import faulthandler
 import logging
 import os
 import signal
 import sys
 import tempfile
+
+# Enable faulthandler EARLY so SIGSEGV in C extensions prints a Python
+# traceback instead of a silent "Segmentation fault" exit.
+faulthandler.enable()
 
 logger = logging.getLogger(__name__)
 
@@ -178,10 +183,24 @@ def _release_lock() -> None:
 
 
 def main() -> int:
-    # 1. Logging (basic — LogManager will enhance later)
+    # 0. Parse startup flags
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Vociferous — Speech to Text")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable verbose (DEBUG-level) console logging",
+    )
+    args = parser.parse_args()
+
+    # 1. Logging
     from src.core.log_manager import setup_logging
 
-    setup_logging()
+    log_manager = setup_logging()
+    if args.verbose:
+        log_manager.set_console_level(logging.DEBUG)
 
     # 2. Single instance check
     if not _acquire_lock():

@@ -36,8 +36,8 @@ Core stack:
 * **Frontend**: Svelte 5 + Tailwind CSS v4 + Vite
 * **Backend API**: Litestar (REST + WebSocket)
 * **Core Logic**: Python 3.12+ (Command Bus, Application Coordinator)
-* **ASR Runtime**: In-process background thread using `pywhispercpp` (whisper.cpp Python bindings)
-* **SLM**: In-process background thread using `llama-cpp-python`
+* **ASR Runtime**: In-process background thread using `faster-whisper` (CTranslate2 Whisper backend)
+* **SLM**: In-process background thread using `ctranslate2` Generator + `tokenizers`
 
 The project is actively developed and maintained by a **single primary developer**. All workflow rules are calibrated accordingly.
 
@@ -65,8 +65,8 @@ State changes must follow this path:
 
 * **GTK/Main Thread**: Runs `pywebview`. **Zero blocking operations allowed here.**
 * **API Thread**: Runs `Litestar` (async).
-* **Recording Thread**: Audio capture + ASR inference via `pywhispercpp` (in-process, background thread).
-* **SLM Thread**: Text refinement runs in a background `Thread` via `llama-cpp-python`.
+* **Recording Thread**: Audio capture + ASR inference via `faster-whisper` / CTranslate2 (in-process, background thread).
+* **SLM Thread**: Text refinement runs in a background `Thread` via `ctranslate2` Generator.
 
 ### 3.4 Persistence Model
 

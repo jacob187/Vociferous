@@ -413,8 +413,8 @@
                 <p
                     class="text-[var(--text-sm)] text-[var(--text-tertiary)] text-center leading-[var(--leading-relaxed)] max-w-[520px] m-0"
                 >
-                    Powered by whisper.cpp and GGUF language models. Fully local, privacy-first speech-to-text that runs
-                    entirely on your machine. No cloud, no data collection, no internet.
+                    Powered by CTranslate2 language models. Fully local, privacy-first speech-to-text that runs entirely
+                    on your machine. No cloud, no data collection, no internet.
                 </p>
 
                 {#if healthInfo}
