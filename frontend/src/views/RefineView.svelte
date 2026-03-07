@@ -388,7 +388,7 @@
                     </div>
                 {:else if refinedText}
                     <WorkspacePanel>
-                        <MarkdownBody text={refinedText} class="text-[var(--text-sm)] text-[var(--text-primary)]" />
+                        <MarkdownBody text={refinedText} className="text-[var(--text-sm)] text-[var(--text-primary)]" />
                     </WorkspacePanel>
                 {:else}
                     <div

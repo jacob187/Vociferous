@@ -13,10 +13,10 @@
 
     interface Props {
         text: string;
-        class?: string;
+        className?: string;
     }
 
-    let { text, class: className = "" }: Props = $props();
+    let { text, className = "" }: Props = $props();
 
     // marked config: no async, no mangle, GFM enabled (tables, strikethrough, etc.)
     marked.use({ async: false, gfm: true, breaks: true });

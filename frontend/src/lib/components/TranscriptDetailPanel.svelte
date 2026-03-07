@@ -189,7 +189,7 @@
     <div class="overflow-hidden flex flex-col relative group flex-1 min-h-[80px]">
         <WorkspacePanel>
             <div class="overflow-y-auto h-full">
-                <MarkdownBody text={displayText} class="text-base text-[var(--text-primary)]" />
+                <MarkdownBody text={displayText} className="text-base text-[var(--text-primary)]" />
             </div>
         </WorkspacePanel>
     </div>
@@ -217,7 +217,7 @@
                             <X size={12} />
                         </button>
                     </div>
-                    <MarkdownBody text={variant.text} class="text-sm text-[var(--text-secondary)]" />
+                    <MarkdownBody text={variant.text} className="text-sm text-[var(--text-secondary)]" />
                 </div>
             {/each}
         </div>

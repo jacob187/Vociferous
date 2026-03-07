@@ -21,30 +21,25 @@
         title?: string;
     }
 
-    let { entries, title = "Recent Activity" }: Props = $props();
+    let { entries, title = "Activity Heatmap" }: Props = $props();
 
     /* ── Layout constants ── */
-    const TARGET_CELL = 16;
+    const TARGET_CELL = 18;
     const CELL_MIN = 12;
-    const CELL_MAX = 22;
+    const CELL_MAX = 28;
     const CELL_GAP = 3;
     const MONTH_GAP = 10;
     const DIVIDER_W = 1;
     const LABEL_W = 36;
     const MONTH_LABEL_H = 22;
-    const FONT = "11px";
+    const FONT = "12px";
+    const TITLE_FONT = "13px";
     const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
     /* ── Colors ── */
     const EMPTY_COLOR = "var(--surface-tertiary)";
     const BLACKOUT_COLOR = "var(--gray-9)";
-    const LEVEL_COLORS = [
-        EMPTY_COLOR,
-        "var(--blue-8)",
-        "var(--blue-6)",
-        "var(--blue-4)",
-        "var(--blue-3)",
-    ];
+    const LEVEL_COLORS = [EMPTY_COLOR, "var(--blue-8)", "var(--blue-6)", "var(--blue-4)", "var(--blue-3)"];
 
     /* ── Resize tracking ── */
     let containerEl: HTMLDivElement | undefined = $state();
@@ -66,24 +61,10 @@
             const raw = e.created_at ?? e.timestamp;
             if (!raw) continue;
             const key = new Date(raw).toLocaleDateString("sv");
-            const w = (e.text || (e as any).normalized_text || "")
-                .split(/\s+/)
-                .filter(Boolean).length;
+            const w = (e.text || (e as any).normalized_text || "").split(/\s+/).filter(Boolean).length;
             map.set(key, (map.get(key) ?? 0) + w);
         }
         return map;
-    });
-
-    /* ── Find first transcript date ── */
-    let firstDate = $derived.by(() => {
-        let min: Date | null = null;
-        for (const e of entries) {
-            const raw = e.created_at ?? e.timestamp;
-            if (!raw) continue;
-            const d = new Date(raw);
-            if (!min || d < min) min = d;
-        }
-        return min;
     });
 
     /* ── Summary stats ── */
@@ -161,11 +142,6 @@
         return [at(0.25), at(0.5), at(0.75)];
     }
 
-    /* ── Iterating months ── */
-    function nextMonth(y: number, m: number): [number, number] {
-        return m === 11 ? [y + 1, 0] : [y, m + 1];
-    }
-
     /* Width of a month section at a given cell size */
     function sectionWidth(numCols: number, cs: number): number {
         return numCols * (cs + CELL_GAP) - CELL_GAP;
@@ -175,40 +151,29 @@
     interface GridLayout {
         blocks: MonthBlock[];
         cellSize: number;
+        gridWidth: number;
     }
 
     let layout = $derived.by((): GridLayout | null => {
-        if (containerWidth < 150 || !firstDate) return null;
+        if (containerWidth < 150 || entries.length === 0) return null;
 
         const today = new Date();
         today.setHours(23, 59, 59, 999);
         const q = computeThresholds(dailyWords);
 
-        const startY = firstDate.getFullYear();
-        const startM = firstDate.getMonth();
-        const curY = today.getFullYear();
+        const year = today.getFullYear();
         const curM = today.getMonth();
 
-        // Build mandatory months: first transcript → current
+        // Mandatory months: Jan → current month of this year
         const mandatoryKeys: [number, number][] = [];
-        {
-            let y = startY,
-                m = startM;
-            while (y < curY || (y === curY && m <= curM)) {
-                mandatoryKeys.push([y, m]);
-                [y, m] = nextMonth(y, m);
-            }
-        }
-
-        // Mandatory column count (to check if they fit)
-        const mandatoryCols = mandatoryKeys.map(([y, m]) => {
-            const dow = (new Date(y, m, 1).getDay() + 6) % 7;
-            return Math.ceil((dow + daysInMonth(y, m)) / 7);
-        });
+        for (let m = 0; m <= curM; m++) mandatoryKeys.push([year, m]);
 
         const availableW = containerWidth - LABEL_W;
 
-        // Compute total width for a set of column counts at a given cell size
+        function colCount(y: number, m: number): number {
+            return Math.ceil((((new Date(y, m, 1).getDay() + 6) % 7) + daysInMonth(y, m)) / 7);
+        }
+
         function totalW(colCounts: number[], cs: number): number {
             let w = 0;
             for (let i = 0; i < colCounts.length; i++) {
@@ -218,44 +183,50 @@
             return w;
         }
 
-        // Start with target cell size — can we fit mandatory months?
+        const mandatoryCols = mandatoryKeys.map(([y, m]) => colCount(y, m));
+
+        // Find the largest cell size where all mandatory months fit;
+        // if even CELL_MIN is too wide, trim oldest mandatory months from left.
         let cellSize = TARGET_CELL;
-        if (totalW(mandatoryCols, cellSize) > availableW) {
+        let trimmedKeys = [...mandatoryKeys];
+        let trimmedCols = [...mandatoryCols];
+
+        if (totalW(trimmedCols, cellSize) > availableW) {
+            // Try shrinking cell size first
             for (let cs = cellSize - 1; cs >= CELL_MIN; cs--) {
-                if (totalW(mandatoryCols, cs) <= availableW) {
+                if (totalW(trimmedCols, cs) <= availableW) {
                     cellSize = cs;
                     break;
                 }
                 cellSize = cs;
             }
-        }
-
-        // Add future months to fill remaining space
-        const allColCounts = [...mandatoryCols];
-        const allKeys: [number, number][] = [...mandatoryKeys];
-        {
-            let [y, m] = nextMonth(curY, curM);
-            const maxExtra = 24;
-            for (let i = 0; i < maxExtra; i++) {
-                const dow = (new Date(y, m, 1).getDay() + 6) % 7;
-                const nc = Math.ceil((dow + daysInMonth(y, m)) / 7);
-                if (totalW([...allColCounts, nc], cellSize) > availableW) break;
-                allColCounts.push(nc);
-                allKeys.push([y, m]);
-                [y, m] = nextMonth(y, m);
+            // If still doesn't fit at CELL_MIN, trim from the left
+            while (trimmedCols.length > 1 && totalW(trimmedCols, cellSize) > availableW) {
+                trimmedKeys.shift();
+                trimmedCols.shift();
             }
         }
 
-        // Try to grow cell size with the blocks we have
+        // Add remaining year months (current+1 → Dec) if they fit
+        const allKeys: [number, number][] = [...trimmedKeys];
+        const allColCounts: number[] = [...trimmedCols];
+        for (let m = curM + 1; m <= 11; m++) {
+            const nc = colCount(year, m);
+            if (totalW([...allColCounts, nc], cellSize) > availableW) break;
+            allColCounts.push(nc);
+            allKeys.push([year, m]);
+        }
+
+        // Try to grow cell size now that we have a fixed set of months
         while (cellSize < CELL_MAX) {
             if (totalW(allColCounts, cellSize + 1) > availableW) break;
             cellSize++;
         }
 
-        // Build actual month blocks
+        const gridWidth = LABEL_W + totalW(allColCounts, cellSize);
         const blocks = allKeys.map(([y, m]) => buildMonthBlock(y, m, today, dailyWords, q));
 
-        return { blocks, cellSize };
+        return { blocks, cellSize, gridWidth };
     });
 
     function cellBg(cell: DayCell): string {
@@ -272,9 +243,7 @@
             month: "short",
             day: "numeric",
         });
-        return cell.words > 0
-            ? `${label}: ${cell.words.toLocaleString()} words`
-            : `${label}: no activity`;
+        return cell.words > 0 ? `${label}: ${cell.words.toLocaleString()} words` : `${label}: no activity`;
     }
 </script>
 
@@ -287,21 +256,19 @@
     {#if layout}
         {@const cs = layout.cellSize}
         {@const stride = cs + CELL_GAP}
+        <div class="mx-auto" style="width: {layout.gridWidth}px;">
 
         <!-- Title -->
         {#if title}
             <div
-                class="text-[{FONT}] font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-[var(--space-2)] pl-[{LABEL_W}px]"
+                class="text-[{TITLE_FONT}] font-medium text-[var(--text-tertiary)] uppercase tracking-widest mb-[var(--space-2)] text-center"
             >
                 {title}
             </div>
         {/if}
 
         <!-- Month labels row -->
-        <div
-            class="flex items-end"
-            style="padding-left: {LABEL_W}px; height: {MONTH_LABEL_H}px;"
-        >
+        <div class="flex items-end" style="padding-left: {LABEL_W}px; height: {MONTH_LABEL_H}px;">
             {#each layout.blocks as block, bi}
                 {#if bi > 0}
                     <div style="width: {MONTH_GAP + DIVIDER_W}px; height: 1px;"></div>
@@ -334,9 +301,7 @@
                             class="shrink-0 flex items-center justify-center"
                             style="width: {MONTH_GAP + DIVIDER_W}px;"
                         >
-                            <div
-                                class="h-full w-px bg-[var(--shell-border)] opacity-30"
-                            ></div>
+                            <div class="h-full w-px bg-[var(--shell-border)] opacity-30"></div>
                         </div>
                     {/if}
                     <div class="flex shrink-0" style="gap: {CELL_GAP}px;">
@@ -357,24 +322,19 @@
         </div>
 
         <!-- Legend -->
-        <div
-            class="flex items-center justify-between mt-[var(--space-2)]"
-            style="padding-left: {LABEL_W}px;"
-        >
-            <span class="text-[{FONT}] text-[var(--text-muted)] whitespace-nowrap">
+        <div class="flex items-center justify-between mt-[var(--space-2)] w-full">
+            <span class="text-[{FONT}] text-[var(--text-muted)] whitespace-nowrap pl-[{LABEL_W}px]">
                 {activeDays} active day{activeDays !== 1 ? "s" : ""}
                 · {totalWords.toLocaleString()} words
             </span>
             <div class="flex items-center gap-1 shrink-0">
                 <span class="text-[{FONT}] text-[var(--text-muted)]">Less</span>
                 {#each LEVEL_COLORS as color}
-                    <div
-                        class="rounded-[2px]"
-                        style="width: 10px; height: 10px; background: {color};"
-                    ></div>
+                    <div class="rounded-[2px]" style="width: 10px; height: 10px; background: {color};"></div>
                 {/each}
                 <span class="text-[{FONT}] text-[var(--text-muted)]">More</span>
             </div>
+        </div>
         </div>
     {/if}
 </div>

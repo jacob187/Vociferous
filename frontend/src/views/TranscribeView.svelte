@@ -320,7 +320,7 @@
         {#if viewState === "idle"}
             <div class="flex flex-col items-center text-center gap-[var(--space-1)]">
                 <h1
-                    class="text-2xl font-[var(--weight-emphasis)] text-[var(--accent)] m-0 leading-[var(--leading-tight)]"
+                    class="text-3xl font-[var(--weight-emphasis)] text-[var(--accent)] m-0 leading-[var(--leading-tight)]"
                 >
                     {greeting}
                 </h1>
@@ -343,15 +343,21 @@
                 {#if sessionStats && sessionStats.count > 0}
                     <div class="flex items-center gap-[var(--space-4)] mt-[var(--space-1)]">
                         <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
-                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]">{sessionStats.todayWords.toLocaleString()}</span> words today
+                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                                >{sessionStats.todayWords.toLocaleString()}</span
+                            > words today
                         </span>
                         <span class="w-px h-4 bg-[var(--shell-border)]"></span>
                         <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
-                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]">{sessionStats.avgWpm > 0 ? sessionStats.avgWpm : "\u2014"}</span> wpm avg
+                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                                >{sessionStats.avgWpm > 0 ? sessionStats.avgWpm : "\u2014"}</span
+                            > wpm avg
                         </span>
                         <span class="w-px h-4 bg-[var(--shell-border)]"></span>
                         <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
-                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]">{sessionStats.count}</span> sessions
+                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                                >{sessionStats.count}</span
+                            > sessions
                         </span>
                     </div>
                 {/if}
