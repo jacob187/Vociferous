@@ -17,6 +17,7 @@
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
     import BarSpectrumVisualizer from "../lib/components/BarSpectrumVisualizer.svelte";
+    import ActivityHeatmap from "../lib/components/ActivityHeatmap.svelte";
     import { formatDuration, formatWpm } from "../lib/formatters";
     import {
         deleteTranscript as apiDeleteTranscript,
@@ -111,17 +112,10 @@
                 return ca ? new Date(ca).toLocaleDateString("sv") === todayStr : false;
             })
             .reduce((sum, t) => sum + (t.text || t.normalized_text || "").split(/\s+/).filter(Boolean).length, 0);
-        const totalDurationMs = recentSessions.reduce((s, t) => s + (t.duration_ms ?? 0), 0);
         const totalSpeechMs = recentSessions.reduce((s, t) => s + (t.speech_duration_ms ?? 0), 0);
         const avgWpm =
             totalSpeechMs > 0 ? Math.round(wordsPerSession.reduce((a, b) => a + b, 0) / (totalSpeechMs / 60000)) : 0;
-        // Build sparkline bars for up to last 14 sessions, oldest→newest
-        const sparkData = [...recentSessions].reverse().slice(-14);
-        const sparkWords = sparkData.map(
-            (t) => (t.text || t.normalized_text || "").split(/\s+/).filter(Boolean).length,
-        );
-        const sparkMax = Math.max(...sparkWords, 1);
-        return { todayWords, avgWpm, sparkWords, sparkMax, count: recentSessions.length };
+        return { todayWords, avgWpm, count: recentSessions.length };
     });
 
     function formatTranscriptTimestamp(iso: string): string {
@@ -324,26 +318,42 @@
     <!-- Header -->
     <div class="shrink-0 py-[var(--space-1)]">
         {#if viewState === "idle"}
-            <div class="flex flex-col items-center text-center">
+            <div class="flex flex-col items-center text-center gap-[var(--space-1)]">
                 <h1
-                    class="text-[var(--text-xl)] font-[var(--weight-emphasis)] text-[var(--text-primary)] m-0 leading-[var(--leading-tight)]"
+                    class="text-2xl font-[var(--weight-emphasis)] text-[var(--accent)] m-0 leading-[var(--leading-tight)]"
                 >
                     {greeting}
                 </h1>
                 {#if slmInsight}
                     <p
-                        class="text-[var(--text-base)] text-[var(--accent)] italic mt-[var(--space-1)] mb-0 leading-[var(--leading-normal)] opacity-85"
+                        class="text-[var(--text-base)] text-[var(--text-secondary)] italic mb-0 leading-[var(--leading-normal)] opacity-85"
                     >
                         {slmInsight}
                     </p>
                 {:else if !refinementEnabled}
-                    <p class="text-[var(--text-sm)] text-[var(--text-tertiary)] mt-[var(--space-0)] mb-0">
+                    <p class="text-[var(--text-sm)] text-[var(--text-tertiary)] mb-0">
                         Enable Grammar Refinement in Settings to unlock AI insights.
                     </p>
                 {:else}
-                    <p class="text-[var(--text-sm)] text-[var(--text-tertiary)] mt-[var(--space-0)] mb-0">
+                    <p class="text-[var(--text-sm)] text-[var(--text-tertiary)] mb-0">
                         Click the mic button or use your hotkey to start recording
                     </p>
+                {/if}
+                <!-- Stats inline in header -->
+                {#if sessionStats && sessionStats.count > 0}
+                    <div class="flex items-center gap-[var(--space-4)] mt-[var(--space-1)]">
+                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
+                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]">{sessionStats.todayWords.toLocaleString()}</span> words today
+                        </span>
+                        <span class="w-px h-4 bg-[var(--shell-border)]"></span>
+                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
+                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]">{sessionStats.avgWpm > 0 ? sessionStats.avgWpm : "\u2014"}</span> wpm avg
+                        </span>
+                        <span class="w-px h-4 bg-[var(--shell-border)]"></span>
+                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
+                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]">{sessionStats.count}</span> sessions
+                        </span>
+                    </div>
                 {/if}
             </div>
         {:else if viewState === "recording"}
@@ -422,98 +432,30 @@
 
     <!-- Content panel -->
     <WorkspacePanel editing={viewState === "editing"} recording={isRecording || isTranscribing}>
-        <!-- IDLE: mic CTA top, session analytics below -->
+        <!-- IDLE: mic CTA centered, heatmap anchored to bottom -->
         {#if viewState === "idle"}
-            <div class="flex-1 flex items-center justify-center min-h-0 overflow-y-auto">
-                <div
-                    class="flex flex-col items-center gap-[var(--space-6)] w-full max-w-[560px] py-[var(--space-6)] px-[var(--space-5)]"
-                >
-                    <!-- Record CTA -->
-                    <div class="flex flex-col items-center justify-center gap-[var(--space-3)]">
+            <div class="flex-1 flex flex-col min-h-0">
+                <!-- Upper zone: mic CTA, vertically centered -->
+                <div class="flex-1 flex flex-col items-center justify-center">
+                    <div class="flex flex-col items-center justify-center gap-[var(--space-4)]">
                         <button
-                            class="w-[88px] h-[88px] rounded-full border-2 border-[var(--accent)] bg-transparent text-[var(--accent)] cursor-pointer flex items-center justify-center transition-[background,border-color,color] duration-[var(--transition-fast)] hover:bg-[var(--hover-overlay-blue)] hover:border-[var(--accent-hover)] hover:text-[var(--accent-hover)]"
+                            class="w-[160px] h-[160px] rounded-full border-2 border-[var(--accent)] bg-transparent text-[var(--accent)] cursor-pointer flex items-center justify-center transition-[background,border-color,color] duration-[var(--transition-fast)] hover:bg-[var(--hover-overlay-blue)] hover:border-[var(--accent-hover)] hover:text-[var(--accent-hover)]"
                             onclick={startRecording}
                             aria-label="Start recording"
                             title="Start recording"
                         >
-                            <Mic size={32} strokeWidth={1.5} />
+                            <Mic size={56} strokeWidth={1.5} />
                         </button>
-                        <p class="text-[var(--text-sm)] text-[var(--text-tertiary)] m-0">Click to record</p>
-                    </div>
-
-                    <!-- Session analytics -->
-                    <div class="flex flex-col gap-[var(--space-4)] w-full">
-                        {#if sessionStats && sessionStats.count > 0}
-                            <!-- Divider -->
-                            <div class="h-px w-full bg-[var(--shell-border)]"></div>
-
-                            <!-- Quick stats row -->
-                            <div class="flex justify-center gap-[var(--space-5)]">
-                                <div class="flex flex-col items-center gap-0.5">
-                                    <span
-                                        class="text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-wider"
-                                        >Today</span
-                                    >
-                                    <span
-                                        class="text-[var(--text-lg)] font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)] leading-none"
-                                    >
-                                        {sessionStats.todayWords.toLocaleString()}
-                                        <span class="text-[var(--text-xs)] font-normal text-[var(--text-tertiary)]"
-                                            >words</span
-                                        >
-                                    </span>
-                                </div>
-                                <div class="w-px bg-[var(--shell-border)] self-stretch"></div>
-                                <div class="flex flex-col items-center gap-0.5">
-                                    <span
-                                        class="text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-wider"
-                                        >Avg Pace</span
-                                    >
-                                    <span
-                                        class="text-[var(--text-lg)] font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)] leading-none"
-                                    >
-                                        {sessionStats.avgWpm > 0 ? sessionStats.avgWpm : "—"}
-                                        <span class="text-[var(--text-xs)] font-normal text-[var(--text-tertiary)]"
-                                            >wpm</span
-                                        >
-                                    </span>
-                                </div>
-                                <div class="w-px bg-[var(--shell-border)] self-stretch"></div>
-                                <div class="flex flex-col items-center gap-0.5">
-                                    <span
-                                        class="text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-wider"
-                                        >Sessions</span
-                                    >
-                                    <span
-                                        class="text-[var(--text-lg)] font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)] leading-none"
-                                    >
-                                        {sessionStats.count}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <!-- Sparkline: word counts per recent session -->
-                            <div class="flex flex-col gap-[var(--space-1)]">
-                                <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-wider"
-                                    >Recent Sessions</span
-                                >
-                                <div class="flex items-end gap-[3px] h-[52px]">
-                                    {#each sessionStats.sparkWords as w, i}
-                                        {@const pct = Math.max(4, Math.round((w / sessionStats.sparkMax) * 100))}
-                                        {@const isLatest = i === sessionStats.sparkWords.length - 1}
-                                        <div
-                                            class="flex-1 rounded-t-[2px] transition-[height] duration-300 {isLatest
-                                                ? 'bg-[var(--accent)]'
-                                                : 'bg-[var(--text-tertiary)] opacity-40'}"
-                                            style="height: {pct}%"
-                                            title="{w} words"
-                                        ></div>
-                                    {/each}
-                                </div>
-                            </div>
-                        {/if}
+                        <p class="text-[var(--text-base)] text-[var(--text-tertiary)] m-0">Click to record</p>
                     </div>
                 </div>
+
+                <!-- Lower zone: activity heatmap -->
+                {#if recentSessions.length > 0}
+                    <div class="shrink-0 flex flex-col gap-[var(--space-2)] px-[var(--space-1)]">
+                        <ActivityHeatmap entries={recentSessions} />
+                    </div>
+                {/if}
             </div>
 
             <!-- RECORDING: spectrum fills the full panel, flush to bottom -->
