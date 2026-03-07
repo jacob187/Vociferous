@@ -15,8 +15,8 @@
         { id: "transcribe", label: "Transcribe", icon: Mic, section: "main" },
         { id: "transcripts", label: "Transcriptions", icon: Library, section: "main" },
         { id: "refine", label: "Refine", icon: Sparkles, section: "main" },
-        { id: "settings", label: "Settings", icon: Settings, section: "footer" },
         { id: "user", label: "User", icon: User, section: "footer" },
+        { id: "settings", label: "Settings", icon: Settings, section: "footer" },
     ];
 
     interface Props {

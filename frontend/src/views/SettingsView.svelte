@@ -290,7 +290,7 @@
                                         type="number"
                                         min="10"
                                         max="200"
-                                        class="h-9 w-24 rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-primary)] px-[var(--space-2)] text-[var(--text-sm)] text-[var(--text-primary)]"
+                                        class="h-9 w-24 rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-primary)] px-[var(--space-2)] text-[var(--text-sm)] text-[var(--text-primary)] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                         value={getSafe(config, "user.typing_wpm", 40)}
                                         onchange={(e: Event) => {
                                             const v = parseInt((e.target as HTMLInputElement).value);
