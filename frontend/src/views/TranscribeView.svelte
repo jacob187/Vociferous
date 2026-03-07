@@ -13,9 +13,10 @@
 
     import { ws } from "../lib/ws";
     import { onMount } from "svelte";
-    import { Mic, Square, Copy, Check, Pencil, Trash2, Save, Undo2, Loader2, Sparkles } from "lucide-svelte";
+    import { Mic, Square, Copy, Check, Pencil, Trash2, Save, Undo2, Loader2, Sparkles, Home } from "lucide-svelte";
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
+    import StyledButton from "../lib/components/StyledButton.svelte";
     import BarSpectrumVisualizer from "../lib/components/BarSpectrumVisualizer.svelte";
     import ActivityHeatmap from "../lib/components/ActivityHeatmap.svelte";
     import { formatDuration, formatWpm } from "../lib/formatters";
@@ -36,6 +37,7 @@
     let transcriptText = $state("");
     let editText = $state("");
     let transcriptId = $state<number | null>(null);
+    let transcriptTitle = $state("");
     let transcriptTimestamp = $state("");
     let durationMs = $state(0);
     let speechDurationMs = $state(0);
@@ -134,6 +136,7 @@
             const t = await getTranscript(id);
             transcriptText = t.text || t.normalized_text || t.raw_text || "";
             transcriptId = t.id;
+            transcriptTitle = t.display_name || "";
             transcriptTimestamp = formatTranscriptTimestamp(t.created_at || t.timestamp || "");
             durationMs = t.duration_ms ?? 0;
             speechDurationMs = t.speech_duration_ms ?? 0;
@@ -180,6 +183,7 @@
                 viewState = "recording";
                 transcriptText = "";
                 transcriptId = null;
+                transcriptTitle = "";
                 transcriptTimestamp = "";
                 durationMs = 0;
                 speechDurationMs = 0;
@@ -201,6 +205,8 @@
                 speechDurationMs = data.speech_duration_ms ?? 0;
                 viewState = "ready";
                 loadRecentSessions();
+                /* Title generated async by SLM — will arrive via transcript_updated */
+                transcriptTitle = "";
             }),
             ws.on("transcription_error", (data) => {
                 transcriptText = `Error: ${data.message}`;
@@ -218,6 +224,16 @@
                 const refinement = (data as any)?.refinement;
                 if (typeof refinement === "object" && refinement !== null && "enabled" in refinement) {
                     refinementEnabled = Boolean((refinement as any).enabled);
+                }
+            }),
+            ws.on("transcript_updated", async (data: any) => {
+                if (data.id != null && data.id === transcriptId) {
+                    try {
+                        const t = await getTranscript(data.id);
+                        transcriptTitle = t.display_name || "";
+                    } catch {
+                        /* title fetch failed — not critical */
+                    }
                 }
             }),
         ];
@@ -302,6 +318,7 @@
     function startNewRecording() {
         transcriptText = "";
         transcriptId = null;
+        transcriptTitle = "";
         transcriptTimestamp = "";
         durationMs = 0;
         speechDurationMs = 0;
@@ -311,6 +328,16 @@
     function goToRefine() {
         if (transcriptId == null) return;
         nav.navigate("refine", transcriptId);
+    }
+
+    function returnToDashboard() {
+        transcriptText = "";
+        transcriptId = null;
+        transcriptTitle = "";
+        transcriptTimestamp = "";
+        durationMs = 0;
+        speechDurationMs = 0;
+        viewState = "idle";
     }
 </script>
 
@@ -365,15 +392,21 @@
         {:else if viewState === "recording"}
             <!-- empty during recording — status lives in the action bar -->
         {:else if viewState === "transcribing"}
-            <div class="flex items-center gap-[var(--space-1)] text-[var(--text-base)] text-[var(--text-secondary)]">
-                <Loader2 size={18} class="spin" />
-                <span>Transcribing…</span>
-            </div>
+            <!-- empty during transcribing — spinner lives in the panel -->
         {:else}
-            <div class="flex items-center gap-[var(--space-1)] text-[var(--text-base)] text-[var(--text-secondary)]">
-                <span class="font-[var(--font-mono)] text-[var(--text-sm)] text-[var(--text-tertiary)]"
-                    >{transcriptTimestamp || "Transcript"}</span
-                >
+            <div class="flex flex-col items-center text-center gap-0.5">
+                {#if transcriptTitle}
+                    <h2
+                        class="text-xl font-[var(--weight-emphasis)] text-[var(--accent)] m-0 leading-[var(--leading-tight)]"
+                    >
+                        {transcriptTitle}
+                    </h2>
+                {/if}
+                {#if transcriptTimestamp}
+                    <span class="text-[var(--text-sm)] text-[var(--text-tertiary)] font-[var(--font-mono)]">
+                        {transcriptTimestamp}
+                    </span>
+                {/if}
             </div>
         {/if}
     </div>
@@ -382,56 +415,44 @@
     {#if hasText && durationMs > 0}
         {@const speechPct = durationMs > 0 ? Math.round((speechDurationMs / durationMs) * 100) : 0}
         <div
-            class="flex items-center gap-[var(--space-2)] py-[var(--space-1)] px-[var(--space-2)] bg-[var(--surface-primary)] rounded-[var(--radius-sm)] shrink-0"
+            class="flex items-center justify-center gap-[var(--space-3)] py-[var(--space-2)] px-[var(--space-3)] bg-[var(--surface-primary)] rounded-[var(--radius-sm)] shrink-0"
         >
-            <div class="flex flex-col gap-0.5">
-                <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-wider">Duration</span>
-                <span
-                    class="text-[var(--text-sm)] font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)]"
+            <span class="text-[var(--text-sm)] text-[var(--text-tertiary)]">
+                <span class="font-[var(--weight-emphasis)] font-[var(--font-mono)] text-[var(--text-primary)]"
                     >{formatDuration(durationMs)}</span
-                >
-            </div>
-            <div class="w-px h-6 bg-[var(--shell-border)] mx-[var(--space-1)]"></div>
-            <div class="flex flex-col gap-0.5">
-                <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-wider">Speech</span>
-                <span
-                    class="text-[var(--text-sm)] font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)]"
+                > Duration
+            </span>
+            <span class="w-px h-4 bg-[var(--shell-border)]"></span>
+            <span class="text-[var(--text-sm)] text-[var(--text-tertiary)]">
+                <span class="font-[var(--weight-emphasis)] font-[var(--font-mono)] text-[var(--text-primary)]"
                     >{formatDuration(speechDurationMs)}</span
-                >
-            </div>
-            <div class="w-px h-6 bg-[var(--shell-border)] mx-[var(--space-1)]"></div>
-            <div class="flex flex-col gap-0.5">
-                <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-wider">Words</span>
-                <span
-                    class="text-[var(--text-sm)] font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)]"
+                > Speech
+            </span>
+            <span class="w-px h-4 bg-[var(--shell-border)]"></span>
+            <span class="text-[var(--text-sm)] text-[var(--text-tertiary)]">
+                <span class="font-[var(--weight-emphasis)] font-[var(--font-mono)] text-[var(--text-primary)]"
                     >{wordCount}</span
-                >
-            </div>
-            <div class="w-px h-6 bg-[var(--shell-border)] mx-[var(--space-1)]"></div>
-            <div class="flex flex-col gap-0.5">
-                <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-wider">Pace</span>
-                <span
-                    class="text-[var(--text-sm)] font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)]"
+                > Words
+            </span>
+            <span class="w-px h-4 bg-[var(--shell-border)]"></span>
+            <span class="text-[var(--text-sm)] text-[var(--text-tertiary)]">
+                <span class="font-[var(--weight-emphasis)] font-[var(--font-mono)] text-[var(--text-primary)]"
                     >{formatWpm(wordCount, speechDurationMs || durationMs)}</span
-                >
-            </div>
-            <div class="w-px h-6 bg-[var(--shell-border)] mx-[var(--space-1)]"></div>
-            <!-- Speech ratio bar -->
-            <div class="flex flex-col gap-1 flex-1 min-w-[80px] max-w-[160px]">
-                <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-wider"
-                    >Speech Ratio</span
-                >
-                <div class="flex items-center gap-[var(--space-1)]">
-                    <div class="flex-1 h-1.5 rounded-full bg-[var(--surface-tertiary)] overflow-hidden">
-                        <div
-                            class="h-full rounded-full bg-[var(--accent)] transition-[width] duration-500"
-                            style="width: {speechPct}%"
-                        ></div>
-                    </div>
-                    <span class="text-[var(--text-xs)] font-[var(--font-mono)] text-[var(--text-tertiary)] shrink-0"
-                        >{speechPct}%</span
-                    >
+                > Pace
+            </span>
+            <span class="w-px h-4 bg-[var(--shell-border)]"></span>
+            <!-- Active Speech bar -->
+            <div class="flex items-center gap-[var(--space-2)] min-w-[100px] max-w-[280px] flex-1">
+                <span class="text-[var(--text-sm)] text-[var(--text-tertiary)] shrink-0">Active Speech</span>
+                <div class="flex-1 h-1.5 rounded-full bg-[var(--surface-tertiary)] overflow-hidden">
+                    <div
+                        class="h-full rounded-full bg-[var(--accent)] transition-[width] duration-500"
+                        style="width: {speechPct}%"
+                    ></div>
                 </div>
+                <span class="text-[var(--text-xs)] font-[var(--font-mono)] text-[var(--text-tertiary)] shrink-0"
+                    >{speechPct}%</span
+                >
             </div>
         </div>
     {/if}
@@ -534,68 +555,42 @@
                     <Square size={15} fill="currentColor" /> Stop & Transcribe
                 </button>
             {:else if viewState === "editing"}
-                <button
-                    class="inline-flex items-center gap-1.5 h-8 px-[var(--space-2)] border-none rounded-[var(--radius-sm)] font-[var(--font-family)] text-[var(--text-xs)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] bg-[var(--accent)] text-[var(--gray-0)] hover:bg-[var(--accent-hover)]"
-                    onclick={commitEdits}
-                    title="Save edits"
-                >
-                    <Save size={16} /> Save
-                </button>
-                <button
-                    class="inline-flex items-center gap-1.5 h-8 px-[var(--space-2)] border-none rounded-[var(--radius-sm)] font-[var(--font-family)] text-[var(--text-xs)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]"
-                    onclick={discardEdits}
-                    title="Discard edits"
-                >
-                    <Undo2 size={16} /> Discard
-                </button>
+                <StyledButton variant="ghost" size="sm" onclick={discardEdits}>
+                    <Undo2 size={14} /> Discard
+                </StyledButton>
+                <div class="flex-1"></div>
+                <StyledButton variant="primary" size="sm" onclick={commitEdits}>
+                    <Save size={14} /> Save
+                </StyledButton>
             {:else}
-                <!-- READY / VIEWING -->
-                <button
-                    class="inline-flex items-center gap-1.5 h-8 px-[var(--space-2)] border-none rounded-[var(--radius-sm)] font-[var(--font-family)] text-[var(--text-xs)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] bg-[var(--surface-tertiary)] text-[var(--text-primary)] hover:bg-[var(--gray-6)]"
-                    onclick={copyToClipboard}
-                    title="Copy to clipboard"
-                >
+                <!-- READY / VIEWING: destructive → creative, left → right -->
+                <StyledButton variant="destructive" size="sm" onclick={deleteTranscript}>
+                    <Trash2 size={14} /> Delete
+                </StyledButton>
+                <StyledButton variant="ghost" size="sm" onclick={enterEditMode}>
+                    <Pencil size={14} /> Edit
+                </StyledButton>
+                <StyledButton variant="secondary" size="sm" onclick={copyToClipboard}>
                     {#if copied}
-                        <Check size={16} /> Copied
+                        <Check size={14} /> Copied
                     {:else}
-                        <Copy size={16} /> Copy
+                        <Copy size={14} /> Copy
                     {/if}
-                </button>
-                <button
-                    class="inline-flex items-center gap-1.5 h-8 px-[var(--space-2)] border-none rounded-[var(--radius-sm)] font-[var(--font-family)] text-[var(--text-xs)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]"
-                    onclick={enterEditMode}
-                    title="Edit transcript"
-                >
-                    <Pencil size={16} /> Edit
-                </button>
-                <button
-                    class="inline-flex items-center gap-1.5 h-8 px-[var(--space-2)] border-none rounded-[var(--radius-sm)] font-[var(--font-family)] text-[var(--text-xs)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] bg-transparent text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-surface)]"
-                    onclick={deleteTranscript}
-                    title="Delete transcript"
-                >
-                    <Trash2 size={16} /> Delete
-                </button>
-
-                {#if refinementEnabled}
-                    <button
-                        class="inline-flex items-center gap-1.5 h-8 px-[var(--space-2)] border-none rounded-[var(--radius-sm)] font-[var(--font-family)] text-[var(--text-xs)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]"
-                        onclick={goToRefine}
-                        title="Refine transcript"
-                        disabled={transcriptId == null}
-                    >
-                        <Sparkles size={16} /> Refine
-                    </button>
-                {/if}
+                </StyledButton>
 
                 <div class="flex-1"></div>
 
-                <button
-                    class="inline-flex items-center gap-1.5 h-8 px-[var(--space-2)] border-none rounded-[var(--radius-sm)] font-[var(--font-family)] text-[var(--text-xs)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]"
-                    onclick={startNewRecording}
-                    title="New recording"
-                >
-                    <Mic size={16} /> New
-                </button>
+                {#if refinementEnabled}
+                    <StyledButton variant="ghost" size="sm" onclick={goToRefine} disabled={transcriptId == null}>
+                        <Sparkles size={14} /> Refine
+                    </StyledButton>
+                {/if}
+                <StyledButton variant="ghost" size="sm" onclick={returnToDashboard}>
+                    <Home size={14} /> Dashboard
+                </StyledButton>
+                <StyledButton variant="primary" size="sm" onclick={startNewRecording}>
+                    <Mic size={14} /> New Recording
+                </StyledButton>
             {/if}
         </div>
     {/if}
