@@ -2,7 +2,7 @@
     /**
      * TranscribeView — State-driven transcription workspace.
      *
-     * States (matching old PyQt6 WorkspaceState):
+     * States:
      *   IDLE         — Welcome greeting, ready to record
      *   RECORDING    — Active recording with spectrum visualizer
      *   TRANSCRIBING — Processing audio, spinner shown
@@ -245,7 +245,7 @@
                 transcriptText = `Error: ${data.message}`;
                 viewState = "ready";
             }),
-            ws.on("motd_ready", (data: any) => {
+            ws.on("motd_ready", (data) => {
                 slmInsight = data.text || "";
             }),
             ws.on("audio_spectrum", (data) => {
@@ -259,8 +259,8 @@
                     refinementEnabled = Boolean((refinement as any).enabled);
                 }
             }),
-            ws.on("transcript_updated", async (data: any) => {
-                if (data.id != null && data.id === transcriptId) {
+            ws.on("transcript_updated", async (data) => {
+                if (data.id === transcriptId) {
                     try {
                         const t = await getTranscript(data.id);
                         transcriptTitle = t.display_name || "";
@@ -588,14 +588,9 @@
         <div class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] shrink-0">
             {#if viewState === "recording"}
                 <!-- Cancel left, status+timer centered, Stop right -->
-                <button
-                    class="inline-flex items-center gap-1.5 h-9 px-[var(--space-3)] border border-[var(--color-danger)] rounded-[var(--radius-sm)] bg-transparent text-[var(--color-danger)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] hover:bg-[var(--color-danger-surface)]"
-                    onclick={cancelRecording}
-                    aria-label="Cancel recording and discard audio"
-                    title="Cancel recording and discard captured audio"
-                >
+                <StyledButton variant="danger-outline" size="sm" onclick={cancelRecording} ariaLabel="Cancel recording and discard audio" title="Cancel recording and discard captured audio">
                     <Trash2 size={15} /> Cancel
-                </button>
+                </StyledButton>
                 <div class="flex-1 flex items-center justify-center gap-[var(--space-2)]">
                     <span
                         class="w-2 h-2 rounded-full bg-[var(--color-danger)] shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite]"
@@ -606,14 +601,9 @@
                         >{formatElapsed(recordingElapsedMs)}</span
                     >
                 </div>
-                <button
-                    class="inline-flex items-center gap-1.5 h-9 px-[var(--space-3)] border-none rounded-[var(--radius-sm)] bg-[var(--accent)] text-[var(--gray-0)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] hover:bg-[var(--accent-hover)]"
-                    onclick={stopRecording}
-                    aria-label="Stop recording and transcribe"
-                    title="Stop recording and transcribe audio"
-                >
-                    <Square size={15} fill="currentColor" /> Stop & Transcribe
-                </button>
+                <StyledButton variant="primary" size="sm" onclick={stopRecording} ariaLabel="Stop recording and transcribe" title="Stop recording and transcribe audio">
+                    <Square size={15} fill="currentColor" /> Stop &amp; Transcribe
+                </StyledButton>
             {:else if viewState === "editing"}
                 <StyledButton variant="ghost" size="sm" onclick={discardEdits}>
                     <Undo2 size={14} /> Discard
@@ -656,27 +646,3 @@
     {/if}
 </div>
 
-<style>
-    @keyframes pulse-dot {
-        0%,
-        100% {
-            opacity: 1;
-        }
-        50% {
-            opacity: 0.3;
-        }
-    }
-
-    :global(.spin) {
-        animation: spin 1.2s linear infinite;
-    }
-
-    @keyframes spin {
-        from {
-            transform: rotate(0deg);
-        }
-        to {
-            transform: rotate(360deg);
-        }
-    }
-</style>

@@ -4,6 +4,47 @@
 
 ---
 
+## Maintenance — Frontend Audit: Dead Code, Component Consolidation, Design Conformity
+
+**Date:** 2026-03-07
+**Status:** Chore (no behavior change)
+
+Comprehensive frontend audit pass. Removed dead/orphaned code, consolidated duplicate implementations, enforced Svelte 5 idioms, centralised global animations, and applied design-system conformity across all action bars.
+
+### Dead / Orphaned Code Removed
+- **`ws.on("refinement_error", () => {})`** — no-op WebSocket subscription in `TranscriptsView` doing literally nothing. Deleted.
+- **`monstercat` prop** — legacy alias for `spreadFactor` in `BarSpectrumVisualizer`. Removed from Props interface and destructuring.
+- **Local `formatCount()`** — identical one-liner duplicated in `UserView` and `ActivityChart`. Centralised in `formatters.ts`; both files now import it.
+
+### Deprecated API Fixed
+- **`<svelte:component this={...}>`** in `ToastContainer` — Svelte 4 syntax. Replaced with Svelte 5 `{@const Icon = iconMap[...]}` pattern.
+
+### Bespoke Reimplementations Replaced
+- **Bespoke border-div spinner** in `UserView` — replaced with `<Loader2 class="spin" />` consistent with every other view.
+- **Hand-rolled save bar buttons** in `SettingsView` — 200-char inline Tailwind strings replaced with `<StyledButton variant="ghost/primary" size="sm">`. `StyledButton` imported.
+- **Hand-rolled recording bar buttons** in `TranscribeView` (Cancel, Stop & Transcribe) — replaced with `StyledButton`.
+- **Three hand-rolled action buttons** in `RefineView` (Re-run, Delete Result, Refine) — replaced with `StyledButton`. `StyledButton` imported.
+
+### Component Library Extended
+- **`StyledButton`** — added three new semantic variants: `danger-outline` (outline danger, soft fill on hover), `neutral` (shell border, accent border on hover), `danger-reveal` (shell border that floods danger on hover). Added `title` and `ariaLabel` prop passthrough. Removed spurious `border-none` from base class (each border-free variant now carries it explicitly).
+- **`DownloadButton.svelte`** — new shared component. Extracted identical ghost-outline-accent download button that was copy-pasted verbatim between `AsrModelCard` and `OutputCard`. Both updated to use it.
+
+### Global Animations Centralised
+- Moved `@keyframes spin` + `.spin` class from `TranscribeView` `<style>` block to `app.css`.
+- Moved `@keyframes pulse-dot` from `TitleBar` and `TranscribeView` `<style>` blocks (duplicated in both) to `app.css`.
+- Moved `@keyframes slide-in` + `.animate-slide-in` from `ToastContainer` `<style>` block to `app.css`.
+- All three component `<style>` blocks removed entirely.
+
+### Stale Historical Comments Removed
+- Removed "Ported from PyQt6 …" header comment from `app.css`.
+- Removed PyQt6 docblock references from `WorkspacePanel`, `ToggleSwitch`, and `SettingsView`.
+
+### Design Principle Enforcement (Destroy-Left / Create-Right)
+- **`RefineView`** action bar: `[Accept & Copy] [Re-run] [Delete Result]` → `[Delete Result] [Re-run] [Accept & Copy]`.
+- **`TranscriptsView`** selection bar: `[N selected] … [Clear] [Delete]` → `[Delete] [N selected] … [Clear]`.
+
+---
+
 ## Maintenance — Python Backend Style Pass
 
 **Date:** 2026-03-07

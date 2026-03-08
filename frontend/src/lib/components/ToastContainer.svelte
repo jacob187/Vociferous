@@ -26,13 +26,14 @@
 {#if toast.items.length > 0}
     <div class="fixed bottom-4 right-4 z-[200] flex flex-col-reverse gap-2 pointer-events-none max-w-[380px]">
         {#each toast.items as item (item.id)}
+            {@const Icon = iconMap[item.variant]}
             <div
                 class="pointer-events-auto flex items-start gap-2 px-3 py-2.5 rounded-[var(--radius-md)] border bg-[var(--surface-secondary)] shadow-lg animate-slide-in {colorMap[
                     item.variant
                 ]}"
                 role="alert"
             >
-                <svelte:component this={iconMap[item.variant]} size={16} class="shrink-0 mt-0.5" />
+                <Icon size={16} class="shrink-0 mt-0.5" />
                 <span class="flex-1 text-[var(--text-sm)] text-[var(--text-primary)] leading-snug">{item.message}</span>
                 <button
                     class="shrink-0 bg-transparent border-none cursor-pointer text-[var(--text-tertiary)] hover:text-[var(--text-primary)] p-0"
@@ -46,19 +47,3 @@
     </div>
 {/if}
 
-<style>
-    @keyframes slide-in {
-        from {
-            opacity: 0;
-            transform: translateX(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-
-    :global(.animate-slide-in) {
-        animation: slide-in 0.2s ease-out;
-    }
-</style>

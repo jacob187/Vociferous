@@ -10,8 +10,6 @@
         intensity?: number;
         /** Neighbor-spread smoothing factor (higher = less spread) */
         spreadFactor?: number;
-        /** Legacy alias for spreadFactor; kept for backward compatibility */
-        monstercat?: number;
         /** Noise reduction / temporal memory (0-1) */
         noiseReduction?: number;
         /** Peak hold duration in ms */
@@ -33,7 +31,6 @@
         barGap = 2,
         intensity = 1.0,
         spreadFactor,
-        monstercat,
         noiseReduction = 0.85,
         peakHoldMs = 800,
         peakFallRate = 0.015,
@@ -110,9 +107,7 @@
     }
 
     function effectiveSpreadFactor(): number {
-        if (spreadFactor !== undefined) return spreadFactor;
-        if (monstercat !== undefined) return monstercat;
-        return 1.5;
+        return spreadFactor ?? 1.5;
     }
 
     function recomputeSpreadAttenuation(): void {

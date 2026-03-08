@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
     import { getTranscripts, getHealth, getConfig, getInsight, refreshInsight, type Transcript } from "../lib/api";
     import { ws } from "../lib/ws";
+    import { formatCount } from "../lib/formatters";
     import StatCard from "../lib/components/StatCard.svelte";
     import ActivityChart from "../lib/components/ActivityChart.svelte";
     import {
@@ -19,6 +20,7 @@
         Github,
         Linkedin,
         User,
+        Loader2,
     } from "lucide-svelte";
 
     /* ── Constants ── */
@@ -161,10 +163,6 @@
         return `${Math.round(v * 100)}%`;
     }
 
-    function formatCount(n: number): string {
-        return n.toLocaleString();
-    }
-
     /* ── Data loading ── */
     async function loadData() {
         loading = true;
@@ -244,13 +242,11 @@
 <div class="flex flex-col h-full bg-[var(--surface-primary)]">
     <div class="flex-1 overflow-y-auto">
         <div
-            class="w-full min-w-[var(--content-min-width)] mx-auto pt-[var(--space-5)] px-[var(--space-5)] flex flex-col gap-[var(--space-5)]"
+            class="w-full min-w-[var(--content-min-width)] mx-auto pt-[var(--space-5)] px-[var(--space-5)] pb-32 flex flex-col gap-[var(--space-5)]"
         >
             {#if loading}
                 <div class="flex flex-col items-center gap-[var(--space-3)] py-[96px] text-[var(--text-tertiary)]">
-                    <div
-                        class="w-8 h-8 border-[3px] border-[var(--shell-border)] border-t-[var(--accent)] rounded-full animate-spin"
-                    ></div>
+                    <Loader2 size={32} class="spin" />
                     <p>Loading your statistics…</p>
                 </div>
             {:else if !hasData}
@@ -462,7 +458,6 @@
                 <p class="text-[var(--text-xs)] text-[var(--accent)] m-0">Created by Andrew Brown</p>
             </footer>
 
-            <div class="h-32"></div>
         </div>
     </div>
 </div>

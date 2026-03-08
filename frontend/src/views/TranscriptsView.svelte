@@ -1,12 +1,4 @@
 <script lang="ts">
-    /**
-     * TranscriptsView — Full-width card-based transcript browser.
-     *
-     * Replaces the old split-panel project-tree layout with a flat,
-     * tag-filtered, searchable card list. Clicking a card navigates
-     * to the detail/edit view. Multi-select + bottom action bar.
-     */
-
     import {
         getTranscripts,
         getConfig,
@@ -512,7 +504,6 @@
                 searchResults = searchResults.filter((e) => !deleted.has(e.id));
             }),
             ws.on("refinement_complete", () => loadTranscripts()),
-            ws.on("refinement_error", () => {}),
             ws.on("transcript_updated", () => loadTranscripts()),
             ws.on("tag_created", () => loadTags()),
             ws.on("tag_updated", () => loadTags()),
@@ -843,6 +834,11 @@
         <div
             class="shrink-0 flex items-center gap-2 px-4 py-2.5 border-t border-[var(--shell-border)] bg-[var(--surface-secondary)]"
         >
+            <StyledButton size="sm" variant="destructive" onclick={handleDelete}>
+                <Trash2 size={13} />
+                {selection.isMulti ? `Delete ${selection.count}` : "Delete"}
+            </StyledButton>
+
             <span class="text-xs font-semibold text-[var(--accent)]">
                 {selection.count} selected
             </span>
@@ -871,11 +867,6 @@
             >
                 Clear
             </button>
-
-            <StyledButton size="sm" variant="destructive" onclick={handleDelete}>
-                <Trash2 size={13} />
-                {selection.isMulti ? `Delete ${selection.count}` : "Delete"}
-            </StyledButton>
         </div>
     {/if}
 </div>
@@ -884,8 +875,8 @@
 {#if tagAssignOpen}
     <div class="fixed inset-0 z-[199]" onclick={closeTagAssign} role="presentation"></div>
     <div
-        class="fixed min-w-[220px] max-w-[300px] max-h-[320px] overflow-y-auto bg-[var(--surface-primary)] border border-[var(--shell-border)] rounded-lg shadow-[0_12px_28px_rgba(0,0,0,0.45)] py-1 z-[200]"
-        style="left: {tagAssignX}px; bottom: {window.innerHeight - tagAssignY}px"
+        class="fixed min-w-[220px] max-w-[300px] max-h-[320px] overflow-y-auto bg-[var(--surface-primary)] border border-[var(--shell-border)] rounded-lg shadow-[0_12px_28px_rgba(0,0,0,0.45)] py-1 z-[200] -translate-y-full"
+        style="left: {tagAssignX}px; top: {tagAssignY}px"
         role="menu"
         tabindex="-1"
         onpointerdown={(e) => e.stopPropagation()}

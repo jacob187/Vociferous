@@ -6,8 +6,9 @@
      * All config mutations flow through parent-supplied `setSafe`.
      */
 
-    import { Loader2, Cpu, Download, CheckCircle, AlertCircle } from "lucide-svelte";
+    import { Loader2, Cpu, CheckCircle, AlertCircle } from "lucide-svelte";
     import CustomSelect from "./CustomSelect.svelte";
+    import DownloadButton from "./DownloadButton.svelte";
 
     interface Props {
         config: Record<string, any>;
@@ -88,12 +89,7 @@
                                     >
                                 </span>
                             {:else}
-                                <button
-                                    class="inline-flex items-center gap-1 py-1.5 px-3 border border-[var(--accent)] rounded-[var(--radius-sm)] bg-transparent text-[var(--accent)] font-[var(--font-family)] text-[var(--text-xs)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] hover:bg-[var(--accent)] hover:text-[var(--gray-0)]"
-                                    onclick={() => handleDownload("asr", getSafe(config, "model.model"))}
-                                >
-                                    <Download size={14} /> Download
-                                </button>
+                                <DownloadButton onclick={() => handleDownload("asr", getSafe(config, "model.model"))} />
                             {/if}
                         {:else}
                             <span

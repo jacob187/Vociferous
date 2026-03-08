@@ -1,7 +1,6 @@
 <script lang="ts">
     /**
-     * Animated toggle switch — ported from PyQt6 ToggleSwitch widget.
-     * Pill-shaped track with sliding circle, smooth CSS transitions.
+     * Animated toggle switch. Pill-shaped track with sliding circle.
      */
 
     let {

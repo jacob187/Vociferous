@@ -1,7 +1,6 @@
 <script lang="ts">
     /**
-     * WorkspacePanel — rounded visual container with subtle border.
-     * Ported from PyQt6 WorkspacePanel QPainter-drawn custom widget.
+     * WorkspacePanel — Rounded visual container with subtle border.
      * Supports editing and recording visual states via props.
      */
 

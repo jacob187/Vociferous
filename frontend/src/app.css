@@ -2,7 +2,6 @@
 
 /* ==========================================================================
    Vociferous Design System
-   Ported from PyQt6 constants: colors.py, typography.py, spacing.py, dimensions.py
    ========================================================================== */
 
 :root {
@@ -165,19 +164,6 @@
     /* Icon rail */
     --rail-width: 142px;
     --rail-button-height: 80px;
-    --rail-icon-size: 32px;
-
-    /* Toggle switch */
-    --toggle-width: 50px;
-    --toggle-height: 24px;
-    --toggle-radius: 12px;
-    --toggle-circle: 18px;
-    --toggle-circle-margin: 3px;
-
-    /* Button heights */
-    --btn-height-primary: 48px;
-    --btn-height-secondary: 40px;
-    --btn-min-width: 240px;
 
     /* Content column */
     --content-min-width: 480px;
@@ -307,4 +293,39 @@ select {
 
 ::placeholder {
     color: var(--text-tertiary);
+}
+
+/* ==========================================================================
+   GLOBAL ANIMATIONS
+   ========================================================================== */
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* Reusable spinner class (pairs with lucide Loader2 or any element) */
+.spin {
+    animation: spin 1.2s linear infinite;
+}
+
+@keyframes pulse-dot {
+    0%,
+    100% { opacity: 1; }
+    50%  { opacity: 0.3; }
+}
+
+@keyframes slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.animate-slide-in {
+    animation: slide-in 0.2s ease-out;
 }

@@ -1,13 +1,6 @@
 <script lang="ts">
     /**
      * SettingsView — Card-based configuration surface.
-     *
-     * Ported from PyQt6 SettingsView with:
-     * - Scrollable content centered within min/max width
-     * - Card-based sections: ASR, Recording, Output, Visualization
-     * - ToggleSwitch for boolean settings
-     * - Data management and application controls
-     * - Save/cancel footer
      */
 
     import { getConfig, updateConfig, getModels, getHealth, downloadModel } from "../lib/api";
@@ -19,6 +12,7 @@
     import MaintenanceCard from "../lib/components/MaintenanceCard.svelte";
     import OutputCard from "../lib/components/OutputCard.svelte";
     import AsrModelCard from "../lib/components/AsrModelCard.svelte";
+    import StyledButton from "../lib/components/StyledButton.svelte";
     import type { DownloadProgressData, EngineStatusData } from "../lib/events";
 
     /* ===== State ===== */
@@ -408,20 +402,12 @@
                 {/if}
                 <div class="flex-1"></div>
                 {#if isDirty}
-                    <button
-                        class="inline-flex items-center gap-1.5 h-9 px-[var(--space-3)] border-none rounded-[var(--radius-md)] font-[var(--font-family)] text-[var(--text-sm)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] bg-transparent text-[var(--text-secondary)] hover:enabled:text-[var(--text-primary)] hover:enabled:bg-[var(--hover-overlay)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        onclick={revertConfig}
-                        disabled={saving}
-                    >
+                    <StyledButton variant="ghost" size="sm" onclick={revertConfig} disabled={saving}>
                         <Undo2 size={14} /> Revert
-                    </button>
-                    <button
-                        class="inline-flex items-center gap-1.5 h-9 px-[var(--space-3)] border-none rounded-[var(--radius-md)] font-[var(--font-family)] text-[var(--text-sm)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] bg-[var(--accent)] text-[var(--gray-0)] hover:enabled:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        onclick={saveConfig}
-                        disabled={saving}
-                    >
+                    </StyledButton>
+                    <StyledButton variant="primary" size="sm" onclick={saveConfig} disabled={saving}>
                         {#if saving}<Loader2 size={14} class="spin" /> Saving…{:else}<Save size={14} /> Save Settings{/if}
-                    </button>
+                    </StyledButton>
                 {/if}
             </div>
         </div>

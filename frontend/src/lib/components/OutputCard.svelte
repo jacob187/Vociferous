@@ -6,9 +6,10 @@
      * SLM model selection + download, GPU layers, context size.
      */
 
-    import { Sliders, Loader2, Download, CheckCircle, AlertCircle } from "lucide-svelte";
+    import { Sliders, Loader2, CheckCircle, AlertCircle } from "lucide-svelte";
     import ToggleSwitch from "./ToggleSwitch.svelte";
     import CustomSelect from "./CustomSelect.svelte";
+    import DownloadButton from "./DownloadButton.svelte";
 
     interface Props {
         config: Record<string, any>;
@@ -141,13 +142,10 @@
                                         >
                                     </span>
                                 {:else}
-                                    <button
-                                        class="inline-flex items-center gap-1 py-1.5 px-3 border border-[var(--accent)] rounded-[var(--radius-sm)] bg-transparent text-[var(--accent)] font-[var(--font-family)] text-[var(--text-xs)] font-[var(--weight-emphasis)] cursor-pointer whitespace-nowrap transition-[background,color] duration-[var(--transition-fast)] hover:bg-[var(--accent)] hover:text-[var(--gray-0)]"
+                                    <DownloadButton
                                         onclick={() =>
                                             handleDownload("slm", getSafe(config, "refinement.model_id", "qwen4b"))}
-                                    >
-                                        <Download size={14} /> Download
-                                    </button>
+                                    />
                                 {/if}
                             {:else}
                                 <span

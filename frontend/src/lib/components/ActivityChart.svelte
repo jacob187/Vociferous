@@ -4,6 +4,8 @@
      * Self-contained: receives transcript entries, computes its own bucketing.
      */
 
+    import { formatCount } from "../formatters";
+
     interface DayBucket {
         date: string;
         label: string;
@@ -125,9 +127,6 @@
         return new Set(indices);
     });
 
-    function formatCount(n: number): string {
-        return n.toLocaleString();
-    }
 </script>
 
 <section class="flex flex-col gap-[var(--space-3)]">
@@ -138,7 +137,7 @@
         >
             Recent Activity — {chartTitle}
         </h3>
-        <div class="flex justify-center gap-[var(--space-2)] text-[var(--text-xs)] text-[var(--text-muted)]">
+        <div class="flex justify-center gap-[var(--space-2)] text-[var(--text-xs)] text-[var(--text-tertiary)]">
             <span>{activeDays} active day{activeDays !== 1 ? "s" : ""}</span>
             <span class="opacity-40">·</span>
             <span>{formatCount(periodWords)} words</span>
@@ -153,8 +152,7 @@
     >
         <svg
             viewBox="0 0 {svgWidth} {svgHeight + 8}"
-            class="w-full"
-            style="height: {periodDays <= 30 ? '126px' : '100px'}"
+            class="w-full {periodDays <= 30 ? 'h-[126px]' : 'h-[100px]'}"
             preserveAspectRatio="none"
         >
             <!-- Guide lines -->
@@ -188,7 +186,7 @@
                         width={barWidth}
                         height="1"
                         rx="0"
-                        class="fill-[var(--text-muted)] opacity-20"
+                        class="fill-[var(--text-tertiary)] opacity-20"
                     >
                         <title>{day.label}: no activity</title>
                     </rect>
@@ -201,7 +199,7 @@
             {#each buckets as day, i}
                 {#if labelIndices.has(i)}
                     <span
-                        class="absolute transform -translate-x-1/2 text-[10px] text-[var(--text-muted)] whitespace-nowrap"
+                        class="absolute transform -translate-x-1/2 text-[10px] text-[var(--text-tertiary)] whitespace-nowrap"
                         style="left: {((i * cellWidth + cellWidth / 2) / svgWidth) * 100}%"
                     >
                         {day.label}
@@ -219,7 +217,7 @@
                     class="px-[var(--space-3)] py-[var(--space-1)] rounded-[var(--radius-md)] text-[11px] font-medium border-none cursor-pointer transition-all duration-150 {activePeriod ===
                     period.key
                         ? 'bg-[var(--accent)] text-[var(--gray-0)]'
-                        : 'bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]'}"
+                        : 'bg-transparent text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)]'}"
                     onclick={() => (activePeriod = period.key)}
                 >
                     {period.label}

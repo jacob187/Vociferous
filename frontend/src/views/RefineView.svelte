@@ -1,10 +1,11 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
-    import { getTranscripts, getTranscript, refineTranscript, deleteVariant, type Transcript } from "../lib/api";
+    import { getTranscripts, getTranscript, refineTranscript, type Transcript } from "../lib/api";
     import { ws } from "../lib/ws";
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
     import MarkdownBody from "../lib/components/MarkdownBody.svelte";
+    import StyledButton from "../lib/components/StyledButton.svelte";
     import {
         Sparkles,
         Copy,
@@ -38,8 +39,6 @@
     let refineElapsed = $state(0);
     let refineTimer: ReturnType<typeof setInterval> | null = $state(null);
     let refineError = $state("");
-    /** Variant ID of the most recent refinement result (for discard/rerun cleanup). */
-    let currentVariantId: number | null = $state(null);
 
     /* ── Data ── */
     async function loadTranscripts() {
@@ -56,7 +55,6 @@
         selectedId = id;
         refinedText = "";
         hasRefined = false;
-        currentVariantId = null;
         showPicker = false;
         refineError = "";
         if (isRefining) {
@@ -119,29 +117,13 @@
     }
 
     function handleDiscard() {
-        if (selectedId != null && currentVariantId != null) {
-            // Fire-and-forget: delete the variant from persistence
-            deleteVariant(selectedId, currentVariantId).catch((e) =>
-                console.error("Failed to delete discarded variant:", e),
-            );
-        }
         refinedText = "";
         hasRefined = false;
-        currentVariantId = null;
     }
 
     async function handleRerun() {
-        // Delete the previous refinement variant before creating a new one
-        if (selectedId != null && currentVariantId != null) {
-            try {
-                await deleteVariant(selectedId, currentVariantId);
-            } catch (e) {
-                console.error("Failed to delete previous variant on rerun:", e);
-            }
-        }
         refinedText = "";
         hasRefined = false;
-        currentVariantId = null;
         await handleRefine();
     }
 
@@ -174,7 +156,6 @@
         unsubRefinement = ws.on("refinement_complete", (data) => {
             if (data.transcript_id === selectedId) {
                 refinedText = data.text;
-                currentVariantId = (data as any).variant_id ?? null;
                 isRefining = false;
                 hasRefined = true;
                 refineError = "";
@@ -433,8 +414,16 @@
         class="flex gap-[var(--space-2)] py-[var(--space-3)] px-[var(--space-4)] border-t border-[var(--shell-border)] justify-center"
     >
         {#if hasRefined}
+            {#if !accepted}
+                <StyledButton variant="danger-reveal" size="sm" title="Permanently removes this refinement from storage" onclick={handleDiscard}>
+                    <Trash2 size={15} /> Delete Result
+                </StyledButton>
+                <StyledButton variant="neutral" size="sm" onclick={handleRerun}>
+                    <RotateCcw size={15} /> Re-run
+                </StyledButton>
+            {/if}
             <button
-                class="accept-btn flex items-center gap-[var(--space-1)] py-[var(--space-2)] px-[var(--space-4)] border rounded-[var(--radius-md)] text-white text-[var(--text-sm)] font-[var(--weight-emphasis)] cursor-pointer transition-[color,border-color,background,transform] duration-[var(--transition-fast)] {accepted
+                class="flex items-center gap-[var(--space-1)] py-[var(--space-2)] px-[var(--space-4)] border rounded-[var(--radius-md)] text-white text-[var(--text-sm)] font-[var(--weight-emphasis)] cursor-pointer transition-[color,border-color,background,transform] duration-[var(--transition-fast)] active:scale-[0.93] {accepted
                     ? 'border-[var(--color-success)] bg-[var(--color-success)]'
                     : 'border-[var(--accent)] bg-[var(--accent)] hover:bg-[var(--blue-5)] hover:border-[var(--blue-5)]'}"
                 onclick={handleAccept}
@@ -445,39 +434,14 @@
                     <ThumbsUp size={15} /> Accept & Copy
                 {/if}
             </button>
-            {#if !accepted}
-                <button
-                    class="flex items-center gap-[var(--space-1)] py-[var(--space-2)] px-[var(--space-4)] border border-[var(--shell-border)] rounded-[var(--radius-md)] bg-[var(--surface-secondary)] text-[var(--text-secondary)] text-[var(--text-sm)] font-[var(--weight-emphasis)] cursor-pointer transition-[color,border-color,background] duration-[var(--transition-fast)] hover:text-[var(--text-primary)] hover:border-[var(--accent)]"
-                    onclick={handleRerun}
-                >
-                    <RotateCcw size={15} /> Re-run
-                </button>
-                <button
-                    class="flex items-center gap-[var(--space-1)] py-[var(--space-2)] px-[var(--space-4)] border border-[var(--shell-border)] rounded-[var(--radius-md)] bg-[var(--surface-secondary)] text-[var(--text-secondary)] text-[var(--text-sm)] font-[var(--weight-emphasis)] cursor-pointer transition-[color,border-color,background] duration-[var(--transition-fast)] hover:text-[var(--color-danger)] hover:border-[var(--color-danger)] hover:bg-[var(--color-danger-surface)]"
-                    title="Permanently removes this refinement from storage"
-                    onclick={handleDiscard}
-                >
-                    <Trash2 size={15} /> Delete Result
-                </button>
-            {/if}
         {:else}
-            <button
-                class="flex items-center gap-[var(--space-1)] py-[var(--space-2)] px-[var(--space-4)] border border-[var(--accent)] rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[var(--text-sm)] font-[var(--weight-emphasis)] cursor-pointer transition-[color,border-color,background] duration-[var(--transition-fast)] hover:bg-[var(--blue-5)] hover:border-[var(--blue-5)] disabled:opacity-50 disabled:cursor-not-allowed"
-                onclick={handleRefine}
-                disabled={selectedId === null || isRefining}
-            >
+            <StyledButton variant="primary" size="sm" onclick={handleRefine} disabled={selectedId === null || isRefining}>
                 {#if isRefining}
                     <Loader2 size={15} class="spin" /> Refining… {refineElapsed}s
                 {:else}
                     <Sparkles size={15} /> Refine
                 {/if}
-            </button>
+            </StyledButton>
         {/if}
     </div>
 </div>
-
-<style>
-    .accept-btn:active {
-        transform: scale(0.93);
-    }
-</style>
