@@ -19,26 +19,23 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_app_version() -> str:
-    """Resolve app version from package metadata, with pyproject fallback."""
-    try:
-        return importlib.metadata.version("vociferous")
-    except importlib.metadata.PackageNotFoundError:
-        pass
-    except Exception:
-        logger.exception("Failed to read version from package metadata")
-
+    """Resolve app version, preferring pyproject.toml as the source of truth."""
     try:
         root = Path(__file__).resolve().parents[2]
         pyproject_path = root / "pyproject.toml"
         if pyproject_path.is_file():
             with pyproject_path.open("rb") as f:
                 data = tomllib.load(f)
-            project = data.get("project", {})
-            version = project.get("version")
+            version = data.get("project", {}).get("version")
             if isinstance(version, str) and version.strip():
                 return version.strip()
     except Exception:
         logger.exception("Failed to read version from pyproject.toml")
+
+    try:
+        return importlib.metadata.version("vociferous")
+    except Exception:
+        logger.exception("Failed to read version from package metadata")
 
     return "unknown"
 

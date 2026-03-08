@@ -2,6 +2,17 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.3.3 — Version Resolution Fix + UserView Width
+
+**Date:** 2026-03-08
+**Status:** Hotfix / Polish
+
+### Fixed
+- **ISS-027** — `_resolve_app_version()` now reads `pyproject.toml` first and falls back to `importlib.metadata`. The stale installed metadata no longer causes a wrong version in the UI. Coordinator startup log now uses `APP_VERSION` instead of the hardcoded `"v5.0..."` string.
+- **ISS-033** — UserView content width bumped from `max-w-4xl` (896 px) to `max-w-6xl` (1152 px), filling roughly half a 1920 px viewport at fullscreen.
+
+---
+
 ## v5.3.2 — Refinement Accept/Discard + Button Bar Polish
 
 **Date:** 2026-03-08

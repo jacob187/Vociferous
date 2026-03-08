@@ -326,7 +326,7 @@
 <div class="flex flex-col h-full bg-[var(--surface-primary)]">
     <div class="flex-1 overflow-y-auto">
         <div
-            class="w-full max-w-4xl min-w-[var(--content-min-width)] mx-auto pt-[var(--space-5)] px-[var(--space-5)] pb-32 flex flex-col gap-[var(--space-5)]"
+            class="w-full max-w-6xl min-w-[var(--content-min-width)] mx-auto pt-[var(--space-5)] px-[var(--space-5)] pb-32 flex flex-col gap-[var(--space-5)]"
         >
             {#if loading}
                 <div class="flex flex-col items-center gap-[var(--space-3)] py-[96px] text-[var(--text-tertiary)]">
