@@ -492,6 +492,23 @@ class TranscriptDB:
             )
             self._conn.commit()
 
+    def batch_toggle_tag(self, transcript_ids: list[int], tag_id: int, *, add: bool) -> None:
+        """Add or remove a single tag from multiple transcripts in one transaction."""
+        if not transcript_ids:
+            return
+        with self._write_lock:
+            if add:
+                self._conn.executemany(
+                    "INSERT OR IGNORE INTO transcript_tags (transcript_id, tag_id) VALUES (?, ?)",
+                    [(tid, tag_id) for tid in transcript_ids],
+                )
+            else:
+                self._conn.executemany(
+                    "DELETE FROM transcript_tags WHERE transcript_id = ? AND tag_id = ?",
+                    [(tid, tag_id) for tid in transcript_ids],
+                )
+            self._conn.commit()
+
     def _get_tags_for_transcript(self, transcript_id: int) -> list[Tag]:
         """Fetch all tags for a transcript. Caller must hold _write_lock."""
         rows = self._conn.execute(

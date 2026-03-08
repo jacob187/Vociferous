@@ -134,6 +134,16 @@ class AssignTagsIntent(InteractionIntent):
 
 
 @dataclass(frozen=True, slots=True)
+class BatchToggleTagIntent(InteractionIntent):
+    """Add or remove a single tag from multiple transcripts in one transaction."""
+
+    transcript_ids: tuple[int, ...] = field(default_factory=tuple)
+    tag_id: int = 0
+    add: bool = True
+    source: IntentSource = IntentSource.API
+
+
+@dataclass(frozen=True, slots=True)
 class ClearTranscriptsIntent(InteractionIntent):
     """Delete all transcripts."""
 

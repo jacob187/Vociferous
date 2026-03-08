@@ -425,6 +425,7 @@ class ApplicationCoordinator:
             AssignTagsIntent,
             BatchDeleteTranscriptsIntent,
             BatchRetitleIntent,
+            BatchToggleTagIntent,
             BeginRecordingIntent,
             CancelRecordingIntent,
             ClearTranscriptsIntent,
@@ -488,6 +489,7 @@ class ApplicationCoordinator:
         bus.register(UpdateTagIntent, tag.handle_update)
         bus.register(DeleteTagIntent, tag.handle_delete)
         bus.register(AssignTagsIntent, tag.handle_assign_tags)
+        bus.register(BatchToggleTagIntent, tag.handle_batch_toggle_tag)
         bus.register(UpdateConfigIntent, system.handle_update_config)
         bus.register(RestartEngineIntent, system.handle_restart_engine)
         bus.register(RefreshInsightIntent, system.handle_refresh_insight)

@@ -110,6 +110,28 @@ def search_transcripts(q: str, limit: int = 50, offset: int = 0) -> dict:
     }
 
 
+@post("/api/transcripts/batch-tag-toggle")
+async def batch_tag_toggle(data: dict) -> Response:
+    """Add or remove a single tag from multiple transcripts in one DB transaction."""
+    transcript_ids = data.get("transcript_ids", [])
+    tag_id = data.get("tag_id")
+    add = data.get("add", True)
+
+    if not isinstance(transcript_ids, list) or not all(isinstance(i, int) for i in transcript_ids):
+        return Response(content={"error": "'transcript_ids' must be a list of integers"}, status_code=400)
+    if not isinstance(tag_id, int):
+        return Response(content={"error": "'tag_id' must be an integer"}, status_code=400)
+    if not transcript_ids:
+        return Response(content={"toggled": 0})
+
+    from src.core.intents.definitions import BatchToggleTagIntent
+
+    coordinator = get_coordinator()
+    intent = BatchToggleTagIntent(transcript_ids=tuple(transcript_ids), tag_id=tag_id, add=bool(add))
+    coordinator.command_bus.dispatch(intent)
+    return Response(content={"toggled": len(transcript_ids)})
+
+
 @post("/api/transcripts/{transcript_id:int}/refine")
 async def refine_transcript(transcript_id: int, data: dict) -> Response:
     """Queue a refinement via CommandBus intent."""

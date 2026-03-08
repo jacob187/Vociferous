@@ -71,3 +71,9 @@ class TagHandlers:
                 "tags": [{"id": t.id, "name": t.name, "color": t.color} for t in tags],
             },
         )
+
+    def handle_batch_toggle_tag(self, intent: Any) -> None:
+        db = self._db_provider()
+        if not db:
+            return
+        db.batch_toggle_tag(list(intent.transcript_ids), intent.tag_id, add=intent.add)

@@ -136,23 +136,19 @@ export function assignTags(transcriptId: number, tagIds: number[]): Promise<{ st
 }
 
 /**
- * Batch-assign tags to multiple transcripts.
+ * Add or remove a single tag from multiple transcripts in one server round-trip.
+ * add=true → insert the tag on all transcripts that lack it (preserves other tags).
+ * add=false → remove the tag from all specified transcripts (preserves other tags).
  */
-export async function batchAssignTags(
+export function batchToggleTag(
     transcriptIds: number[],
-    tagIds: number[],
-): Promise<{ succeeded: number; failed: number }> {
-    let succeeded = 0;
-    let failed = 0;
-    for (const id of transcriptIds) {
-        try {
-            await assignTags(id, tagIds);
-            succeeded++;
-        } catch {
-            failed++;
-        }
-    }
-    return { succeeded, failed };
+    tagId: number,
+    add: boolean,
+): Promise<{ toggled: number }> {
+    return request("/transcripts/batch-tag-toggle", {
+        method: "POST",
+        body: JSON.stringify({ transcript_ids: transcriptIds, tag_id: tagId, add }),
+    });
 }
 
 /**

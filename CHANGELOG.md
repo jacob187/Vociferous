@@ -2,6 +2,19 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.3.5 — Bulk Tag Toggle (ISS-030)
+
+**Date:** 2026-03-08
+**Status:** Hotfix / Bug Fix
+
+### Fixed
+- **ISS-030** — Multi-select tag assignment completely reworked.
+  - **O(n) loop eliminated**: new `POST /api/transcripts/batch-tag-toggle` endpoint dispatches `BatchToggleTagIntent`, which calls `db.batch_toggle_tag()` — a single `executemany` transaction instead of one request per transcript.
+  - **Tag replacement bug fixed**: clicking a tag in multi-select now adds it to transcripts that lack it (or removes it from all if every selected transcript already has it). All other tags on each transcript are untouched.
+  - **Checkmarks in multi-select**: ✓ shown when ALL selected transcripts have the tag; — (dash) shown when only SOME have it; blank when none have it.
+
+---
+
 ## v5.3.4 — MOTD Clip Fix + Transcriptions Action Bar
 
 **Date:** 2026-03-08

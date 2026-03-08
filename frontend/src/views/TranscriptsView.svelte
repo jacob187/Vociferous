@@ -11,7 +11,7 @@
         createTag,
         deleteTag,
         assignTags,
-        batchAssignTags,
+        batchToggleTag,
         type Transcript,
         type Tag,
         type SearchResult,
@@ -36,6 +36,7 @@
         ChevronRight,
         ArrowUpDown,
         Palette,
+        Minus,
     } from "lucide-svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
     import { formatDuration, wordCount, formatRelativeDate } from "../lib/formatters";
@@ -430,6 +431,7 @@
         if (ids.length === 0) return;
 
         if (ids.length === 1) {
+            // Single-select: replace the full tag set via existing endpoint
             const entry = filteredEntries.find((e) => e.id === ids[0]);
             if (!entry) return;
             const currentTagIds = entry.tags.map((t) => t.id);
@@ -438,7 +440,13 @@
                 : [...currentTagIds, tagId];
             await assignTags(ids[0], newTagIds);
         } else {
-            await batchAssignTags(ids, [tagId]);
+            // Multi-select: add if not all selected have the tag; remove if all do.
+            // Preserves every other tag on each transcript.
+            const selectedTranscripts = ids
+                .map((id) => filteredEntries.find((e) => e.id === id))
+                .filter(Boolean) as Transcript[];
+            const allHave = selectedTranscripts.every((t) => t.tags.some((tag) => tag.id === tagId));
+            await batchToggleTag(ids, tagId, !allHave);
         }
         await loadTranscripts();
     }
@@ -884,6 +892,11 @@
         {:else}
             {#each allTags as tag (tag.id)}
                 {@const isOn = selectedEntry ? selectedEntry.tags.some((t) => t.id === tag.id) : false}
+                {@const multiSelected = selection.isMulti
+                    ? (selection.ids.map((id) => filteredEntries.find((e) => e.id === id)).filter(Boolean) as Transcript[])
+                    : []}
+                {@const allHave = selection.isMulti && multiSelected.every((t) => t.tags.some((tt) => tt.id === tag.id))}
+                {@const someHave = selection.isMulti && !allHave && multiSelected.some((t) => t.tags.some((tt) => tt.id === tag.id))}
                 <button
                     class="w-full flex items-center gap-2 px-3 py-1.5 border-none bg-transparent text-left text-sm cursor-pointer transition-colors duration-150 hover:bg-[var(--hover-overlay)] text-[var(--text-primary)]"
                     onclick={() => toggleTagOnSelected(tag.id)}
@@ -891,8 +904,10 @@
                 >
                     <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background: {tagColor(tag)}"></span>
                     <span class="flex-1 truncate">{tag.name}</span>
-                    {#if isOn}
+                    {#if isOn || allHave}
                         <Check size={13} class="text-[var(--accent)] shrink-0" />
+                    {:else if someHave}
+                        <Minus size={13} class="text-[var(--text-tertiary)] shrink-0" />
                     {/if}
                 </button>
             {/each}
