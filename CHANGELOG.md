@@ -2,6 +2,17 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.3.4 — MOTD Clip Fix + Transcriptions Action Bar
+
+**Date:** 2026-03-08
+**Status:** Hotfix / Polish
+
+### Fixed
+- **ISS-028** — MOTD insight paragraph in TranscribeView now has `max-w-prose`, horizontal padding, and `overflow-wrap: anywhere`. Text wraps cleanly at any viewport width instead of clipping at the edge.
+- **ISS-029** — Transcriptions action bar overhauled: selection count moved to the controls row (right of total transcript count); Delete left-aligned; Edit / Copy / Tag / Refine right-aligned; Refine promoted to `variant="primary"` (accent blue); raw `<button>` Clear removed (Escape clears selection).
+
+---
+
 ## v5.3.3 — Version Resolution Fix + UserView Width
 
 **Date:** 2026-03-08

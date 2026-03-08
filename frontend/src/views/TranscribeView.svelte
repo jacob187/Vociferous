@@ -391,7 +391,7 @@
                 </h1>
                 {#if slmInsight}
                     <p
-                        class="text-[var(--text-base)] text-[var(--text-secondary)] italic mb-0 leading-[var(--leading-normal)] opacity-85"
+                        class="text-[var(--text-base)] text-[var(--text-secondary)] italic mb-0 leading-[var(--leading-normal)] opacity-85 max-w-prose px-[var(--space-4)] [overflow-wrap:anywhere]"
                     >
                         {slmInsight}
                     </p>
@@ -436,7 +436,7 @@
                 </h1>
                 {#if slmInsight}
                     <p
-                        class="text-[var(--text-base)] text-[var(--text-secondary)] italic mb-0 leading-[var(--leading-normal)] opacity-85"
+                        class="text-[var(--text-base)] text-[var(--text-secondary)] italic mb-0 leading-[var(--leading-normal)] opacity-85 max-w-prose px-[var(--space-4)] [overflow-wrap:anywhere]"
                     >
                         {slmInsight}
                     </p>

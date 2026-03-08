@@ -664,6 +664,9 @@
                 {/if}
             {/if}
         </span>
+        {#if selection.hasSelection}
+            <span class="text-xs font-semibold text-[var(--accent)]">{selection.count} selected</span>
+        {/if}
 
         <div class="flex-1"></div>
 
@@ -839,16 +842,11 @@
                 {selection.isMulti ? `Delete ${selection.count}` : "Delete"}
             </StyledButton>
 
-            <span class="text-xs font-semibold text-[var(--accent)]">
-                {selection.count} selected
-            </span>
+            <div class="flex-1"></div>
 
             {#if selection.count === 1}
                 <StyledButton size="sm" variant="secondary" onclick={editSelected}>
                     <Pencil size={13} /> Edit
-                </StyledButton>
-                <StyledButton size="sm" variant="secondary" onclick={refineSelected}>
-                    <Sparkles size={13} /> Refine
                 </StyledButton>
                 <StyledButton size="sm" variant="secondary" onclick={copySelectedText}>
                     {#if copied}<Check size={13} /> Copied{:else}<Copy size={13} /> Copy{/if}
@@ -856,17 +854,14 @@
             {/if}
 
             <StyledButton size="sm" variant="secondary" onclick={openTagAssign}>
-                <TagIcon size={13} /> Tag{selection.isMulti ? ` ${selection.count}` : ""}
+                <TagIcon size={13} /> Tag
             </StyledButton>
 
-            <div class="flex-1"></div>
-
-            <button
-                class="text-xs text-[var(--text-tertiary)] bg-transparent border-none cursor-pointer hover:text-[var(--text-primary)] transition-colors"
-                onclick={() => selection.clear()}
-            >
-                Clear
-            </button>
+            {#if selection.count === 1}
+                <StyledButton size="sm" variant="primary" onclick={refineSelected}>
+                    <Sparkles size={13} /> Refine
+                </StyledButton>
+            {/if}
         </div>
     {/if}
 </div>
