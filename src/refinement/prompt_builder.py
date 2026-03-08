@@ -31,19 +31,26 @@ with full privacy — no cloud, no data collection.
 
 Here are the user's current usage statistics:
 
+Overall:
 - Total transcriptions: {count}
 - Total words captured: {total_words}
 - Total recording time: {recorded_time}
 - Estimated time saved vs typing: {time_saved}
 - Average recording length: {avg_length}
-- Vocabulary diversity (unique/total words): {vocab_pct}
-- Total estimated silence in recordings: {silence}
-- Filler words detected: {fillers}
 
+Verbatim (raw speech-to-text output):
+- Vocabulary diversity: {verbatim_vocab_pct}
+- Filler words detected: {verbatim_fillers} ({verbatim_filler_density} of words)
+- Average Flesch-Kincaid reading level: grade {verbatim_fk_grade}
+- Average sentence length: {verbatim_avg_sentence_len} words
+
+{refinement_section}\
 Write exactly ONE short paragraph (2-3 sentences) giving the user personalized, \
 specific feedback based on these statistics. Be warm, direct, and subtly witty. \
-Reference concrete numbers. Do not use bullet points. Do not begin with "You" or \
-"Your". Do not mention the app name. Do not use exclamation marks more than once. \
+Reference concrete numbers. If refinement data is available, highlight the measurable \
+improvement between verbatim and refined text — this demonstrates the value of the \
+refinement pipeline. Do not use bullet points. Do not begin with "You" or "Your". \
+Do not mention the app name. Do not use exclamation marks more than once. \
 Write as a confident peer, not a cheerleader."""
 
     MOTD_TEMPLATE: str = """\

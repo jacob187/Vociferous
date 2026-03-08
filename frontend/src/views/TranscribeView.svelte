@@ -4,7 +4,7 @@
      *
      * States:
      *   IDLE         — Welcome greeting, ready to record
-     *   RECORDING    — Active recording with spectrum visualizer
+     *   RECORDING    — Active recording with pulse animation
      *   TRANSCRIBING — Processing audio, spinner shown
      *   READY        — Fresh transcript just arrived
      *   VIEWING      — Viewing a transcript
@@ -13,11 +13,11 @@
 
     import { ws } from "../lib/ws";
     import { onMount } from "svelte";
+    import RecordingOrrery from "../lib/components/RecordingOrrery.svelte";
     import { Mic, Square, Copy, Check, Pencil, Trash2, Save, Undo2, Loader2, Sparkles, Home } from "lucide-svelte";
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
-    import BarSpectrumVisualizer from "../lib/components/BarSpectrumVisualizer.svelte";
     import ActivityHeatmap from "../lib/components/ActivityHeatmap.svelte";
     import { formatDuration, formatWpm } from "../lib/formatters";
     import { Tag as TagIcon } from "lucide-svelte";
@@ -57,6 +57,9 @@
             .catch(() => {});
     }
 
+    /* ===== SLM insight (header subtitle) ===== */
+    let slmInsight = $state("");
+
     async function toggleTag(tagId: number) {
         if (transcriptId == null) return;
         const next = new Set(assignedTagIds);
@@ -74,10 +77,8 @@
         }
     }
 
-    let visualizerRef: BarSpectrumVisualizer | undefined = $state();
-
-    /* ===== SLM insight (header subtitle) ===== */
-    let slmInsight = $state("");
+    /* ===== Audio level (voice reactivity) ===== */
+    let audioLevel = $state(0);
 
     /* ===== Recent sessions (idle panel) ===== */
     let recentSessions = $state<Transcript[]>([]);
@@ -223,7 +224,6 @@
             }),
             ws.on("recording_stopped", (data) => {
                 stopRecordingTimer();
-                visualizerRef?.reset();
                 if (data.cancelled) {
                     viewState = "idle";
                 } else {
@@ -248,10 +248,8 @@
             ws.on("motd_ready", (data) => {
                 slmInsight = data.text || "";
             }),
-            ws.on("audio_spectrum", (data) => {
-                if (viewState === "recording" && visualizerRef) {
-                    visualizerRef.addSpectrum(data.bands);
-                }
+            ws.on("audio_level", (data) => {
+                audioLevel = data.level;
             }),
             ws.on("config_updated", (data) => {
                 const refinement = (data as any)?.refinement;
@@ -430,7 +428,43 @@
                 {/if}
             </div>
         {:else if viewState === "recording"}
-            <!-- empty during recording — status lives in the action bar -->
+            <div class="flex flex-col items-center text-center gap-[var(--space-1)]">
+                <h1
+                    class="text-3xl font-[var(--weight-emphasis)] text-[var(--accent)] m-0 leading-[var(--leading-tight)]"
+                >
+                    {greeting}
+                </h1>
+                {#if slmInsight}
+                    <p
+                        class="text-[var(--text-base)] text-[var(--text-secondary)] italic mb-0 leading-[var(--leading-normal)] opacity-85"
+                    >
+                        {slmInsight}
+                    </p>
+                {:else}
+                    <p class="text-[var(--text-sm)] text-[var(--text-tertiary)] mb-0">Recording in progress</p>
+                {/if}
+                {#if sessionStats && sessionStats.count > 0}
+                    <div class="flex items-center gap-[var(--space-4)] mt-[var(--space-1)]">
+                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
+                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                                >{sessionStats.todayWords.toLocaleString()}</span
+                            > words today
+                        </span>
+                        <span class="w-px h-4 bg-[var(--shell-border)]"></span>
+                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
+                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                                >{sessionStats.avgWpm > 0 ? sessionStats.avgWpm : "\u2014"}</span
+                            > wpm avg
+                        </span>
+                        <span class="w-px h-4 bg-[var(--shell-border)]"></span>
+                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
+                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                                >{sessionStats.count}</span
+                            > sessions
+                        </span>
+                    </div>
+                {/if}
+            </div>
         {:else if viewState === "transcribing"}
             <!-- empty during transcribing — spinner lives in the panel -->
         {:else}
@@ -519,39 +553,34 @@
 
     <!-- Content panel -->
     <WorkspacePanel editing={viewState === "editing"} recording={isRecording || isTranscribing}>
-        <!-- IDLE: mic CTA centered, heatmap anchored to bottom -->
-        {#if viewState === "idle"}
+        <!-- IDLE + RECORDING: shared composition with heatmap anchored at the bottom -->
+        {#if viewState === "idle" || viewState === "recording"}
             <div class="flex-1 flex flex-col min-h-0">
-                <!-- Upper zone: mic CTA, vertically centered -->
-                <div class="flex-1 flex flex-col items-center justify-center">
-                    <div class="flex flex-col items-center justify-center gap-[var(--space-4)]">
-                        <button
-                            class="w-[160px] h-[160px] rounded-full border-2 border-[var(--accent)] bg-transparent text-[var(--accent)] cursor-pointer flex items-center justify-center transition-[background,border-color,color] duration-[var(--transition-fast)] hover:bg-[var(--hover-overlay-blue)] hover:border-[var(--accent-hover)] hover:text-[var(--accent-hover)]"
-                            onclick={startRecording}
-                            aria-label="Start recording"
-                            title="Start recording"
-                        >
-                            <Mic size={56} strokeWidth={1.5} />
-                        </button>
-                        <p class="text-[var(--text-base)] text-[var(--text-tertiary)] m-0">Click to record</p>
-                    </div>
+                <div class="flex-1 min-h-0 flex flex-col items-center justify-center gap-[var(--space-4)]">
+                    {#if viewState === "idle"}
+                        <div class="flex flex-col items-center justify-center gap-[var(--space-4)]">
+                            <button
+                                class="w-[160px] h-[160px] rounded-full border-2 border-[var(--accent)] bg-transparent text-[var(--accent)] cursor-pointer flex items-center justify-center transition-[background,border-color,color] duration-[var(--transition-fast)] hover:bg-[var(--hover-overlay-blue)] hover:border-[var(--accent-hover)] hover:text-[var(--accent-hover)]"
+                                onclick={startRecording}
+                                aria-label="Start recording"
+                                title="Start recording"
+                            >
+                                <Mic size={56} strokeWidth={1.5} />
+                            </button>
+                            <p class="text-[var(--text-base)] text-[var(--text-tertiary)] m-0">Click to record</p>
+                        </div>
+                    {:else}
+                        <div class="w-full flex-1 min-h-0">
+                            <RecordingOrrery {audioLevel} />
+                        </div>
+                    {/if}
                 </div>
 
-                <!-- Lower zone: activity heatmap -->
                 {#if recentSessions.length > 0}
                     <div class="shrink-0 flex flex-col gap-[var(--space-2)] px-[var(--space-1)]">
                         <ActivityHeatmap entries={recentSessions} />
                     </div>
                 {/if}
-            </div>
-
-            <!-- RECORDING: spectrum fills the full panel, flush to bottom -->
-        {:else if viewState === "recording"}
-            <div class="flex-1 flex flex-col">
-                <!-- Spectrum fills all available space, flush to bottom edge of panel -->
-                <div class="flex-1 min-h-[120px]">
-                    <BarSpectrumVisualizer bind:this={visualizerRef} active={isRecording} numBars={64} />
-                </div>
             </div>
 
             <!-- TRANSCRIBING: spinner -->
@@ -583,28 +612,49 @@
         {/if}
     </WorkspacePanel>
 
-    <!-- Action bar (below panel) -->
-    {#if viewState !== "idle" && viewState !== "transcribing"}
+    <!-- Recording controls (below heatmap, above action bar) -->
+    {#if viewState === "recording"}
         <div class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] shrink-0">
-            {#if viewState === "recording"}
-                <!-- Cancel left, status+timer centered, Stop right -->
-                <StyledButton variant="danger-outline" size="sm" onclick={cancelRecording} ariaLabel="Cancel recording and discard audio" title="Cancel recording and discard captured audio">
-                    <Trash2 size={15} /> Cancel
-                </StyledButton>
-                <div class="flex-1 flex items-center justify-center gap-[var(--space-2)]">
-                    <span
-                        class="w-2 h-2 rounded-full bg-[var(--color-danger)] shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite]"
-                    ></span>
-                    <span class="text-[var(--text-sm)] text-[var(--color-danger)]">Recording in progress…</span>
-                    <span class="w-px h-4 bg-[var(--shell-border)]"></span>
-                    <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)] tabular-nums"
-                        >{formatElapsed(recordingElapsedMs)}</span
-                    >
-                </div>
-                <StyledButton variant="primary" size="sm" onclick={stopRecording} ariaLabel="Stop recording and transcribe" title="Stop recording and transcribe audio">
-                    <Square size={15} fill="currentColor" /> Stop &amp; Transcribe
-                </StyledButton>
-            {:else if viewState === "editing"}
+            <StyledButton
+                variant="danger-outline"
+                size="sm"
+                onclick={cancelRecording}
+                ariaLabel="Cancel recording and discard audio"
+                title="Cancel recording and discard captured audio"
+            >
+                <Trash2 size={15} /> Cancel
+            </StyledButton>
+
+            <div class="flex-1 flex items-center justify-center gap-[var(--space-2)] min-w-0">
+                <span
+                    class="w-2 h-2 rounded-full bg-[var(--color-danger)] shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite]"
+                ></span>
+                <span class="text-[var(--text-sm)] text-[var(--color-danger)] whitespace-nowrap"
+                    >Recording in progress…</span
+                >
+                <span class="w-px h-4 bg-[var(--shell-border)] shrink-0"></span>
+                <span
+                    class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)] tabular-nums whitespace-nowrap"
+                    >{formatElapsed(recordingElapsedMs)}</span
+                >
+            </div>
+
+            <StyledButton
+                variant="primary"
+                size="sm"
+                onclick={stopRecording}
+                ariaLabel="Stop recording and transcribe"
+                title="Stop recording and transcribe audio"
+            >
+                <Square size={15} fill="currentColor" /> Stop &amp; Transcribe
+            </StyledButton>
+        </div>
+    {/if}
+
+    <!-- Action bar (below panel) -->
+    {#if viewState !== "idle" && viewState !== "transcribing" && viewState !== "recording"}
+        <div class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] shrink-0">
+            {#if viewState === "editing"}
                 <StyledButton variant="ghost" size="sm" onclick={discardEdits}>
                     <Undo2 size={14} /> Discard
                 </StyledButton>
@@ -645,4 +695,3 @@
         </div>
     {/if}
 </div>
-

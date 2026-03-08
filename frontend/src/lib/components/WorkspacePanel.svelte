@@ -18,8 +18,8 @@
         "flex-1 flex flex-col overflow-hidden bg-[var(--surface-secondary)] border border-[var(--shell-border)] rounded-xl transition-all duration-250";
 
     let paddingClasses = $derived.by(() => {
-        // Recording: flush bottom so the spectrum grows into the panel edge
-        if (recording) return "pt-4 px-4 pb-0";
+        // Recording: keep standard padding (centered pulse animation)
+        if (recording) return "p-4";
         return "p-4";
     });
 

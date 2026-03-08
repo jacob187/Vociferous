@@ -153,9 +153,12 @@ class TestTemplates:
             "recorded_time",
             "time_saved",
             "avg_length",
-            "vocab_pct",
-            "silence",
-            "fillers",
+            "verbatim_vocab_pct",
+            "verbatim_fillers",
+            "verbatim_filler_density",
+            "verbatim_fk_grade",
+            "verbatim_avg_sentence_len",
+            "refinement_section",
         ]:
             assert f"{{{key}}}" in PromptBuilder.INSIGHT_TEMPLATE
 
@@ -165,15 +168,20 @@ class TestTemplates:
 
     def test_insight_template_can_format(self) -> None:
         """Ensure the template formats without error given valid data."""
-        result = PromptBuilder.INSIGHT_TEMPLATE.format(
-            count=10,
-            total_words="1,234",
-            recorded_time="5m",
-            time_saved="2m",
-            avg_length="30s",
-            vocab_pct="25%",
-            silence="10s",
-            fillers=5,
+        result = PromptBuilder.INSIGHT_TEMPLATE.format_map(
+            {
+                "count": 10,
+                "total_words": "1,234",
+                "recorded_time": "5m",
+                "time_saved": "2m",
+                "avg_length": "30s",
+                "verbatim_vocab_pct": "25%",
+                "verbatim_fillers": 5,
+                "verbatim_filler_density": "3.2%",
+                "verbatim_fk_grade": 6.5,
+                "verbatim_avg_sentence_len": 12.3,
+                "refinement_section": "",
+            }
         )
         assert "10" in result
         assert "1,234" in result

@@ -194,9 +194,15 @@ def _v4_drop_projects_and_variants(conn: sqlite3.Connection) -> None:
     conn.execute("DROP INDEX IF EXISTS idx_transcripts_project")
     conn.execute("DROP INDEX IF EXISTS idx_variants_transcript")
 
-    # Phase 3: Drop dependent tables
+    # Phase 3: Drop dependent tables.
+    # Commit any open implicit transaction before touching PRAGMA foreign_keys —
+    # SQLite silently ignores FK pragma changes issued mid-transaction (Python 3.6+
+    # no longer auto-commits before DDL, so the Phase 1 UPDATE leaves one open).
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF")
     conn.execute("DROP TABLE IF EXISTS transcript_variants")
     conn.execute("DROP TABLE IF EXISTS projects")
+    conn.execute("PRAGMA foreign_keys = ON")
 
     # Phase 4: Remove vestigial columns (SQLite 3.35+, guaranteed by Python 3.12+)
     # Column drops require no active FK constraints on the column, so disable temporarily.

@@ -317,7 +317,6 @@ def _wire_event_bridge(coordinator: ApplicationCoordinator, ws_manager: Connecti
         "transcription_complete",
         "transcription_error",
         "audio_level",
-        "audio_spectrum",
         "refinement_started",
         "refinement_complete",
         "refinement_error",

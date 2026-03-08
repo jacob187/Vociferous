@@ -214,17 +214,43 @@ class InsightManager:
             total_words = stats.get("total_words", 0)
             speech_seconds = stats.get("recorded_seconds", 0) - stats.get("total_silence_seconds", 0)
             avg_pace = round(total_words / (speech_seconds / 60)) if speech_seconds > 0 else 0
-            prompt = self._prompt_template.format(
-                count=stats.get("count", 0),
-                total_words=f"{total_words:,}",
-                recorded_time=self._fmt_duration(stats.get("recorded_seconds", 0)),
-                time_saved=self._fmt_duration(stats.get("time_saved_seconds", 0)),
-                avg_length=self._fmt_duration(stats.get("avg_seconds", 0)),
-                vocab_pct=f"{stats.get('vocab_ratio', 0):.0%}",
-                silence=self._fmt_duration(stats.get("total_silence_seconds", 0)),
-                fillers=stats.get("filler_count", 0),
-                avg_pace=avg_pace,
-            )
+
+            # Build the refinement comparison section if data exists
+            refined_count = stats.get("refined_count", 0)
+            if refined_count > 0:
+                refinement_section = (
+                    f"Refined (after AI refinement — {refined_count} transcripts):\n"
+                    f"- Vocabulary diversity: {stats.get('refined_vocab_ratio', 0):.0%}\n"
+                    f"- Filler words remaining: {stats.get('refined_filler_count', 0)} "
+                    f"({stats.get('refined_filler_density', 0):.1%} of words)\n"
+                    f"- Average Flesch-Kincaid reading level: grade {stats.get('refined_avg_fk_grade', 0)}\n"
+                    f"- Average sentence length: {stats.get('refined_avg_sentence_length', 0)} words\n"
+                    f"- Fillers removed by refinement: "
+                    f"{stats.get('verbatim_filler_count', 0) - stats.get('refined_filler_count', 0)}\n\n"
+                )
+            else:
+                refinement_section = ""
+
+            # Superset of format fields — each template uses whichever it needs.
+            fmt = {
+                "count": stats.get("count", 0),
+                "total_words": f"{total_words:,}",
+                "recorded_time": self._fmt_duration(stats.get("recorded_seconds", 0)),
+                "time_saved": self._fmt_duration(stats.get("time_saved_seconds", 0)),
+                "avg_length": self._fmt_duration(stats.get("avg_seconds", 0)),
+                "avg_pace": avg_pace,
+                # Legacy keys (MOTD still uses these)
+                "vocab_pct": f"{stats.get('vocab_ratio', 0):.0%}",
+                # Verbatim pipeline
+                "verbatim_vocab_pct": f"{stats.get('verbatim_vocab_ratio', 0):.0%}",
+                "verbatim_fillers": stats.get("verbatim_filler_count", 0),
+                "verbatim_filler_density": f"{stats.get('verbatim_filler_density', 0):.1%}",
+                "verbatim_fk_grade": stats.get("verbatim_avg_fk_grade", 0),
+                "verbatim_avg_sentence_len": stats.get("verbatim_avg_sentence_length", 0),
+                # Refinement section (pre-built block or empty string)
+                "refinement_section": refinement_section,
+            }
+            prompt = self._prompt_template.format_map(fmt)
 
             slm = self._slm_provider()
             if slm is None:

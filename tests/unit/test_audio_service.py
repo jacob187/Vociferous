@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pytest
 
 from src.services.audio_service import AudioService
@@ -22,45 +21,7 @@ def audio_service(fresh_settings):
     return AudioService(
         settings_provider=lambda: fresh_settings,
         on_level_update=None,
-        on_spectrum_update=None,
     )
-
-
-# ── _compute_speech_bins ──────────────────────────────────────────────────
-
-
-class TestComputeSpeechBins:
-    """Frequency bin computation — the FFT→display mapping."""
-
-    def test_returns_correct_number_of_edges(self, audio_service):
-        """Should be N_BINS+1 edges (64 bins → 65 edges)."""
-        edges = audio_service._compute_speech_bins()
-        assert len(edges) == audio_service._N_BINS + 1
-
-    def test_edges_are_monotonically_increasing(self, audio_service):
-        """Bin edges must be sorted — log spacing means no overlaps."""
-        edges = audio_service._compute_speech_bins()
-        for i in range(len(edges) - 1):
-            assert edges[i] <= edges[i + 1]
-
-    def test_edges_within_fft_range(self, audio_service):
-        """All edges must be valid FFT bin indices."""
-        edges = audio_service._compute_speech_bins()
-        # 512-point FFT at 16kHz → 257 real bins (n//2 + 1)
-        max_bin = audio_service._FFT_WINDOW_SIZE // 2 + 1
-        assert all(0 <= e <= max_bin for e in edges)
-
-    def test_first_edge_covers_speech_minimum(self, audio_service):
-        """First edge should be at or near 100 Hz bin index."""
-        edges = audio_service._compute_speech_bins()
-        # 16kHz / 512 = 31.25 Hz per bin → 100 Hz ≈ bin 3
-        assert edges[0] >= 2  # at least above DC and 31 Hz
-
-    def test_deterministic(self, audio_service):
-        """Same input → same output (no random state)."""
-        a = audio_service._compute_speech_bins()
-        b = audio_service._compute_speech_bins()
-        np.testing.assert_array_equal(a, b)
 
 
 # ── validate_microphone ──────────────────────────────────────────────────
@@ -150,23 +111,15 @@ class TestValidateMicrophone:
 
 
 class TestConstructor:
-    """Init wires up bins and callbacks correctly."""
-
-    def test_bin_edges_computed_on_init(self, audio_service):
-        """_bin_edges should be populated at construction time."""
-        assert audio_service._bin_edges is not None
-        assert len(audio_service._bin_edges) == audio_service._N_BINS + 1
+    """Init wires up callbacks correctly."""
 
     def test_sample_rate_default(self, audio_service):
         assert audio_service.sample_rate == 16000
 
     def test_callbacks_stored(self, fresh_settings):
         on_level = MagicMock()
-        on_spectrum = MagicMock()
         svc = AudioService(
             settings_provider=lambda: fresh_settings,
             on_level_update=on_level,
-            on_spectrum_update=on_spectrum,
         )
         assert svc.on_level_update is on_level
-        assert svc.on_spectrum_update is on_spectrum

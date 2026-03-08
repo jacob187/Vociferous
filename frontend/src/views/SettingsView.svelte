@@ -315,30 +315,6 @@
                             >
                                 <label
                                     class="text-[var(--text-base)] text-[var(--text-secondary)] pt-2"
-                                    for="setting-viztype">Spectrum Type</label
-                                >
-                                <div class="flex flex-col gap-1 flex-1">
-                                    <div class="w-full max-w-[460px]">
-                                        <CustomSelect
-                                            id="setting-viztype"
-                                            options={[
-                                                { value: "bar", label: "Bar Spectrum" },
-                                                { value: "none", label: "None" },
-                                            ]}
-                                            value={getSafe(config, "visualizer.type", "bar")}
-                                            onchange={(v: string) => setSafe("visualizer.type", v)}
-                                        />
-                                    </div>
-                                    <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] italic"
-                                        >Audio visualizer shown during recording. "None" disables it to save CPU.</span
-                                    >
-                                </div>
-                            </div>
-                            <div
-                                class="grid grid-cols-[200px_minmax(0,1fr)] items-start gap-x-[var(--space-4)] min-h-[36px]"
-                            >
-                                <label
-                                    class="text-[var(--text-base)] text-[var(--text-secondary)] pt-2"
                                     for="setting-uiscale">UI Scale</label
                                 >
                                 <div class="flex flex-col gap-1 flex-1">

@@ -188,6 +188,7 @@ class TestReturnShape:
 
         stats = compute_usage_stats(db)
         expected_keys = {
+            # Overall (backward-compatible)
             "count",
             "total_words",
             "recorded_seconds",
@@ -196,5 +197,180 @@ class TestReturnShape:
             "vocab_ratio",
             "total_silence_seconds",
             "filler_count",
+            # Verbatim pipeline
+            "verbatim_total_words",
+            "verbatim_filler_count",
+            "verbatim_filler_density",
+            "verbatim_vocab_ratio",
+            "verbatim_avg_fk_grade",
+            "verbatim_avg_sentence_length",
+            "verbatim_avg_word_length",
+            "verbatim_long_word_ratio",
+            # Refinement pipeline
+            "refined_count",
+            "refined_total_words",
+            "refined_filler_count",
+            "refined_filler_density",
+            "refined_vocab_ratio",
+            "refined_avg_fk_grade",
+            "refined_avg_sentence_length",
+            "refined_avg_word_length",
+            "refined_long_word_ratio",
+            # Distribution data
+            "word_count_std_dev",
+            "word_count_mean",
+            "distribution_words",
+            "distribution_fk_verbatim",
+            "distribution_fk_refined",
         }
         assert set(stats.keys()) == expected_keys
+
+
+# ---------------------------------------------------------------------------
+# Verbatim / refined split
+# ---------------------------------------------------------------------------
+
+
+class TestVerbatimRefinedSplit:
+    """Verify stats are correctly split between verbatim and refined pipelines."""
+
+    def test_unrefined_transcript_counts_zero_refined(self, db):
+        db.add_transcript(raw_text="Hello world.", duration_ms=5000)
+
+        stats = compute_usage_stats(db)
+        assert stats["refined_count"] == 0
+        assert stats["refined_total_words"] == 0
+
+    def test_refined_transcript_detected(self, db):
+        t = db.add_transcript(raw_text="um hello um world", duration_ms=5000)
+        db.update_normalized_text(t.id, "Hello world.")
+
+        stats = compute_usage_stats(db)
+        assert stats["refined_count"] == 1
+        assert stats["refined_total_words"] == 2
+
+    def test_verbatim_fillers_counted_from_raw(self, db):
+        t = db.add_transcript(raw_text="um like I basically went um there", duration_ms=5000)
+        db.update_normalized_text(t.id, "I went there.")
+
+        stats = compute_usage_stats(db)
+        assert stats["verbatim_filler_count"] == 4  # um x2, like, basically
+        assert stats["refined_filler_count"] == 0
+
+    def test_filler_density_ratio(self, db):
+        t = db.add_transcript(raw_text="um um um um um um um um um um", duration_ms=5000)
+        db.update_normalized_text(t.id, "Something meaningful.")
+
+        stats = compute_usage_stats(db)
+        assert stats["verbatim_filler_density"] == 1.0  # all words are fillers
+        assert stats["refined_filler_density"] == 0.0
+
+    def test_verbatim_stats_always_from_raw_text(self, db):
+        """Even when refined, verbatim metrics should reflect raw_text."""
+        t = db.add_transcript(
+            raw_text="The quick brown fox jumped over the lazy dog.",
+            duration_ms=5000,
+        )
+        db.update_normalized_text(t.id, "A nimble russet fox leaped across the indolent canine.")
+
+        stats = compute_usage_stats(db)
+        assert stats["verbatim_total_words"] == 9
+        assert stats["refined_total_words"] == 9
+
+    def test_mixed_refined_and_unrefined(self, db):
+        db.add_transcript(raw_text="First entry here.", duration_ms=3000)
+        t2 = db.add_transcript(raw_text="um second um entry", duration_ms=4000)
+        db.update_normalized_text(t2.id, "Second entry.")
+
+        stats = compute_usage_stats(db)
+        assert stats["count"] == 2
+        assert stats["refined_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Text analysis metrics (FK grade, sentence length, etc.)
+# ---------------------------------------------------------------------------
+
+
+class TestTextAnalysisMetrics:
+    """Verify Flesch-Kincaid and related metrics are computed."""
+
+    def test_fk_grade_nonzero_for_real_text(self, db):
+        db.add_transcript(
+            raw_text="The committee convened to discuss the preliminary findings. "
+            "Several members expressed reservations about the methodology.",
+            duration_ms=10000,
+        )
+        stats = compute_usage_stats(db)
+        assert stats["verbatim_avg_fk_grade"] > 0
+
+    def test_refined_fk_grade_only_from_refined_transcripts(self, db):
+        db.add_transcript(raw_text="Simple words here.", duration_ms=3000)
+
+        stats = compute_usage_stats(db)
+        # No refinement — refined FK should be 0
+        assert stats["refined_avg_fk_grade"] == 0.0
+
+    def test_avg_word_length_reasonable(self, db):
+        db.add_transcript(raw_text="The cat sat on a mat.", duration_ms=3000)
+
+        stats = compute_usage_stats(db)
+        # Average word length should be in a sane range
+        assert 2.0 <= stats["verbatim_avg_word_length"] <= 5.0
+
+    def test_long_word_ratio(self, db):
+        db.add_transcript(
+            raw_text="Internationalization is a sophisticated concept.",
+            duration_ms=5000,
+        )
+        stats = compute_usage_stats(db)
+        # "Internationalization" and "sophisticated" are > 6 chars
+        assert stats["verbatim_long_word_ratio"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Distribution data
+# ---------------------------------------------------------------------------
+
+
+class TestDistributionData:
+    """Verify distribution arrays for bell curve visualizations."""
+
+    def test_distribution_words_length_matches_count(self, db):
+        db.add_transcript(raw_text="Hello world.", duration_ms=3000)
+        db.add_transcript(raw_text="Testing one two three.", duration_ms=4000)
+
+        stats = compute_usage_stats(db)
+        assert len(stats["distribution_words"]) == 2
+        assert sorted(stats["distribution_words"]) == [2.0, 4.0]
+
+    def test_distribution_fk_verbatim_populated(self, db):
+        db.add_transcript(
+            raw_text="The quick brown fox jumps over the lazy dog.",
+            duration_ms=5000,
+        )
+        stats = compute_usage_stats(db)
+        assert len(stats["distribution_fk_verbatim"]) == 1
+        assert stats["distribution_fk_verbatim"][0] > 0
+
+    def test_distribution_fk_refined_only_for_refined(self, db):
+        t = db.add_transcript(raw_text="um hello um world", duration_ms=3000)
+        db.update_normalized_text(t.id, "Hello, world.")
+        db.add_transcript(raw_text="Plain entry.", duration_ms=3000)
+
+        stats = compute_usage_stats(db)
+        # Only the refined transcript should appear in refined FK distribution
+        assert len(stats["distribution_fk_refined"]) == 1
+        # Both should appear in verbatim FK distribution
+        assert len(stats["distribution_fk_verbatim"]) == 2
+
+    def test_word_count_std_dev(self, db):
+        db.add_transcript(raw_text="Short.", duration_ms=2000)
+        db.add_transcript(
+            raw_text=" ".join(["word"] * 50),
+            duration_ms=20000,
+        )
+
+        stats = compute_usage_stats(db)
+        assert stats["word_count_std_dev"] > 0
+        assert stats["word_count_mean"] > 0

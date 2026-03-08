@@ -355,13 +355,9 @@ class ApplicationCoordinator:
             def on_level(level: float) -> None:
                 self.event_bus.emit("audio_level", {"level": level})
 
-            def on_spectrum(bands: list[float]) -> None:
-                self.event_bus.emit("audio_spectrum", {"bands": bands})
-
             self.audio_service = AudioService(
                 settings_provider=lambda: self.settings,
                 on_level_update=on_level,
-                on_spectrum_update=on_spectrum,
             )
             logger.info("Audio service ready")
         except Exception:

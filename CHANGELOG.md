@@ -2,10 +2,37 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
-## [5.2.0] - Database Schema Simplification & Legacy System Removal
+## v5.3.1 — Recording View Polish: Audio-Reactive Mic Button
+
+**Date:** 2026-03-08
+**Status:** Polish / Cleanup
+
+### Overview
+
+Scrapped the over-engineered canvas-based solar system orrery (221MB pre-rendered sprite atlases, three TypeScript modules, an offline Node.js pre-render pipeline) that failed to render reliably under WebKitGTK. Replaced with a focused, ~100-line audio-reactive mic button that does exactly what the recording view needs: a centered indicator that pulses with your voice.
+
+### Removed
+- `frontend/src/lib/orrery/` — `aurelia-system.ts`, `renderer.ts`, `atlas-loader.ts` (1,500+ lines of canvas/sprite machinery)
+- `scripts/prerender-orrery/index.ts` — offline Node.js pre-render pipeline
+- `@napi-rs/canvas` devDependency and `prerender:low/medium/high` npm scripts
+- `planet_density` field from `DisplaySettings`, all frontend config/WS handlers, and the "Planet Density" dropdown in `SettingsView`
+
+### Changed
+- **`RecordingOrrery.svelte`** — Rewritten from 267 lines of broken canvas machinery to ~100 lines of clean DOM:
+  - Audio-reactive radial glow: `scale` and `opacity` track `audioLevel` via a smoothed rAF loop
+  - `box-shadow` on the mic button brightens proportionally with voice amplitude
+  - Two staggered sonar-style ripple rings (4.5s expand-and-fade, active only while speaking)
+  - Idle breathing animation (`@keyframes`) when silent, disabled via `animation: none` when the rAF loop is active so CSS never overrides JS-driven values
+  - Responsive sizing via `ResizeObserver`
+
+---
+
+## v5.3.0 — Database Schema Simplification & Legacy System Removal
 
 **Date:** 2026-03-07
 **Status:** Feature / Refactor
+
+### Overview
 
 Massive architectural cleanup removing the deprecated "Project" and "Variant" systems.
 
@@ -22,12 +49,12 @@ Massive architectural cleanup removing the deprecated "Project" and "Variant" sy
 
 ---
 
----
-
-## Maintenance — Frontend Audit: Dead Code, Component Consolidation, Design Conformity
+## v5.2.2 — Frontend Audit: Dead Code, Component Consolidation, Design Conformity
 
 **Date:** 2026-03-07
-**Status:** Chore (no behavior change)
+**Status:** Maintenance Release (no behavior change)
+
+### Overview
 
 Comprehensive frontend audit pass. Removed dead/orphaned code, consolidated duplicate implementations, enforced Svelte 5 idioms, centralised global animations, and applied design-system conformity across all action bars.
 
@@ -65,12 +92,16 @@ Comprehensive frontend audit pass. Removed dead/orphaned code, consolidated dupl
 
 ---
 
-## Maintenance — Python Backend Style Pass
+## v5.2.1 — Python Backend Style Pass
 
 **Date:** 2026-03-07
-**Status:** Chore (no behavior change)
+**Status:** Maintenance Release (no behavior change)
+
+### Overview
 
 PEP 8 compliance and naming clarity pass across all backend Python files. No logic changed.
+
+### Changed
 
 - **Naming** — Replaced ambiguous single-letter variables throughout: `t` → `transcript` (Transcript objects), `t` → `token` (FTS search tokens), `t` → `thread` (Thread objects), `m`/`h`/`rm` → `minutes`/`hours`/`remaining_minutes` in `InsightManager._fmt_duration`, `s` → `settings` in `SLMRuntime` and `LogManager`.
 - **Import hygiene** — `from abc import ABC` moved before `from dataclasses import dataclass` in `intents/__init__.py` (stdlib alphabetical order); `import time` moved from inside `_batch_retitle_task` method body to module-level in `title_generator.py`; removed empty `if TYPE_CHECKING: pass` block in `log_manager.py`.

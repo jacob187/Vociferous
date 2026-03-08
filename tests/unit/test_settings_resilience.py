@@ -254,7 +254,6 @@ class TestRoundtripFidelity:
             "recording",
             "user",
             "logging",
-            "visualizer",
             "output",
             "refinement",
         ]

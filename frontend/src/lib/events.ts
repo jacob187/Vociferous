@@ -31,10 +31,6 @@ export interface AudioLevelData {
     level: number;
 }
 
-export interface AudioSpectrumData {
-    bands: number[];
-}
-
 export interface RefinementStartedData {
     transcript_id: number;
     level: number;
@@ -137,7 +133,6 @@ export interface WSEventMap {
     transcription_complete: TranscriptionCompleteData;
     transcription_error: TranscriptionErrorData;
     audio_level: AudioLevelData;
-    audio_spectrum: AudioSpectrumData;
     refinement_started: RefinementStartedData;
     refinement_complete: RefinementCompleteData;
     refinement_error: RefinementErrorData;
@@ -205,8 +200,6 @@ export const wsEventValidators: {
         isObject(data) && isString(data.message),
     audio_level: (data): data is AudioLevelData =>
         isObject(data) && isNumber(data.level),
-    audio_spectrum: (data): data is AudioSpectrumData =>
-        isObject(data) && isNumberArray(data.bands),
     refinement_started: (data): data is RefinementStartedData =>
         isObject(data) && isNumber(data.transcript_id) && isNumber(data.level),
     refinement_complete: (data): data is RefinementCompleteData =>

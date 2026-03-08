@@ -87,23 +87,6 @@ class LoggingSettings(BaseModel):
     structured_output: bool = False
 
 
-class VisualizerSettings(BaseModel):
-    """Audio visualizer configuration."""
-
-    model_config = ConfigDict(frozen=True)
-
-    type: str = "bars"
-    style: str = "interstellar"
-    quality: str = "medium"
-    intensity: float = 1.0
-    num_bars: int = 64
-    decay_rate: float = 0.1
-    peak_hold_ms: int = 800
-    monstercat: float = 0.8
-    noise_reduction: float = 0.77
-    gate_aggression: float = 0.0
-
-
 class OutputSettings(BaseModel):
     """Text output configuration."""
 
@@ -154,7 +137,6 @@ class VociferousSettings(BaseSettings):
     recording: RecordingSettings = Field(default_factory=RecordingSettings)
     user: UserSettings = Field(default_factory=UserSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
-    visualizer: VisualizerSettings = Field(default_factory=VisualizerSettings)
     output: OutputSettings = Field(default_factory=OutputSettings)
     refinement: RefinementSettings = Field(default_factory=RefinementSettings)
     display: DisplaySettings = Field(default_factory=DisplaySettings)
