@@ -111,6 +111,10 @@ class RefinementSettings(BaseModel):
     enabled: bool = True
     model_id: str = "qwen14b"
     n_gpu_layers: int = -1  # -1 = full GPU (CT2 device="cuda"), 0 = CPU only
+    temperature: float = 0.3
+    top_p: float = 0.9
+    top_k: int = 20
+    repetition_penalty: float = 1.0
     system_prompt: str = "You are a professional editor and proofreader."
     invariants: list[str] = Field(
         default_factory=lambda: [

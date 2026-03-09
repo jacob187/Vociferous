@@ -2,6 +2,21 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.3.13 — Refinement Generation Params Into Settings (TODO-4)
+
+**Date:** 2026-03-09
+**Status:** Hotfix / Polish
+
+### Changed
+- **TODO-4** — `temperature`, `top_p`, `top_k`, and `repetition_penalty` are now stored in `RefinementSettings` instead of being scattered as hardcoded literals.
+  - `RefinementSettings` gains four fields with the previously-hardcoded production defaults (`temperature=0.3`, `top_p=0.9`, `top_k=20`, `repetition_penalty=1.0`).
+  - `SLMRuntime._sampling_params_for_level()` reads from live settings instead of returning a static dict; method changed from `@staticmethod` to instance method.
+  - `RefinementEngine.refine()` gains `repetition_penalty` as an explicit parameter (was hardcoded in the `generate_batch()` call body and not overridable by callers).
+  - Defaults on `engine.refine()` updated to match the production values (`temperature` was 0.05, `top_p` was 0.8 — both stale from an earlier tuning era).
+  - Lays groundwork for ISS-025 (advanced model settings UI) without touching the API or frontend.
+
+---
+
 ## v5.3.12 — Retire Show Backend Details (ISS-041)
 
 **Date:** 2026-03-09

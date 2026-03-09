@@ -177,9 +177,10 @@ class RefinementEngine:
         self,
         text: str,
         user_instructions: str = "",
-        temperature: float = 0.05,
-        top_p: float = 0.8,
+        temperature: float = 0.3,
+        top_p: float = 0.9,
         top_k: int = 20,
+        repetition_penalty: float = 1.0,
         use_thinking: bool = False,
     ) -> GenerationResult:
         """
@@ -225,7 +226,7 @@ class RefinementEngine:
             sampling_temperature=effective_temp,
             sampling_topp=top_p,
             sampling_topk=top_k,
-            repetition_penalty=1.0,
+            repetition_penalty=repetition_penalty,
             end_token=self._end_tokens,
             include_prompt_in_result=False,
         )

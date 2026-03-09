@@ -129,8 +129,7 @@ class SLMRuntime:
                 self._engine = None
                 gc.collect()
 
-    @staticmethod
-    def _sampling_params_for_level(level: int) -> dict[str, float | int | bool]:
+    def _sampling_params_for_level(self, level: int) -> dict[str, float | int | bool]:
         """Return sampling profile for grammar-edit refinement.
 
         Thinking mode is DISABLED.  Empirical testing showed that Qwen3 models
@@ -141,10 +140,12 @@ class SLMRuntime:
         `level` is intentionally ignored — single-purpose grammar pipeline.
         """
         _ = level
+        r = self._settings_provider().refinement
         return {
-            "temperature": 0.3,
-            "top_p": 0.9,
-            "top_k": 20,
+            "temperature": r.temperature,
+            "top_p": r.top_p,
+            "top_k": r.top_k,
+            "repetition_penalty": r.repetition_penalty,
             "use_thinking": False,
         }
 
@@ -174,6 +175,7 @@ class SLMRuntime:
                 temperature=float(params["temperature"]),
                 top_p=float(params["top_p"]),
                 top_k=int(params["top_k"]),
+                repetition_penalty=float(params["repetition_penalty"]),
                 use_thinking=bool(params["use_thinking"]),
             )
         return result.content
@@ -209,6 +211,7 @@ class SLMRuntime:
                     temperature=float(params["temperature"]),
                     top_p=float(params["top_p"]),
                     top_k=int(params["top_k"]),
+                    repetition_penalty=float(params["repetition_penalty"]),
                     use_thinking=bool(params["use_thinking"]),
                 )
 
