@@ -17,6 +17,7 @@
         type SearchResult,
     } from "../lib/api";
     import { ws } from "../lib/ws";
+    import { toast } from "../lib/toast.svelte";
     import { nav } from "../lib/navigation.svelte";
     import { SelectionManager } from "../lib/selection.svelte";
     import { onMount } from "svelte";
@@ -289,8 +290,10 @@
                 entries = entries.filter((e) => !selection.isSelected(e.id));
                 searchResults = searchResults.filter((e) => !selection.isSelected(e.id));
                 selection.clear();
+                toast.success(`Deleted ${ids.length} transcripts`);
             } catch (e: any) {
                 error = e.message;
+                toast.error(`Delete failed: ${e.message}`);
             }
             return;
         }
@@ -300,8 +303,10 @@
             entries = entries.filter((e) => e.id !== selectedEntry!.id);
             searchResults = searchResults.filter((e) => e.id !== selectedEntry!.id);
             selection.clear();
+            toast.success("Transcript deleted");
         } catch (e: any) {
             error = e.message;
+            toast.error(`Delete failed: ${e.message}`);
         }
     }
 
@@ -365,8 +370,10 @@
             newTagName = "";
             showTagCreate = false;
             await loadTags();
+            toast.success(`Tag "${name}" created`);
         } catch (e: any) {
             error = e.message;
+            toast.error(`Tag creation failed: ${e.message}`);
         }
     }
 
@@ -379,8 +386,10 @@
             activeTagIds = next;
             await loadTags();
             await loadTranscripts();
+            toast.success("Tag deleted");
         } catch (e: any) {
             error = e.message;
+            toast.error(`Tag deletion failed: ${e.message}`);
         }
     }
 
@@ -408,6 +417,7 @@
             await loadTranscripts();
         } catch (e: any) {
             error = e.message;
+            toast.error(`Failed to update tag color: ${e.message}`);
         }
     }
 
@@ -431,25 +441,29 @@
         const ids = selection.ids;
         if (ids.length === 0) return;
 
-        if (ids.length === 1) {
-            // Single-select: replace the full tag set via existing endpoint
-            const entry = filteredEntries.find((e) => e.id === ids[0]);
-            if (!entry) return;
-            const currentTagIds = entry.tags.map((t) => t.id);
-            const newTagIds = currentTagIds.includes(tagId)
-                ? currentTagIds.filter((id) => id !== tagId)
-                : [...currentTagIds, tagId];
-            await assignTags(ids[0], newTagIds);
-        } else {
-            // Multi-select: add if not all selected have the tag; remove if all do.
-            // Preserves every other tag on each transcript.
-            const selectedTranscripts = ids
-                .map((id) => filteredEntries.find((e) => e.id === id))
-                .filter(Boolean) as Transcript[];
-            const allHave = selectedTranscripts.every((t) => t.tags.some((tag) => tag.id === tagId));
-            await batchToggleTag(ids, tagId, !allHave);
+        try {
+            if (ids.length === 1) {
+                // Single-select: replace the full tag set via existing endpoint
+                const entry = filteredEntries.find((e) => e.id === ids[0]);
+                if (!entry) return;
+                const currentTagIds = entry.tags.map((t) => t.id);
+                const newTagIds = currentTagIds.includes(tagId)
+                    ? currentTagIds.filter((id) => id !== tagId)
+                    : [...currentTagIds, tagId];
+                await assignTags(ids[0], newTagIds);
+            } else {
+                // Multi-select: add if not all selected have the tag; remove if all do.
+                // Preserves every other tag on each transcript.
+                const selectedTranscripts = ids
+                    .map((id) => filteredEntries.find((e) => e.id === id))
+                    .filter(Boolean) as Transcript[];
+                const allHave = selectedTranscripts.every((t) => t.tags.some((tag) => tag.id === tagId));
+                await batchToggleTag(ids, tagId, !allHave);
+            }
+            await loadTranscripts();
+        } catch (e: any) {
+            toast.error(`Tag update failed: ${e.message}`);
         }
-        await loadTranscripts();
     }
 
     /* ===== Keyboard ===== */

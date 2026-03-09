@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import { getTranscripts, getTranscript, refineTranscript, commitRefinement, type Transcript } from "../lib/api";
+    import { toast } from "../lib/toast.svelte";
     import { ws } from "../lib/ws";
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
@@ -100,6 +101,7 @@
         } catch (e) {
             console.error("Refinement failed:", e);
             refineError = e instanceof Error ? e.message : "Refinement request failed. Check that the model is loaded.";
+            toast.error(refineError);
             isRefining = false;
             stopRefineTimer();
         }
@@ -107,11 +109,16 @@
 
     async function handleAccept() {
         if (!refinedText || selectedId === null) return;
-        await commitRefinement(selectedId, refinedText);
-        navigator.clipboard.writeText(refinedText);
-        originalText = refinedText;
-        accepted = true;
-        setTimeout(() => (accepted = false), 2000);
+        try {
+            await commitRefinement(selectedId, refinedText);
+            navigator.clipboard.writeText(refinedText);
+            originalText = refinedText;
+            accepted = true;
+            setTimeout(() => (accepted = false), 2000);
+            toast.success("Refinement committed");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Failed to commit refinement");
+        }
     }
 
     function editSelectedTranscript() {
@@ -163,6 +170,7 @@
                 hasRefined = true;
                 refineError = "";
                 stopRefineTimer();
+                toast.success("Refinement complete");
             }
         });
 
@@ -171,6 +179,7 @@
                 isRefining = false;
                 stopRefineTimer();
                 refineError = data.message || "Refinement failed unexpectedly.";
+                toast.error(refineError);
                 console.error("Refinement error:", data.message);
             }
         });

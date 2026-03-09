@@ -9,6 +9,7 @@
     import { onMount } from "svelte";
     import { nav } from "../lib/navigation.svelte";
     import { getTranscript, dispatchIntent, type Transcript } from "../lib/api";
+    import { toast } from "../lib/toast.svelte";
     import { formatRelativeDate, formatDuration, wordCount } from "../lib/formatters";
     import StyledButton from "../lib/components/StyledButton.svelte";
     import { ArrowLeft, Check, X } from "lucide-svelte";
@@ -61,9 +62,11 @@
                 transcript_id: transcript.id,
                 content: editText.trim(),
             });
+            toast.success("Changes saved");
             nav.completeEditSession();
         } catch (e: any) {
             error = e.message;
+            toast.error(`Save failed: ${e.message}`);
             saving = false;
         }
     }

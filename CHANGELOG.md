@@ -2,6 +2,25 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.4.2 — Toast & Confirmation System (ISS-026)
+
+**Date:** 2026-03-09
+**Status:** Feature
+
+### Added
+- **Toast confirm() API** — `toast.confirm({ title, message, confirmLabel?, cancelLabel?, danger? })` returns a `Promise<boolean>`. One confirmation dialog shown at a time with FIFO queue. Esc/backdrop click cancels, Enter confirms.
+- **Confirmation dialog UI** — modal card with backdrop, danger variant support, keyboard handling. Uses existing `StyledButton` and design token system.
+- **`animate-fade-in`** CSS keyframe for backdrop transitions.
+
+### Changed
+- **RefineView** — `handleAccept()` now has proper try/catch (was silently swallowing errors). Toast success on refinement complete, toast error on refinement failure and commit failure.
+- **TranscriptsView** — Toast feedback on delete (single + batch), tag create, tag delete, tag color change failure, and tag assignment failure.
+- **EditView** — Toast error on save failure, toast success on save.
+- **SettingsView** — Toast success/error alongside existing inline message system.
+- **UserView** — Toast error on insight refresh failure.
+
+---
+
 ## v5.4.1 — Recording Active State UX Overhaul
 
 **Date:** 2026-03-09

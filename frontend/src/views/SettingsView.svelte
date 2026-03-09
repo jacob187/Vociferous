@@ -7,6 +7,7 @@
      */
 
     import { getConfig, updateConfig, getModels, getHealth, downloadModel } from "../lib/api";
+    import { toast } from "../lib/toast.svelte";
     import { ws } from "../lib/ws";
     import { onMount, onDestroy } from "svelte";
     import { Save, Undo2, Loader2, Cpu, Mic, Sliders, Eye, RotateCcw, Check } from "lucide-svelte";
@@ -132,8 +133,10 @@
             config = (await updateConfig(config)) as Record<string, any>;
             originalConfig = JSON.stringify(config);
             showMessage("Settings saved", "success");
+            toast.success("Settings saved");
         } catch (e: any) {
             showMessage(`Error: ${e.message}`, "error");
+            toast.error(`Settings save failed: ${e.message}`);
         } finally {
             saving = false;
         }

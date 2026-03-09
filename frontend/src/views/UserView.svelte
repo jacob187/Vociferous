@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { getTranscripts, getHealth, getConfig, getInsight, refreshInsight, type Transcript } from "../lib/api";
+    import { toast } from "../lib/toast.svelte";
     import { ws } from "../lib/ws";
     import { formatCount } from "../lib/formatters";
     import { computeTextMetrics, fleschKincaidGrade, countFillers, estimateSyllables } from "../lib/textAnalysis";
@@ -362,8 +363,9 @@
                             try {
                                 const res = await refreshInsight();
                                 if (res.status !== "generating") refreshingInsight = false;
-                            } catch {
+                            } catch (e) {
                                 refreshingInsight = false;
+                                toast.error("Failed to refresh insight");
                             }
                         }}
                     >
