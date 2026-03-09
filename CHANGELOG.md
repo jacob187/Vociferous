@@ -2,6 +2,20 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.5.1 — Code-Level TODO Sweep
+
+**Date:** 2026-03-09
+**Status:** Hotfix / Polish
+
+### Changed
+- **RecordingControls extraction** — Extracted mic button, orrery visualizer, cancel bar, and recording timer into a new `RecordingControls.svelte` component. TranscribeView delegates via props and callbacks, reducing its line count significantly.
+- **Chord logic extraction** — `make_capture_handler()` moved to `src/input_handler/key_capture.py`. The `start_key_capture` route handler is now a thin wrapper that passes an `on_chord` callback.
+- **Evdev keyboard hotplug** — `EvdevBackend._rescan_devices()` runs every 3 s inside the listen loop, diffs `/dev/input/*` paths, and opens newly connected key-capable devices without requiring a restart.
+- **Mic device-loss detection** — `AudioService` now accepts an `on_device_lost` callback. Sustained `input_overflow` flags (10+ consecutive callbacks) and `PortAudioError` exceptions during recording both fire the callback for proactive notification.
+- **Input backend degradation event** — `KeyListener._log_backend_limitations()` now fires an `on_degradation` callback (wired via `create_listener`), which the coordinator emits as an `engine_status` WebSocket event so the frontend can surface a toast.
+
+---
+
 ## v5.5.0 — Refined System Tag (ISS-044)
 
 **Date:** 2026-03-09

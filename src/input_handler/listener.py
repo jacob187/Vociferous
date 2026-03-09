@@ -27,6 +27,7 @@ class KeyListener:
         }
         self.capture_mode: bool = False
         self.capture_callback: Callable[[KeyCode, InputEvent], None] | None = None
+        self.on_degradation: Callable[[str], None] | None = None
         self.load_activation_keys()
         self.initialize_backends()
         self.select_backend_from_config()
@@ -104,11 +105,17 @@ class KeyListener:
         backend_name = type(backend).__name__
 
         if backend_name == "PynputBackend" and sys.platform.startswith("linux") and self._is_wayland_session():
-            logger.warning(
+            msg = (
                 "PynputBackend is active under Wayland. Global key capture may fail for "
                 "native Wayland windows. Prefer EvdevBackend with /dev/input access "
                 "(input group membership required)."
             )
+            logger.warning(msg)
+            if self.on_degradation:
+                try:
+                    self.on_degradation(msg)
+                except Exception:
+                    logger.debug("on_degradation callback failed", exc_info=True)
 
     @staticmethod
     def _is_wayland_session() -> bool:

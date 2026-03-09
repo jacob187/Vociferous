@@ -13,7 +13,7 @@
 
     import { ws } from "../lib/ws";
     import { onMount } from "svelte";
-    import RecordingOrrery from "../lib/components/RecordingOrrery.svelte";
+    import RecordingControls from "../lib/components/RecordingControls.svelte";
     import { Mic, Copy, Check, Pencil, Trash2, Save, Undo2, Loader2, Sparkles, Home } from "lucide-svelte";
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
@@ -103,13 +103,6 @@
             clearInterval(recordingTimerInterval);
             recordingTimerInterval = null;
         }
-    }
-
-    function formatElapsed(ms: number): string {
-        const totalSec = Math.floor(ms / 1000);
-        const m = Math.floor(totalSec / 60);
-        const s = totalSec % 60;
-        return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
     }
 
     function loadRecentSessions() {
@@ -609,30 +602,14 @@
         {#if viewState === "idle" || viewState === "recording"}
             <div class="flex-1 flex flex-col min-h-0">
                 <div class="flex-1 min-h-0 flex flex-col items-center justify-center gap-[var(--space-4)]">
-                    {#if viewState === "idle"}
-                        <div class="flex flex-col items-center justify-center gap-[var(--space-4)]">
-                            <button
-                                class="w-[160px] h-[160px] rounded-full border-2 border-[var(--accent)] bg-transparent text-[var(--accent)] cursor-pointer flex items-center justify-center transition-[background,border-color,color] duration-[var(--transition-fast)] hover:bg-[var(--hover-overlay-blue)] hover:border-[var(--accent-hover)] hover:text-[var(--accent-hover)]"
-                                onclick={startRecording}
-                                aria-label="Start recording"
-                                title="Start recording"
-                            >
-                                <Mic size={56} strokeWidth={1.5} />
-                            </button>
-                            <p class="text-[var(--text-base)] text-[var(--text-tertiary)] m-0">Click to record</p>
-                        </div>
-                    {:else}
-                        <div class="flex flex-col items-center justify-center gap-[var(--space-4)]">
-                            <button
-                                class="w-[160px] h-[160px] rounded-full cursor-pointer p-0 bg-transparent border-none focus:outline-none"
-                                onclick={stopRecording}
-                                aria-label="Stop recording"
-                                title="Stop recording and transcribe"
-                            >
-                                <RecordingOrrery {audioLevel} size={160} />
-                            </button>
-                        </div>
-                    {/if}
+                    <RecordingControls
+                        isRecording={isRecording}
+                        {audioLevel}
+                        elapsedMs={recordingElapsedMs}
+                        onstart={startRecording}
+                        onstop={stopRecording}
+                        oncancel={cancelRecording}
+                    />
                 </div>
 
                 {#if recentSessions.length > 0}
@@ -670,35 +647,6 @@
             </div>
         {/if}
     </WorkspacePanel>
-
-    <!-- Recording controls (below heatmap, above action bar) -->
-    {#if viewState === "recording"}
-        <div class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] shrink-0">
-            <StyledButton
-                variant="danger-outline"
-                size="sm"
-                onclick={cancelRecording}
-                ariaLabel="Cancel recording and discard audio"
-                title="Cancel recording and discard captured audio"
-            >
-                <Trash2 size={15} /> Cancel
-            </StyledButton>
-
-            <div class="flex-1 flex items-center justify-center gap-[var(--space-2)]">
-                <span
-                    class="w-2 h-2 rounded-full bg-[var(--color-danger)] shrink-0 animate-[pulse-dot_1.2s_ease-in-out_infinite]"
-                ></span>
-                <span class="text-[var(--text-sm)] text-[var(--color-danger)] whitespace-nowrap"
-                    >Recording in progress…</span
-                >
-            </div>
-
-            <span
-                class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)] tabular-nums whitespace-nowrap"
-                >{formatElapsed(recordingElapsedMs)}</span
-            >
-        </div>
-    {/if}
 
     <!-- Action bar (below panel) -->
     {#if viewState !== "idle" && viewState !== "transcribing" && viewState !== "recording"}

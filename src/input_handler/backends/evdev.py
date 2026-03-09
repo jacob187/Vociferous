@@ -24,9 +24,13 @@ class EvdevBackend:
         except ImportError:
             return False
 
+    # Rescan for new devices every N seconds
+    _RESCAN_INTERVAL: float = 3.0
+
     def __init__(self) -> None:
         """Initialize the EvdevBackend."""
         self.devices: list = []  # List of evdev.InputDevice
+        self._device_paths: set[str] = set()  # Tracked paths for hotplug diff
         self.key_map: dict[int, KeyCode] | None = None
         from typing import Any
 
@@ -52,6 +56,7 @@ class EvdevBackend:
                     d.close()
                 except Exception:
                     pass
+        self._device_paths = {d.path for d in self.devices}
         logger.info(f"Evdev: {len(self.devices)} key-capable devices (of {len(all_devices)} total)")
         if not self.devices:
             raise RuntimeError(
@@ -93,8 +98,16 @@ class EvdevBackend:
         import select
         import time
 
+        last_rescan = time.monotonic()
+
         while not self.stop_event.is_set():
             try:
+                # Periodic hotplug rescan
+                now = time.monotonic()
+                if now - last_rescan >= self._RESCAN_INTERVAL:
+                    last_rescan = now
+                    self._rescan_devices()
+
                 devices_snapshot = list(self.devices)
                 if not devices_snapshot:
                     time.sleep(0.1)
@@ -119,8 +132,35 @@ class EvdevBackend:
         with suppress(ValueError):
             if device in self.devices:
                 self.devices.remove(device)
+                self._device_paths.discard(device.path)
                 with suppress(Exception):
                     device.close()
+
+    def _rescan_devices(self) -> None:
+        """Check for newly connected key-capable input devices (hotplug)."""
+        from contextlib import suppress
+
+        try:
+            current_paths = set(self.evdev.list_devices())
+        except Exception:
+            return  # udev unavailable or permission error — skip this cycle
+
+        new_paths = current_paths - self._device_paths
+        if not new_paths:
+            return
+
+        for path in new_paths:
+            try:
+                dev = self.evdev.InputDevice(path)
+                if self.evdev.ecodes.EV_KEY in (dev.capabilities() or {}):
+                    self.devices.append(dev)
+                    self._device_paths.add(path)
+                    logger.info("Evdev hotplug: added %s (%s)", dev.name, path)
+                else:
+                    with suppress(Exception):
+                        dev.close()
+            except Exception:
+                logger.debug("Evdev hotplug: failed to open %s", path)
 
     def _read_device_events(self, device) -> bool:
         """Read events from device. Returns False if device should be removed."""

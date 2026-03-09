@@ -357,15 +357,11 @@ def close_window() -> dict:
 
 @post("/api/keycapture/start")
 async def start_key_capture() -> Response:
-    """Start key capture mode for hotkey rebinding. Keys are emitted via WebSocket.
-
-    H-pattern exception: sets up closures over local state (captured_keys set,
-    modifier maps) that belong in the API layer, not in a handler class.
-    """
+    """Start key capture mode for hotkey rebinding. Keys are emitted via WebSocket."""
     import os
     import sys
 
-    from src.input_handler.types import InputEvent, KeyCode
+    from src.input_handler.key_capture import make_capture_handler
 
     coordinator = get_coordinator()
     if not coordinator.input_listener:
@@ -398,49 +394,12 @@ async def start_key_capture() -> Response:
             status_code=503,
         )
 
-    captured_keys: set[str] = set()
+    def on_chord(combo: str, display: str) -> None:
+        coordinator.input_listener.disable_capture_mode()
+        coordinator.event_bus.emit("key_captured", {"combo": combo, "display": display})
 
-    # Map KeyCode back to human-readable names for display
-    modifier_codes = {
-        KeyCode.CTRL_LEFT,
-        KeyCode.CTRL_RIGHT,
-        KeyCode.SHIFT_LEFT,
-        KeyCode.SHIFT_RIGHT,
-        KeyCode.ALT_LEFT,
-        KeyCode.ALT_RIGHT,
-        KeyCode.META_LEFT,
-        KeyCode.META_RIGHT,
-    }
-
-    modifier_labels: dict[KeyCode, str] = {
-        KeyCode.CTRL_LEFT: "Ctrl",
-        KeyCode.CTRL_RIGHT: "Ctrl",
-        KeyCode.SHIFT_LEFT: "Shift",
-        KeyCode.SHIFT_RIGHT: "Shift",
-        KeyCode.ALT_LEFT: "Alt",
-        KeyCode.ALT_RIGHT: "Alt",
-        KeyCode.META_LEFT: "Meta",
-        KeyCode.META_RIGHT: "Meta",
-    }
-
-    def on_key(key: KeyCode, event: InputEvent) -> None:
-        if event == InputEvent.KEY_PRESS:
-            if key in modifier_codes:
-                captured_keys.add(modifier_labels[key])
-            else:
-                # Non-modifier key pressed — finalize the chord
-                key_name = key.name.replace("_", " ").title().replace(" ", "_")
-                # Build the combo string: modifiers + key, using + separator
-                parts = sorted(captured_keys) + [key.name]
-                combo = "+".join(parts)
-
-                coordinator.input_listener.disable_capture_mode()
-                coordinator.event_bus.emit(
-                    "key_captured", {"combo": combo, "display": " + ".join(sorted(captured_keys) + [key_name])}
-                )
-                captured_keys.clear()
-
-    coordinator.input_listener.enable_capture_mode(on_key)
+    handler = make_capture_handler(on_chord=on_chord)
+    coordinator.input_listener.enable_capture_mode(handler)
     return Response(content={"status": "capturing"})
 
 
@@ -479,6 +438,7 @@ async def dispatch_intent(data: dict) -> Response:
         "batch_delete_transcripts": defs.BatchDeleteTranscriptsIntent,
         "clear_transcripts": defs.ClearTranscriptsIntent,
         "commit_edits": defs.CommitEditsIntent,
+        "revert_to_raw": defs.RevertToRawIntent,
         "refine_transcript": defs.RefineTranscriptIntent,
         "rename_transcript": defs.RenameTranscriptIntent,
         "retitle_transcript": defs.RetitleTranscriptIntent,

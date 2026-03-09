@@ -376,6 +376,10 @@ class ApplicationCoordinator:
             self.input_listener = create_listener(
                 callback=self._on_hotkey,
                 deactivate_callback=self._on_hotkey_release,
+                on_degradation=lambda msg: self.event_bus.emit(
+                    "engine_status",
+                    {"component": "input", "status": "degraded", "message": msg},
+                ),
             )
             if self.input_listener.active_backend is None:
                 logger.warning(
@@ -434,6 +438,7 @@ class ApplicationCoordinator:
             ClearTranscriptsIntent,
             CommitEditsIntent,
             CommitRefinementIntent,
+            RevertToRawIntent,
             CreateTagIntent,
             DeleteTagIntent,
             DeleteTranscriptIntent,
@@ -485,6 +490,7 @@ class ApplicationCoordinator:
         bus.register(BatchDeleteTranscriptsIntent, transcript.handle_batch_delete)
         bus.register(ClearTranscriptsIntent, transcript.handle_clear)
         bus.register(CommitEditsIntent, transcript.handle_commit_edits)
+        bus.register(RevertToRawIntent, transcript.handle_revert_to_raw)
         bus.register(RenameTranscriptIntent, transcript.handle_rename)
         bus.register(RefineTranscriptIntent, refinement.handle_refine)
         bus.register(CommitRefinementIntent, refinement.handle_commit_refinement)

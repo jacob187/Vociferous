@@ -23,6 +23,7 @@ def create_listener(
     callback: Callable[[], None],
     deactivate_callback: Callable[[], None] | None = None,
     activation_key: str | None = None,
+    on_degradation: Callable[[str], None] | None = None,
 ) -> KeyListener:
     """
     Factory: create a KeyListener, wire the activation callback, and start it.
@@ -32,6 +33,8 @@ def create_listener(
         deactivate_callback: Function to call when the activation hotkey is released
             (needed for hold-to-record mode).
         activation_key: Override for the activation key (uses settings default if None).
+        on_degradation: Optional callback fired with a human-readable message when the
+            active backend has known limitations (e.g. pynput under Wayland).
 
     Returns:
         A running KeyListener instance.
@@ -40,6 +43,8 @@ def create_listener(
     listener.add_callback("on_activate", callback)
     if deactivate_callback is not None:
         listener.add_callback("on_deactivate", deactivate_callback)
+    if on_degradation is not None:
+        listener.on_degradation = on_degradation
 
     # Override activation key if provided
     if activation_key is not None:

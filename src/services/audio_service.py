@@ -34,6 +34,7 @@ class AudioService:
         self,
         settings_provider: Callable[[], VociferousSettings],
         on_level_update: Callable[[float], None] | None = None,
+        on_device_lost: Callable[[], None] | None = None,
     ) -> None:
         """
         Initialize the AudioService.
@@ -41,9 +42,11 @@ class AudioService:
         Args:
             settings_provider: Callable that returns the current application settings.
             on_level_update: Optional callback for audio level updates (normalized 0-1).
+            on_device_lost: Optional callback fired when the microphone is lost mid-recording.
         """
         self._settings_provider = settings_provider
         self.on_level_update = on_level_update
+        self.on_device_lost = on_device_lost
         self.sample_rate = 16000
 
     # ------------------------------------------------------------------
@@ -110,12 +113,29 @@ class AudioService:
         # Thread-safe queue for audio callback data
         audio_queue: Queue[NDArray[np.int16]] = Queue()
         recording: list[np.int16] = []
+        consecutive_errors = 0
+        _DEVICE_LOSS_THRESHOLD = 10  # consecutive error callbacks before declaring loss
 
         def audio_callback(indata, frames, time_info, status) -> None:
             """PortAudio C callback — kept minimal: copy, enqueue, RMS only."""
+            nonlocal consecutive_errors
             try:
                 if status:
                     logger.debug(f"Audio callback status: {status}")
+                    if status.input_overflow or status.priming_output:
+                        consecutive_errors += 1
+                        if consecutive_errors >= _DEVICE_LOSS_THRESHOLD:
+                            logger.warning("Microphone appears lost (repeated stream errors)")
+                            if self.on_device_lost:
+                                try:
+                                    self.on_device_lost()
+                                except Exception:
+                                    pass
+                            return
+                    else:
+                        consecutive_errors = 0
+                else:
+                    consecutive_errors = 0
 
                 # Copy audio data — numpy arrays share memory with PortAudio
                 frame_data = indata[:, 0].copy()
@@ -178,6 +198,14 @@ class AudioService:
                             s.recording.max_recording_minutes,
                         )
                         break
+        except sd.PortAudioError as e:
+            logger.error(f"PortAudio device error during recording: {e}")
+            if self.on_device_lost:
+                try:
+                    self.on_device_lost()
+                except Exception:
+                    pass
+            raise AudioError(f"Recording device lost: {e}") from e
         except Exception as e:
             logger.error(f"Recording loop error: {e}")
             raise AudioError(f"Recording loop error: {e}") from e
