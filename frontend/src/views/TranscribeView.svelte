@@ -20,7 +20,7 @@
     import StyledButton from "../lib/components/StyledButton.svelte";
     import ActivityHeatmap from "../lib/components/ActivityHeatmap.svelte";
     import { formatDuration, formatWpm } from "../lib/formatters";
-    import { Tag as TagIcon } from "lucide-svelte";
+    import { Tag as TagIcon, Bookmark } from "lucide-svelte";
     import {
         deleteTranscript as apiDeleteTranscript,
         dispatchIntent,
@@ -31,10 +31,15 @@
         getMotd,
         getTags,
         assignTags,
+        createTag,
+        deleteTag,
+        updateTag,
         refineTranscript,
         commitRefinement,
     } from "../lib/api";
     import type { Transcript, Tag } from "../lib/api";
+    import TagBar from "../lib/components/TagBar.svelte";
+    import { toast } from "../lib/toast.svelte";
 
     type WorkspaceState = "idle" | "recording" | "transcribing" | "ready" | "viewing" | "editing";
 
@@ -59,6 +64,66 @@
         getTags()
             .then((tags) => (allTags = tags))
             .catch(() => {});
+    }
+
+    /* ===== Session tag state (persisted via localStorage) ===== */
+    const SESSION_TAGS_STORAGE_KEY = "vociferous_session_tag_ids";
+
+    function loadSessionTagIdsFromStorage(): Set<number> {
+        try {
+            const raw = localStorage.getItem(SESSION_TAGS_STORAGE_KEY);
+            if (!raw) return new Set();
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return new Set();
+            return new Set(parsed.filter((x: unknown) => typeof x === "number"));
+        } catch {
+            return new Set();
+        }
+    }
+
+    let sessionTagIds = $state<Set<number>>(loadSessionTagIdsFromStorage());
+
+    $effect(() => {
+        localStorage.setItem(SESSION_TAGS_STORAGE_KEY, JSON.stringify([...sessionTagIds]));
+    });
+
+    function toggleSessionTag(tagId: number) {
+        const next = new Set(sessionTagIds);
+        if (next.has(tagId)) next.delete(tagId);
+        else next.add(tagId);
+        sessionTagIds = next;
+    }
+
+    async function handleSessionTagCreate(name: string, color: string) {
+        try {
+            await createTag(name, color);
+            await loadTags();
+            toast.success(`Tag "${name}" created`);
+        } catch (e: any) {
+            toast.error(`Tag creation failed: ${e.message}`);
+        }
+    }
+
+    async function handleSessionTagDelete(tagId: number) {
+        try {
+            await deleteTag(tagId);
+            const next = new Set(sessionTagIds);
+            next.delete(tagId);
+            sessionTagIds = next;
+            await loadTags();
+            toast.success("Tag deleted");
+        } catch (e: any) {
+            toast.error(`Tag deletion failed: ${e.message}`);
+        }
+    }
+
+    async function handleSessionTagColorChange(tagId: number, color: string) {
+        try {
+            await updateTag(tagId, { color });
+            await loadTags();
+        } catch (e: any) {
+            toast.error(`Failed to update tag color: ${e.message}`);
+        }
     }
 
     /* ===== SLM insight (header subtitle) ===== */
@@ -234,7 +299,16 @@
                 durationMs = data.duration_ms ?? 0;
                 speechDurationMs = data.speech_duration_ms ?? 0;
                 viewState = "ready";
-                assignedTagIds = new Set();
+                /* Apply session tags first, then overlay any already-assigned tags */
+                if (sessionTagIds.size > 0 && data.id) {
+                    const ids = [...sessionTagIds];
+                    assignedTagIds = new Set(ids);
+                    assignTags(data.id, ids).catch((e) =>
+                        console.warn("Session tag auto-assign failed:", e),
+                    );
+                } else {
+                    assignedTagIds = new Set();
+                }
                 loadRecentSessions();
                 /* Title generated async by SLM — will arrive via transcript_updated */
                 transcriptTitle = "";
@@ -298,6 +372,7 @@
             ws.on("tag_deleted", (data) => {
                 loadTags();
                 assignedTagIds = new Set([...assignedTagIds].filter((id) => id !== data.id));
+                sessionTagIds = new Set([...sessionTagIds].filter((id) => id !== data.id));
             }),
         ];
         return () => unsubs.forEach((fn) => fn());
@@ -576,6 +651,25 @@
         </div>
     {/if}
 
+    <!-- Session tag bar (idle/recording — selects tags auto-applied to every new transcript) -->
+    {#if (viewState === "idle" || viewState === "recording") && allTags.filter((t) => !t.is_system).length > 0}
+        <div class="shrink-0 flex items-center gap-[var(--space-2)] py-[var(--space-1)] px-[var(--space-1)]">
+            <Bookmark
+                size={13}
+                class={sessionTagIds.size > 0 ? "text-[var(--accent)] shrink-0" : "text-[var(--text-tertiary)] shrink-0"}
+            />
+            <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] shrink-0 select-none">Session tags</span>
+            <TagBar
+                tags={allTags.filter((t) => !t.is_system)}
+                activeIds={sessionTagIds}
+                ontoggle={toggleSessionTag}
+                oncreate={handleSessionTagCreate}
+                ondelete={handleSessionTagDelete}
+                oncolorchange={handleSessionTagColorChange}
+            />
+        </div>
+    {/if}
+
     <!-- Quick-tag strip (visible when a transcript is loaded) -->
     {#if transcriptId != null && allTags.length > 0 && (viewState === "ready" || viewState === "viewing")}
         <div class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-1)] shrink-0 flex-wrap">
@@ -647,6 +741,23 @@
             </div>
         {/if}
     </WorkspacePanel>
+
+    <!-- Session tags applied confirmation (ready state only) -->
+    {#if viewState === "ready" && sessionTagIds.size > 0}
+        {@const appliedTags = allTags.filter((t) => sessionTagIds.has(t.id))}
+        {#if appliedTags.length > 0}
+            <div class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-1)] shrink-0">
+                <Bookmark size={12} class="text-[var(--accent)] shrink-0" />
+                <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">Session tags applied:</span>
+                {#each appliedTags as tag (tag.id)}
+                    <span
+                        class="inline-flex items-center h-5 px-1.5 rounded-full text-[10px] font-medium"
+                        style="background: color-mix(in srgb, {tag.color ?? 'var(--accent)'} 25%, transparent); color: var(--text-primary);"
+                    >{tag.name}</span>
+                {/each}
+            </div>
+        {/if}
+    {/if}
 
     <!-- Action bar (below panel) -->
     {#if viewState !== "idle" && viewState !== "transcribing" && viewState !== "recording"}

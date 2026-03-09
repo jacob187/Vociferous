@@ -2,6 +2,21 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.6.2 — Session Auto-Tagging (ISS-046)
+
+**Date:** 2026-03-09
+**Status:** Hotfix / Feature
+
+### Added
+- **ISS-046** — Session auto-tagging in TranscribeView: a persistent tag selector (using the existing `TagBar` component) appears between the header stats and the workspace panel during idle and recording states.
+  - Selected session tags are automatically assigned to every new transcript when `transcription_complete` fires.
+  - Session tag selection persists across app restarts via `localStorage`.
+  - A post-transcription confirmation strip below the workspace panel lists the tags that were auto-applied after each recording.
+  - Deleting a tag from the context menu also removes it from the active session tag set.
+  - System tags are excluded from the session tag selector (they should never be manually pinned).
+
+---
+
 ## v5.6.1 — TranscriptsView Action Bar Alignment (ISS-054)
 
 **Date:** 2026-03-09
