@@ -273,6 +273,24 @@
                         >
                             <label
                                 class="text-[var(--text-sm)] text-[var(--text-primary)]"
+                                for="setting-username"
+                                title="Your name. Used in the greeting on the Transcribe screen.">Your Name</label
+                            >
+                            <input
+                                id="setting-username"
+                                type="text"
+                                maxlength="40"
+                                class="h-9 w-48 rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-primary)] px-[var(--space-2)] text-[var(--text-sm)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                                placeholder="Optional"
+                                value={getSafe(config, "user.name", "")}
+                                oninput={(e) => setSafe("user.name", (e.target as HTMLInputElement).value)}
+                            />
+                        </div>
+                        <div
+                            class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]"
+                        >
+                            <label
+                                class="text-[var(--text-sm)] text-[var(--text-primary)]"
                                 for="setting-typing-wpm"
                                 title="Your manual typing speed. Used to calculate Time Saved on the dashboard. Default: 40 WPM."
                                 >Typing Speed (WPM)</label

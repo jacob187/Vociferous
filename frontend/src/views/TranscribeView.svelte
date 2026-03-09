@@ -31,6 +31,8 @@
         getMotd,
         getTags,
         assignTags,
+        refineTranscript,
+        commitRefinement,
     } from "../lib/api";
     import type { Transcript, Tag } from "../lib/api";
 
@@ -46,6 +48,8 @@
     let speechDurationMs = $state(0);
     let copied = $state(false);
     let refinementEnabled = $state(true);
+    let autoRefine = $state(false);
+    let username = $state("");
 
     /* ===== Quick-tag state ===== */
     let allTags = $state<Tag[]>([]);
@@ -127,9 +131,8 @@
     /* ===== Greeting ===== */
     let greeting = $derived.by(() => {
         const hour = new Date().getHours();
-        if (hour < 12) return "Good morning";
-        if (hour < 17) return "Good afternoon";
-        return "Good evening";
+        const time = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+        return username ? `${time}, ${username}!` : `${time}!`;
     });
 
     /* ===== Recent session analytics (idle panel) ===== */
@@ -191,6 +194,8 @@
         getConfig()
             .then((config) => {
                 refinementEnabled = (config as any)?.refinement?.enabled ?? true;
+                autoRefine = (config as any)?.output?.auto_refine ?? false;
+                username = (config as any)?.user?.name ?? "";
             })
             .catch(() => {});
 
@@ -240,6 +245,14 @@
                 loadRecentSessions();
                 /* Title generated async by SLM — will arrive via transcript_updated */
                 transcriptTitle = "";
+
+                /* Auto-refine: fire-and-forget if enabled */
+                if (autoRefine && refinementEnabled && data.id) {
+                    const DEFAULT_LEVEL = 2;
+                    refineTranscript(data.id, DEFAULT_LEVEL).catch((e) =>
+                        console.warn("Auto-refine dispatch failed:", e),
+                    );
+                }
             }),
             ws.on("transcription_error", (data) => {
                 transcriptText = `Error: ${data.message}`;
@@ -255,6 +268,25 @@
                 const refinement = (data as any)?.refinement;
                 if (typeof refinement === "object" && refinement !== null && "enabled" in refinement) {
                     refinementEnabled = Boolean((refinement as any).enabled);
+                }
+                const output = (data as any)?.output;
+                if (typeof output === "object" && output !== null && "auto_refine" in output) {
+                    autoRefine = Boolean((output as any).auto_refine);
+                }
+                const user = (data as any)?.user;
+                if (typeof user === "object" && user !== null && "name" in user) {
+                    username = String((user as any).name ?? "");
+                }
+            }),
+            ws.on("refinement_complete", async (data) => {
+                /* Auto-commit: if this transcript is the current one and auto-refine triggered it */
+                if (autoRefine && data.transcript_id === transcriptId && data.text) {
+                    try {
+                        await commitRefinement(data.transcript_id, data.text);
+                        transcriptText = data.text;
+                    } catch (e) {
+                        console.warn("Auto-refine commit failed:", e);
+                    }
                 }
             }),
             ws.on("transcript_updated", async (data) => {
@@ -404,26 +436,36 @@
                         Click the mic button or use your hotkey to start recording
                     </p>
                 {/if}
-                <!-- Stats inline in header -->
+                <!-- Stats card -->
                 {#if sessionStats && sessionStats.count > 0}
-                    <div class="flex items-center gap-[var(--space-4)] mt-[var(--space-1)]">
-                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
-                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                    <div
+                        class="inline-flex items-stretch bg-[var(--surface-secondary)] border border-[var(--shell-border)] rounded-[var(--radius-md)] mt-[var(--space-2)]"
+                    >
+                        <div class="flex flex-col items-center justify-center px-5 py-2">
+                            <span class="text-[11px] text-[var(--text-tertiary)] leading-none mb-1.5"
+                                >Today's Words</span
+                            >
+                            <span
+                                class="text-base font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)] leading-none"
                                 >{sessionStats.todayWords.toLocaleString()}</span
-                            > words today
-                        </span>
-                        <span class="w-px h-4 bg-[var(--shell-border)]"></span>
-                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
-                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                            >
+                        </div>
+                        <div class="w-px self-stretch my-2 bg-[var(--shell-border)]"></div>
+                        <div class="flex flex-col items-center justify-center px-5 py-2">
+                            <span class="text-[11px] text-[var(--text-tertiary)] leading-none mb-1.5">Avg WPM</span>
+                            <span
+                                class="text-base font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)] leading-none"
                                 >{sessionStats.avgWpm > 0 ? sessionStats.avgWpm : "\u2014"}</span
-                            > wpm avg
-                        </span>
-                        <span class="w-px h-4 bg-[var(--shell-border)]"></span>
-                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
-                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                            >
+                        </div>
+                        <div class="w-px self-stretch my-2 bg-[var(--shell-border)]"></div>
+                        <div class="flex flex-col items-center justify-center px-5 py-2">
+                            <span class="text-[11px] text-[var(--text-tertiary)] leading-none mb-1.5">Sessions</span>
+                            <span
+                                class="text-base font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)] leading-none"
                                 >{sessionStats.count}</span
-                            > sessions
-                        </span>
+                            >
+                        </div>
                     </div>
                 {/if}
             </div>
@@ -444,24 +486,34 @@
                     <p class="text-[var(--text-sm)] text-[var(--text-tertiary)] mb-0">Recording in progress</p>
                 {/if}
                 {#if sessionStats && sessionStats.count > 0}
-                    <div class="flex items-center gap-[var(--space-4)] mt-[var(--space-1)]">
-                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
-                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                    <div
+                        class="inline-flex items-stretch bg-[var(--surface-secondary)] border border-[var(--shell-border)] rounded-[var(--radius-md)] mt-[var(--space-2)]"
+                    >
+                        <div class="flex flex-col items-center justify-center px-5 py-2">
+                            <span class="text-[11px] text-[var(--text-tertiary)] leading-none mb-1.5"
+                                >Today's Words</span
+                            >
+                            <span
+                                class="text-base font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)] leading-none"
                                 >{sessionStats.todayWords.toLocaleString()}</span
-                            > words today
-                        </span>
-                        <span class="w-px h-4 bg-[var(--shell-border)]"></span>
-                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
-                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                            >
+                        </div>
+                        <div class="w-px self-stretch my-2 bg-[var(--shell-border)]"></div>
+                        <div class="flex flex-col items-center justify-center px-5 py-2">
+                            <span class="text-[11px] text-[var(--text-tertiary)] leading-none mb-1.5">Avg WPM</span>
+                            <span
+                                class="text-base font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)] leading-none"
                                 >{sessionStats.avgWpm > 0 ? sessionStats.avgWpm : "\u2014"}</span
-                            > wpm avg
-                        </span>
-                        <span class="w-px h-4 bg-[var(--shell-border)]"></span>
-                        <span class="text-[var(--text-sm)] font-[var(--font-mono)] text-[var(--text-tertiary)]">
-                            <span class="text-[var(--text-primary)] font-[var(--weight-emphasis)]"
+                            >
+                        </div>
+                        <div class="w-px self-stretch my-2 bg-[var(--shell-border)]"></div>
+                        <div class="flex flex-col items-center justify-center px-5 py-2">
+                            <span class="text-[11px] text-[var(--text-tertiary)] leading-none mb-1.5">Sessions</span>
+                            <span
+                                class="text-base font-[var(--weight-emphasis)] text-[var(--text-primary)] font-[var(--font-mono)] leading-none"
                                 >{sessionStats.count}</span
-                            > sessions
-                        </span>
+                            >
+                        </div>
                     </div>
                 {/if}
             </div>

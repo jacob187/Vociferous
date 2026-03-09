@@ -118,6 +118,18 @@ class RecordingSession:
             logger.exception("ASR model failed to load (will retry on first transcription)")
             self._emit("engine_status", {"asr": "unavailable"})
 
+    def load_vad_model(self) -> None:
+        """Preload the Silero VAD ONNX model so first transcription has no cold-start."""
+        try:
+            from src.services.audio_pipeline import AudioPipeline
+
+            if self._audio_pipeline is None:
+                self._audio_pipeline = AudioPipeline()
+            self._audio_pipeline._load_vad_model()
+            logger.info("Silero VAD model preloaded")
+        except Exception:
+            logger.exception("VAD model preload failed (will retry on first transcription)")
+
     def unload_asr_model(self) -> None:
         """Release the ASR model (called during engine restart or cleanup)."""
         if self._asr_model:

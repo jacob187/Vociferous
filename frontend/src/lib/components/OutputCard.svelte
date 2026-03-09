@@ -76,6 +76,18 @@
     <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
         <label
             class="text-[var(--text-sm)] text-[var(--text-primary)]"
+            for="setting-autorefine"
+            title="Automatically refines each transcription with the default refinement level immediately after recording. Requires Grammar Refinement to be enabled."
+            >Auto-Refine After Recording</label
+        >
+        <ToggleSwitch
+            checked={getSafe(config, "output.auto_refine", false)}
+            onChange={() => setSafe("output.auto_refine", !getSafe(config, "output.auto_refine", false))}
+        />
+    </div>
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <label
+            class="text-[var(--text-sm)] text-[var(--text-primary)]"
             for="setting-refinement"
             title="Uses a local language model to improve grammar and punctuation after transcription."
             >Grammar Refinement</label

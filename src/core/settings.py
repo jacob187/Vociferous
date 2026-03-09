@@ -96,6 +96,7 @@ class OutputSettings(BaseModel):
     add_trailing_space: bool = True
     auto_copy_to_clipboard: bool = True
     auto_retitle_on_refine: bool = True
+    auto_refine: bool = False
 
 
 class DisplaySettings(BaseModel):

@@ -86,6 +86,7 @@ class ApplicationCoordinator:
         8. Open pywebview window (blocks until closed)
         """
         from src.api.system import APP_VERSION
+
         logger.info("Starting Vociferous %s...", APP_VERSION)
 
         # 1. Database
@@ -122,6 +123,9 @@ class ApplicationCoordinator:
 
         # 3e. Load ASR model (CTranslate2 Whisper).
         self.recording_session.load_asr_model()
+
+        # 3f. Preload Silero VAD model (eliminates cold-start on first transcription).
+        self.recording_session.load_vad_model()
 
         # 4. Audio service with event callbacks
         self._init_audio_service()

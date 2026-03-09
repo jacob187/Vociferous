@@ -2,6 +2,32 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.4.5 — Username Greeting, VAD Preload, Auto-Refine (ISS-050, ISS-048, ISS-051)
+
+**Date:** 2026-03-09
+**Status:** Feature
+
+### Added
+- **ISS-050** — Username greeting personalization.
+  - Greeting in TranscribeView now includes the user’s name if set: “Good afternoon, Drew!”
+  - New “Your Name” text input in Settings → Recording tab. Reads from existing `user.name` field.
+  - Greeting updates live when settings change (via `config_updated` WebSocket event).
+- **ISS-051** — Auto-refine toggle.
+  - New “Auto-Refine After Recording” toggle in Settings → Output tab.
+  - When enabled, each transcription is automatically refined at the default level and committed without user intervention.
+  - Listens for `refinement_complete` WebSocket event and auto-commits the result.
+  - New `output.auto_refine` boolean in settings (default: false).
+- **ISS-048** — Silero VAD model preloaded at startup.
+  - VAD ONNX model now loads during application startup (after ASR model), eliminating cold-start latency on first transcription.
+  - New `RecordingSession.load_vad_model()` method follows the same pattern as `load_asr_model()`.
+
+### Changed
+- **TranscribeView** — Stats strip redesigned as a card with title-case labels above numbers, surface-secondary background, and vertical dividers.
+- **TranscribeView** — Greeting now always ends with “!” even without a username set.
+- **TranscriptsView** — Card list uses `scrollbar-gutter: stable` to prevent content shift when scrollbar appears.
+
+---
+
 ## v5.4.3 — ActivityHeatmap Layout Polish
 
 **Date:** 2026-03-09

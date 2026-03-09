@@ -741,7 +741,7 @@
         </div>
 
         <!-- === Card List === -->
-        <div class="flex-1 overflow-y-auto px-4 pb-2">
+        <div class="flex-1 overflow-y-auto px-4 pb-2" style="scrollbar-gutter: stable">
             {#if loading}
                 <EmptyState icon={Loader2} message="Loading…" height="fixed" spinning />
             {:else if error}
