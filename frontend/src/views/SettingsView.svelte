@@ -42,7 +42,7 @@
         status: string;
         version: string;
         transcripts: number;
-        gpu?: { cuda_available?: boolean; detail?: string; whisper_backends?: string; slm_gpu_layers?: number };
+        gpu?: { cuda_available?: boolean; detail?: string; slm_gpu_layers?: number };
     } = $state({
         status: "unknown",
         version: "",

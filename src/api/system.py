@@ -256,7 +256,6 @@ def _detect_gpu_status() -> dict:
     gpu: dict = {
         "cuda_available": False,
         "detail": "",
-        "whisper_backends": "",
         "slm_gpu_layers": -1,
         "vram_total_mb": 0,
         "vram_used_mb": 0,
@@ -287,15 +286,6 @@ def _detect_gpu_status() -> dict:
         gpu["detail"] = "nvidia-smi not found — no NVIDIA driver"
     except Exception as e:
         gpu["detail"] = str(e)
-
-    # CTranslate2 backend info
-    try:
-        import ctranslate2
-
-        cuda_count = ctranslate2.get_cuda_device_count()
-        gpu["whisper_backends"] = f"ctranslate2 (CUDA devices: {cuda_count})" if cuda_count > 0 else "ctranslate2 (CPU)"
-    except Exception:
-        gpu["whisper_backends"] = "unavailable"
 
     # SLM GPU layer configuration from settings
     try:

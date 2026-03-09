@@ -2,6 +2,18 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.3.12 — Retire Show Backend Details (ISS-041)
+
+**Date:** 2026-03-09
+**Status:** Hotfix / Polish
+
+### Removed
+- **Show/Hide backend details** toggle removed from the GPU Status row in Settings → Speech Recognition.
+  - The whisper.cpp-era `whisper_backends` capability-flag string (`AVX = 1 | CUDA = 1 | …`) was replaced in v5.0 by a plain CTranslate2 description string. The old flag parser produced zero results on every machine. The GPU name badge already conveys all useful information.
+  - `whisper_backends` field removed from `GpuInfo` in `api.ts`, `AsrModelCard` props, `SettingsView` type annotation, and the `_detect_gpu_status()` backend function.
+
+---
+
 ## v5.3.11 — EmptyState Component Extraction (ISS-040)
 
 **Date:** 2026-03-09

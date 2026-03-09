@@ -20,7 +20,6 @@
             gpu?: {
                 cuda_available?: boolean;
                 detail?: string;
-                whisper_backends?: string;
                 slm_gpu_layers?: number;
             };
         };
@@ -44,8 +43,6 @@
         handleDownload,
     }: Props = $props();
 
-    /* ===== Internal state ===== */
-    let showGpuDetails = $state(false);
 </script>
 
 <div class="flex flex-col gap-[var(--space-3)]">
@@ -123,26 +120,7 @@
                     <span>{health.gpu?.detail || "No GPU detected"}</span>
                 {/if}
             </div>
-            {#if health.gpu?.whisper_backends && health.gpu.whisper_backends !== "unavailable"}
-                <button
-                    class="w-fit text-[var(--text-xs)] text-[var(--text-tertiary)] bg-transparent border-none p-0 cursor-pointer transition-[color] duration-[var(--transition-fast)] hover:text-[var(--accent)]"
-                    onclick={() => (showGpuDetails = !showGpuDetails)}
-                >
-                    {showGpuDetails ? "Hide backend details" : "Show backend details"}
-                </button>
-                {#if showGpuDetails}
-                    {@const features = health.gpu.whisper_backends
-                        .split("|")
-                        .map((s: string) => s.trim().split(" = "))
-                        .filter((p: string[]) => p.length === 2 && p[1] === "1")
-                        .map((p: string[]) => p[0])}
-                    {#if features.length}
-                        <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]"
-                            >Active backends: {features.join(", ")}</span
-                        >
-                    {/if}
-                {/if}
-            {/if}
+
         </div>
     </div>
 

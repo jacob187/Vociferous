@@ -195,7 +195,6 @@ export function getModels(): Promise<{ asr: Record<string, ModelInfo>; slm: Reco
 export interface GpuInfo {
     cuda_available: boolean;
     detail: string;
-    whisper_backends: string;
     slm_gpu_layers: number;
     vram_total_mb: number;
     vram_used_mb: number;
