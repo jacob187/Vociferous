@@ -224,7 +224,7 @@ class TestRefinementHandlersStateGuards:
 class TestRefinementHandlersHappyPath:
     """Refinement background thread: successful execution path."""
 
-    def test_successful_refinement_updates_text_and_emits(self, db, events):
+    def test_successful_refinement_emits_preview_without_persisting(self, db, events):
         from src.core.handlers.refinement_handlers import RefinementHandlers
         from src.core.settings import VociferousSettings
 
@@ -256,8 +256,31 @@ class TestRefinementHandlersHappyPath:
         assert complete[0]["text"] == "refined version of the text"
         assert complete[0]["level"] == 2
 
-        # Verify normalized_text updated in DB
+        # Completion is preview-only until an explicit commit intent is handled.
         refreshed = db.get_transcript(t.id)
+        assert refreshed is not None
+        assert refreshed.normalized_text == "original text to refine"
+        assert refreshed.text == "original text to refine"
+
+    def test_commit_refinement_persists_text(self, db, events):
+        from src.core.handlers.refinement_handlers import RefinementHandlers
+        from src.core.settings import VociferousSettings
+
+        t = db.add_transcript(raw_text="original text to refine", duration_ms=5000)
+        settings = VociferousSettings()
+
+        handler = RefinementHandlers(
+            db_provider=lambda: db,
+            slm_runtime_provider=lambda: None,
+            settings_provider=lambda: settings,
+            event_bus_emit=_emit_to(events),
+        )
+
+        handler.handle_commit_refinement(SimpleNamespace(transcript_id=t.id, text="refined version of the text"))
+
+        refreshed = db.get_transcript(t.id)
+        assert refreshed is not None
+        assert refreshed.normalized_text == "refined version of the text"
         assert refreshed.text == "refined version of the text"
 
     def test_slm_exception_in_refine_thread_emits_error(self, db, events):

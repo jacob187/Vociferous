@@ -533,8 +533,9 @@
 <!-- ========= TEMPLATE ========= -->
 
 <div class="flex flex-col h-full overflow-hidden bg-[var(--surface-primary)]">
-    <!-- === Header: Search + Actions === -->
-    <div class="shrink-0 px-4 pt-3 pb-2 flex flex-col gap-2 border-b border-[var(--shell-border)]">
+    <div class="w-full h-full mx-auto lg:max-w-[80%] flex flex-col overflow-hidden">
+        <!-- === Header: Search + Actions === -->
+        <div class="shrink-0 px-4 pt-3 pb-2 flex flex-col gap-2 border-b border-[var(--shell-border)]">
         <!-- Row 1: Search bar -->
         <div class="relative">
             <input
@@ -653,10 +654,10 @@
                 </button>
             {/if}
         </div>
-    </div>
+        </div>
 
-    <!-- === Controls row: result count + sort + per-page === -->
-    <div class="shrink-0 px-4 py-1.5 flex items-center gap-3 text-[13px] text-[var(--text-tertiary)]">
+        <!-- === Controls row: result count + sort + per-page === -->
+        <div class="shrink-0 px-4 py-1.5 flex items-center gap-3 text-[13px] text-[var(--text-tertiary)]">
         <!-- Result count (left) -->
         <span class="shrink-0">
             {#if isSearching && !searching}
@@ -722,10 +723,10 @@
                 <span class="text-[10px] text-[var(--text-tertiary)] ml-0.5">/ page</span>
             </div>
         {/if}
-    </div>
+        </div>
 
-    <!-- === Card List === -->
-    <div class="flex-1 overflow-y-auto px-4 pb-2">
+        <!-- === Card List === -->
+        <div class="flex-1 overflow-y-auto px-4 pb-2">
         {#if loading}
             <div class="flex flex-col items-center justify-center gap-2 h-[200px] text-[var(--text-tertiary)] text-sm">
                 <Loader2 size={20} class="animate-spin" /><span>Loading…</span>
@@ -838,40 +839,41 @@
                 </div>
             {/if}
         {/if}
-    </div>
-
-    <!-- === Bottom Action Bar === -->
-    {#if selection.hasSelection}
-        <div
-            class="shrink-0 flex items-center gap-2 px-4 py-2.5 border-t border-[var(--shell-border)] bg-[var(--surface-secondary)]"
-        >
-            <StyledButton size="sm" variant="destructive" onclick={handleDelete}>
-                <Trash2 size={13} />
-                {selection.isMulti ? `Delete ${selection.count}` : "Delete"}
-            </StyledButton>
-
-            <div class="flex-1"></div>
-
-            {#if selection.count === 1}
-                <StyledButton size="sm" variant="secondary" onclick={editSelected}>
-                    <Pencil size={13} /> Edit
-                </StyledButton>
-                <StyledButton size="sm" variant="secondary" onclick={copySelectedText}>
-                    {#if copied}<Check size={13} /> Copied{:else}<Copy size={13} /> Copy{/if}
-                </StyledButton>
-            {/if}
-
-            <StyledButton size="sm" variant="secondary" onclick={openTagAssign}>
-                <TagIcon size={13} /> Tag
-            </StyledButton>
-
-            {#if selection.count === 1}
-                <StyledButton size="sm" variant="primary" onclick={refineSelected}>
-                    <Sparkles size={13} /> Refine
-                </StyledButton>
-            {/if}
         </div>
-    {/if}
+
+        <!-- === Bottom Action Bar === -->
+        {#if selection.hasSelection}
+            <div
+                class="shrink-0 flex items-center gap-2 px-4 py-2.5 border-t border-[var(--shell-border)] bg-[var(--surface-secondary)]"
+            >
+                <StyledButton size="sm" variant="destructive" onclick={handleDelete}>
+                    <Trash2 size={13} />
+                    {selection.isMulti ? `Delete ${selection.count}` : "Delete"}
+                </StyledButton>
+
+                <div class="flex-1"></div>
+
+                {#if selection.count === 1}
+                    <StyledButton size="sm" variant="secondary" onclick={editSelected}>
+                        <Pencil size={13} /> Edit
+                    </StyledButton>
+                    <StyledButton size="sm" variant="secondary" onclick={copySelectedText}>
+                        {#if copied}<Check size={13} /> Copied{:else}<Copy size={13} /> Copy{/if}
+                    </StyledButton>
+                {/if}
+
+                <StyledButton size="sm" variant="secondary" onclick={openTagAssign}>
+                    <TagIcon size={13} /> Tag
+                </StyledButton>
+
+                {#if selection.count === 1}
+                    <StyledButton size="sm" variant="primary" onclick={refineSelected}>
+                        <Sparkles size={13} /> Refine
+                    </StyledButton>
+                {/if}
+            </div>
+        {/if}
+    </div>
 </div>
 
 <!-- === Tag Assignment Popover === -->

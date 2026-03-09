@@ -2,6 +2,23 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.3.10 — Transcriptions Width Constraint + Refinement Test Contract Fix (ISS-039)
+
+**Date:** 2026-03-09
+**Status:** Hotfix / Polish
+
+### Changed
+- **ISS-039** — Transcriptions view now uses a single centered content wrapper capped at 80% width on desktop.
+  - **Shared width reference**: search header, controls row, transcript cards, and bottom action bar now align to the same container instead of each row stretching edge to edge independently.
+  - **Responsive behavior preserved**: smaller viewports still use the available width, so this avoids the fullscreen sprawl without introducing cramped mobile nonsense.
+
+### Fixed
+- **ISS-032 test artifact** — `test_successful_refinement_updates_text_and_emits` was asserting the old pre-ISS-032 behavior where refinement completion immediately wrote to the database.
+  - Renamed and corrected the test to assert the actual contract: refinement completion emits preview text without persisting it.
+  - Added explicit coverage for the commit path so `handle_commit_refinement()` is the only thing asserting persistence of accepted refinement text.
+
+---
+
 ## v5.3.9 — Settings Tabbed Redesign + Scroll Fix (ISS-038)
 
 **Date:** 2026-03-09
