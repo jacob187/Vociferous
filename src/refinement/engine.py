@@ -46,6 +46,7 @@ class RefinementEngine:
         system_prompt: str = "",
         invariants: list[str] | None = None,
         n_gpu_layers: int = -1,
+        compute_type: str = "int8",
     ):
         """
         Initialize the Refinement engine.
@@ -79,12 +80,20 @@ class RefinementEngine:
             except Exception:
                 ct2_device = "cpu"
 
-        logger.info("Loading CT2 Generator model from %s (device=%s)...", model_path, ct2_device)
+        # int8 on GPU requires explicit Tensor Core GEMM support; upgrade to float16
+        # for CUDA to avoid silent hangs. int8 remains correct for CPU-only inference.
+        if ct2_device == "cuda" and compute_type == "int8":
+            compute_type = "float16"
+
+        logger.info(
+            "Loading CT2 Generator model from %s (device=%s, compute_type=%s)...", model_path, ct2_device, compute_type
+        )
         start_time = time.perf_counter()
 
         self.generator = ctranslate2.Generator(
             str(model_path),
             device=ct2_device,
+            compute_type=compute_type,
         )
 
         # Load tokenizer from the model directory
@@ -223,6 +232,7 @@ class RefinementEngine:
         results = self.generator.generate_batch(
             [prompt_tokens],
             max_length=max_new_tokens,
+            beam_size=1,
             sampling_temperature=effective_temp,
             sampling_topp=top_p,
             sampling_topk=top_k,
@@ -276,6 +286,7 @@ class RefinementEngine:
         results = self.generator.generate_batch(
             [prompt_tokens],
             max_length=max_tokens,
+            beam_size=1,
             sampling_temperature=effective_temp,
             sampling_topk=50 if temperature > 0 else 1,
             end_token=self._end_tokens,

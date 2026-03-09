@@ -71,11 +71,20 @@ def create_local_model(settings: VociferousSettings):
     else:
         fw_device = "auto"
 
+    # int8 on GPU requires explicit Tensor Core GEMM support and can hang silently
+    # without it. Upgrade to float16 when targeting CUDA; int8 stays correct for CPU.
+    raw_compute_type = settings.model.compute_type
+    if fw_device == "cuda" and raw_compute_type == "int8":
+        compute_type = "float16"
+    else:
+        compute_type = raw_compute_type
+
     logger.info(
-        "Loading faster-whisper model from %s (cpu_threads=%d, device=%s)...",
+        "Loading faster-whisper model from %s (cpu_threads=%d, device=%s, compute_type=%s)...",
         model_dir,
         n_threads,
         fw_device,
+        compute_type,
     )
 
     start = time.perf_counter()
@@ -85,6 +94,7 @@ def create_local_model(settings: VociferousSettings):
             str(model_dir),
             device=fw_device,
             cpu_threads=n_threads,
+            compute_type=compute_type,
             local_files_only=True,
         )
     except Exception as e:

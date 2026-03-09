@@ -2,6 +2,20 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.4.0 — Inference Quantization + Decoding Optimization (ISS-042, ISS-043)
+
+**Date:** 2026-03-09
+**Status:** Minor Release
+
+### Changed
+- **ISS-042** — Explicit `compute_type` for Whisper and SLM inference engines.
+  - Added `compute_type` setting to `ModelSettings` (default: `"int8"`).
+  - WhisperModel and ctranslate2.Generator now receive explicit quantization.
+- **ISS-043** — Greedy decoding for SLM refinement.
+  - Added `beam_size=1` to both `generate_batch()` calls in the refinement engine.
+
+---
+
 ## v5.3.13 — Refinement Generation Params Into Settings (TODO-4)
 
 **Date:** 2026-03-09

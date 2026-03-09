@@ -36,6 +36,7 @@ class ModelSettings(BaseModel):
     device: str = "auto"  # faster-whisper resolves device at model load time
     language: str = "en"
     n_threads: int = 4
+    compute_type: str = "int8"
     # Stylistic anchor for the CTranslate2 Whisper decoder.  This text is
     # tokenized and passed as prompt tokens before each audio chunk.
     # Combined with condition_on_previous_text=False, this prompt becomes

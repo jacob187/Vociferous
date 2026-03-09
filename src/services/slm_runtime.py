@@ -110,6 +110,7 @@ class SLMRuntime:
                 system_prompt=s.refinement.system_prompt,
                 invariants=s.refinement.invariants,
                 n_gpu_layers=s.refinement.n_gpu_layers,
+                compute_type=s.model.compute_type,
             )
 
             self.state = SLMState.READY
