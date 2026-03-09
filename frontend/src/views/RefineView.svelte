@@ -6,6 +6,7 @@
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
     import MarkdownBody from "../lib/components/MarkdownBody.svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
+    import EmptyState from "../lib/components/EmptyState.svelte";
     import {
         Sparkles,
         Copy,
@@ -300,12 +301,7 @@
                         </p>
                     </WorkspacePanel>
                 {:else}
-                    <div
-                        class="flex flex-col items-center justify-center h-full gap-[var(--space-2)] text-[var(--text-tertiary)]"
-                    >
-                        <FileText size={28} strokeWidth={1.2} />
-                        <p class="m-0 text-[var(--text-sm)]">Select a transcript to begin</p>
-                    </div>
+                    <EmptyState icon={FileText} message="Select a transcript to begin" />
                 {/if}
             </div>
         </div>
@@ -345,21 +341,16 @@
             </div>
             <div class="flex-1 overflow-y-auto p-[var(--space-4)]">
                 {#if isRefining}
-                    <div
-                        class="flex flex-col items-center justify-center h-full gap-[var(--space-2)] text-[var(--text-tertiary)]"
-                    >
-                        <Loader2 size={28} class="spin" />
+                    <EmptyState icon={Loader2} spinning>
                         <p class="m-0 text-[var(--text-sm)] text-[var(--text-secondary)] font-[var(--weight-emphasis)]">
                             {refineStatus}
                         </p>
                         <p class="m-0 font-[var(--font-mono)] text-[var(--text-xs)] text-[var(--text-tertiary)]">
                             {refineElapsed}s elapsed
                         </p>
-                    </div>
+                    </EmptyState>
                 {:else if refineError}
-                    <div
-                        class="flex flex-col items-center justify-center h-full gap-[var(--space-2)] text-[var(--text-tertiary)]"
-                    >
+                    <EmptyState>
                         <div
                             class="rounded-[var(--radius-md)] bg-red-500/10 border border-red-500/30 px-[var(--space-4)] py-[var(--space-3)] max-w-md text-center"
                         >
@@ -368,20 +359,16 @@
                             </p>
                             <p class="m-0 mt-[var(--space-1)] text-[var(--text-xs)] text-red-400/80">{refineError}</p>
                         </div>
-                    </div>
+                    </EmptyState>
                 {:else if refinedText}
                     <WorkspacePanel>
                         <MarkdownBody text={refinedText} className="text-[var(--text-sm)] text-[var(--text-primary)]" />
                     </WorkspacePanel>
                 {:else}
-                    <div
-                        class="flex flex-col items-center justify-center h-full gap-[var(--space-2)] text-[var(--text-tertiary)]"
-                    >
-                        <Sparkles size={28} strokeWidth={1.2} />
-                        <p class="m-0 text-[var(--text-sm)]">
-                            {selectedId !== null ? "Ready to refine" : "Refinement will appear here"}
-                        </p>
-                    </div>
+                    <EmptyState
+                        icon={Sparkles}
+                        message={selectedId !== null ? "Ready to refine" : "Refinement will appear here"}
+                    />
                 {/if}
             </div>
         </div>
@@ -416,7 +403,12 @@
         class="flex items-center gap-[var(--space-2)] py-[var(--space-3)] px-[var(--space-4)] border-t border-[var(--shell-border)]"
     >
         {#if hasRefined}
-            <StyledButton variant="danger-reveal" size="sm" title="Clear this refinement result from the view" onclick={handleDiscard}>
+            <StyledButton
+                variant="danger-reveal"
+                size="sm"
+                title="Clear this refinement result from the view"
+                onclick={handleDiscard}
+            >
                 <Trash2 size={15} /> Discard Result
             </StyledButton>
             <div class="flex-1"></div>
@@ -434,7 +426,12 @@
             </StyledButton>
         {:else}
             <div class="flex-1"></div>
-            <StyledButton variant="primary" size="sm" onclick={handleRefine} disabled={selectedId === null || isRefining}>
+            <StyledButton
+                variant="primary"
+                size="sm"
+                onclick={handleRefine}
+                disabled={selectedId === null || isRefining}
+            >
                 {#if isRefining}
                     <Loader2 size={15} class="spin" /> Refining… {refineElapsed}s
                 {:else}

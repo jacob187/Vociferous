@@ -39,6 +39,7 @@
         Minus,
     } from "lucide-svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
+    import EmptyState from "../lib/components/EmptyState.svelte";
     import { formatDuration, wordCount, formatRelativeDate } from "../lib/formatters";
 
     /* ===== State ===== */
@@ -536,309 +537,305 @@
     <div class="w-full h-full mx-auto lg:max-w-[80%] flex flex-col overflow-hidden">
         <!-- === Header: Search + Actions === -->
         <div class="shrink-0 px-4 pt-3 pb-2 flex flex-col gap-2 border-b border-[var(--shell-border)]">
-        <!-- Row 1: Search bar -->
-        <div class="relative">
-            <input
-                type="text"
-                class="w-full h-9 bg-[var(--surface-secondary)] border border-[var(--shell-border)] rounded-lg text-[var(--text-primary)] text-sm pl-3 pr-8 outline-none transition-colors duration-150 focus:border-[var(--accent)] placeholder:text-[var(--text-tertiary)]"
-                placeholder="Search transcripts…"
-                bind:value={searchQuery}
-                oninput={handleSearchInput}
-            />
-            {#if searchQuery}
-                <button
-                    class="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] bg-transparent border-none cursor-pointer p-0 flex items-center justify-center rounded transition-colors"
-                    onclick={() => {
-                        searchQuery = "";
-                        searchResults = [];
-                        searchTotal = 0;
-                    }}
-                    title="Clear search"
-                >
-                    <X size={13} />
-                </button>
-            {:else}
-                <Search
-                    size={14}
-                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none"
+            <!-- Row 1: Search bar -->
+            <div class="relative">
+                <input
+                    type="text"
+                    class="w-full h-9 bg-[var(--surface-secondary)] border border-[var(--shell-border)] rounded-lg text-[var(--text-primary)] text-sm pl-3 pr-8 outline-none transition-colors duration-150 focus:border-[var(--accent)] placeholder:text-[var(--text-tertiary)]"
+                    placeholder="Search transcripts…"
+                    bind:value={searchQuery}
+                    oninput={handleSearchInput}
                 />
-            {/if}
-        </div>
-
-        <!-- Row 2: Tag filter chips -->
-        <div class="flex items-center justify-center gap-1.5 flex-wrap min-h-[28px]">
-            {#each allTags as tag (tag.id)}
-                <button
-                    class="inline-flex items-center gap-1 h-6 px-2 rounded-full text-xs font-medium border cursor-pointer transition-all duration-150 select-none"
-                    style={activeTagIds.has(tag.id)
-                        ? `background: color-mix(in srgb, ${tagColor(tag)} 30%, transparent); border-color: ${tagColor(tag)}; color: var(--text-primary);`
-                        : `background: transparent; border-color: var(--shell-border); color: var(--text-tertiary);`}
-                    onclick={() => toggleTagFilter(tag.id)}
-                    oncontextmenu={(e) => openTagMenu(tag.id, e)}
-                    title="Click to filter · Right-click to edit/delete"
-                >
-                    <span class="w-2 h-2 rounded-full shrink-0" style="background: {tagColor(tag)}"></span>
-                    {tag.name}
-                    {#if activeTagIds.has(tag.id)}
-                        <X size={10} class="ml-0.5 opacity-60" />
-                    {/if}
-                </button>
-            {/each}
-
-            {#if activeTagIds.size > 0}
-                <button
-                    class="h-6 px-2 rounded-full text-xs font-semibold border border-[var(--accent-muted)] bg-transparent text-[var(--accent)] cursor-pointer transition-colors hover:bg-[var(--hover-overlay)]"
-                    onclick={cycleFilterMode}
-                    title="Toggle between matching ANY or ALL selected tags"
-                >
-                    {tagFilterMode === "any" ? "ANY" : "ALL"}
-                </button>
-                <button
-                    class="h-6 px-1.5 rounded-full text-xs text-[var(--text-tertiary)] bg-transparent border-none cursor-pointer hover:text-[var(--text-primary)] transition-colors"
-                    onclick={clearTagFilters}
-                >
-                    Clear
-                </button>
-            {/if}
-
-            {#if allTags.length > 0}
-                <div class="w-px h-4 bg-[var(--shell-border)] mx-0.5"></div>
-            {/if}
-
-            <!-- Inline tag creation -->
-            {#if showTagCreate}
-                <form
-                    class="inline-flex items-center gap-1"
-                    onsubmit={(e) => {
-                        e.preventDefault();
-                        handleCreateTag();
-                    }}
-                >
-                    <input
-                        type="color"
-                        class="w-5 h-5 border-none rounded cursor-pointer p-0 bg-transparent"
-                        bind:value={newTagColor}
-                    />
-                    <input
-                        type="text"
-                        class="h-6 w-24 px-1.5 rounded text-xs bg-[var(--surface-secondary)] border border-[var(--shell-border)] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
-                        placeholder="Tag name"
-                        bind:value={newTagName}
-                    />
+                {#if searchQuery}
                     <button
-                        type="submit"
-                        class="w-5 h-5 rounded bg-[var(--accent)] text-[var(--gray-0)] border-none cursor-pointer flex items-center justify-center"
-                        disabled={!newTagName.trim()}
+                        class="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] bg-transparent border-none cursor-pointer p-0 flex items-center justify-center rounded transition-colors"
+                        onclick={() => {
+                            searchQuery = "";
+                            searchResults = [];
+                            searchTotal = 0;
+                        }}
+                        title="Clear search"
                     >
-                        <Check size={11} />
+                        <X size={13} />
+                    </button>
+                {:else}
+                    <Search
+                        size={14}
+                        class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none"
+                    />
+                {/if}
+            </div>
+
+            <!-- Row 2: Tag filter chips -->
+            <div class="flex items-center justify-center gap-1.5 flex-wrap min-h-[28px]">
+                {#each allTags as tag (tag.id)}
+                    <button
+                        class="inline-flex items-center gap-1 h-6 px-2 rounded-full text-xs font-medium border cursor-pointer transition-all duration-150 select-none"
+                        style={activeTagIds.has(tag.id)
+                            ? `background: color-mix(in srgb, ${tagColor(tag)} 30%, transparent); border-color: ${tagColor(tag)}; color: var(--text-primary);`
+                            : `background: transparent; border-color: var(--shell-border); color: var(--text-tertiary);`}
+                        onclick={() => toggleTagFilter(tag.id)}
+                        oncontextmenu={(e) => openTagMenu(tag.id, e)}
+                        title="Click to filter · Right-click to edit/delete"
+                    >
+                        <span class="w-2 h-2 rounded-full shrink-0" style="background: {tagColor(tag)}"></span>
+                        {tag.name}
+                        {#if activeTagIds.has(tag.id)}
+                            <X size={10} class="ml-0.5 opacity-60" />
+                        {/if}
+                    </button>
+                {/each}
+
+                {#if activeTagIds.size > 0}
+                    <button
+                        class="h-6 px-2 rounded-full text-xs font-semibold border border-[var(--accent-muted)] bg-transparent text-[var(--accent)] cursor-pointer transition-colors hover:bg-[var(--hover-overlay)]"
+                        onclick={cycleFilterMode}
+                        title="Toggle between matching ANY or ALL selected tags"
+                    >
+                        {tagFilterMode === "any" ? "ANY" : "ALL"}
                     </button>
                     <button
-                        type="button"
-                        class="w-5 h-5 rounded bg-transparent text-[var(--text-tertiary)] border-none cursor-pointer flex items-center justify-center hover:text-[var(--text-primary)]"
-                        onclick={() => {
-                            showTagCreate = false;
-                            newTagName = "";
+                        class="h-6 px-1.5 rounded-full text-xs text-[var(--text-tertiary)] bg-transparent border-none cursor-pointer hover:text-[var(--text-primary)] transition-colors"
+                        onclick={clearTagFilters}
+                    >
+                        Clear
+                    </button>
+                {/if}
+
+                {#if allTags.length > 0}
+                    <div class="w-px h-4 bg-[var(--shell-border)] mx-0.5"></div>
+                {/if}
+
+                <!-- Inline tag creation -->
+                {#if showTagCreate}
+                    <form
+                        class="inline-flex items-center gap-1"
+                        onsubmit={(e) => {
+                            e.preventDefault();
+                            handleCreateTag();
                         }}
                     >
-                        <X size={11} />
+                        <input
+                            type="color"
+                            class="w-5 h-5 border-none rounded cursor-pointer p-0 bg-transparent"
+                            bind:value={newTagColor}
+                        />
+                        <input
+                            type="text"
+                            class="h-6 w-24 px-1.5 rounded text-xs bg-[var(--surface-secondary)] border border-[var(--shell-border)] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                            placeholder="Tag name"
+                            bind:value={newTagName}
+                        />
+                        <button
+                            type="submit"
+                            class="w-5 h-5 rounded bg-[var(--accent)] text-[var(--gray-0)] border-none cursor-pointer flex items-center justify-center"
+                            disabled={!newTagName.trim()}
+                        >
+                            <Check size={11} />
+                        </button>
+                        <button
+                            type="button"
+                            class="w-5 h-5 rounded bg-transparent text-[var(--text-tertiary)] border-none cursor-pointer flex items-center justify-center hover:text-[var(--text-primary)]"
+                            onclick={() => {
+                                showTagCreate = false;
+                                newTagName = "";
+                            }}
+                        >
+                            <X size={11} />
+                        </button>
+                    </form>
+                {:else}
+                    <button
+                        class="inline-flex items-center gap-1 h-6 px-2 rounded-full text-xs text-[var(--text-tertiary)] bg-transparent border border-dashed border-[var(--shell-border)] cursor-pointer transition-colors hover:text-[var(--accent)] hover:border-[var(--accent)]"
+                        onclick={() => (showTagCreate = true)}
+                        title={allTags.length > 0 ? "Create new tag" : "Create your first tag"}
+                    >
+                        <Plus size={10} />
+                        {allTags.length > 0 ? "Tag" : "Create a tag"}
                     </button>
-                </form>
-            {:else}
-                <button
-                    class="inline-flex items-center gap-1 h-6 px-2 rounded-full text-xs text-[var(--text-tertiary)] bg-transparent border border-dashed border-[var(--shell-border)] cursor-pointer transition-colors hover:text-[var(--accent)] hover:border-[var(--accent)]"
-                    onclick={() => (showTagCreate = true)}
-                    title={allTags.length > 0 ? "Create new tag" : "Create your first tag"}
-                >
-                    <Plus size={10} />
-                    {allTags.length > 0 ? "Tag" : "Create a tag"}
-                </button>
-            {/if}
-        </div>
+                {/if}
+            </div>
         </div>
 
         <!-- === Controls row: result count + sort + per-page === -->
         <div class="shrink-0 px-4 py-1.5 flex items-center gap-3 text-[13px] text-[var(--text-tertiary)]">
-        <!-- Result count (left) -->
-        <span class="shrink-0">
-            {#if isSearching && !searching}
-                {#if searchTotal > filteredEntries.length}
-                    Showing {filteredEntries.length} of {searchTotal} results for "{searchQuery}"
-                {:else}
-                    {filteredEntries.length} result{filteredEntries.length !== 1 ? "s" : ""} for "{searchQuery}"
+            <!-- Result count (left) -->
+            <span class="shrink-0">
+                {#if isSearching && !searching}
+                    {#if searchTotal > filteredEntries.length}
+                        Showing {filteredEntries.length} of {searchTotal} results for "{searchQuery}"
+                    {:else}
+                        {filteredEntries.length} result{filteredEntries.length !== 1 ? "s" : ""} for "{searchQuery}"
+                    {/if}
+                {:else if !loading}
+                    {displayTotal} transcript{displayTotal !== 1 ? "s" : ""}
+                    {#if activeTagIds.size > 0}
+                        <span class="text-[var(--accent)]">(filtered)</span>
+                    {/if}
                 {/if}
-            {:else if !loading}
-                {displayTotal} transcript{displayTotal !== 1 ? "s" : ""}
-                {#if activeTagIds.size > 0}
-                    <span class="text-[var(--accent)]">(filtered)</span>
-                {/if}
+            </span>
+            {#if selection.hasSelection}
+                <span class="text-xs font-semibold text-[var(--accent)]">{selection.count} selected</span>
             {/if}
-        </span>
-        {#if selection.hasSelection}
-            <span class="text-xs font-semibold text-[var(--accent)]">{selection.count} selected</span>
-        {/if}
 
-        <div class="flex-1"></div>
+            <div class="flex-1"></div>
 
-        <!-- Sort control (right, browse mode only) -->
-        {#if !isSearching}
-            <div class="flex items-center gap-1 shrink-0">
-                <ArrowUpDown size={12} class="text-[var(--text-tertiary)]" />
-                {#each SORT_OPTIONS as opt (opt.value)}
-                    <button
-                        class="h-6 px-1.5 rounded text-[11px] border-none cursor-pointer transition-colors"
-                        class:bg-[var(--hover-overlay)]={sortBy === opt.value}
-                        class:text-[var(--text-primary)]={sortBy === opt.value}
-                        class:font-semibold={sortBy === opt.value}
-                        class:bg-transparent={sortBy !== opt.value}
-                        class:text-[var(--text-tertiary)]={sortBy !== opt.value}
-                        class:hover:text-[var(--text-secondary)]={sortBy !== opt.value}
-                        onclick={() => setSort(opt.value)}
-                        title="Sort by {opt.label}{sortBy === opt.value
-                            ? sortDir === 'asc'
-                                ? ' (ascending)'
-                                : ' (descending)'
-                            : ''}"
-                    >
-                        {opt.label}{sortBy === opt.value ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
-                    </button>
-                {/each}
-            </div>
+            <!-- Sort control (right, browse mode only) -->
+            {#if !isSearching}
+                <div class="flex items-center gap-1 shrink-0">
+                    <ArrowUpDown size={12} class="text-[var(--text-tertiary)]" />
+                    {#each SORT_OPTIONS as opt (opt.value)}
+                        <button
+                            class="h-6 px-1.5 rounded text-[11px] border-none cursor-pointer transition-colors"
+                            class:bg-[var(--hover-overlay)]={sortBy === opt.value}
+                            class:text-[var(--text-primary)]={sortBy === opt.value}
+                            class:font-semibold={sortBy === opt.value}
+                            class:bg-transparent={sortBy !== opt.value}
+                            class:text-[var(--text-tertiary)]={sortBy !== opt.value}
+                            class:hover:text-[var(--text-secondary)]={sortBy !== opt.value}
+                            onclick={() => setSort(opt.value)}
+                            title="Sort by {opt.label}{sortBy === opt.value
+                                ? sortDir === 'asc'
+                                    ? ' (ascending)'
+                                    : ' (descending)'
+                                : ''}"
+                        >
+                            {opt.label}{sortBy === opt.value ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                        </button>
+                    {/each}
+                </div>
 
-            <!-- Per-page selector -->
-            <div class="flex items-center gap-0.5 shrink-0 border-l border-[var(--shell-border)] pl-3">
-                {#each PAGE_SIZES as size (size)}
-                    <button
-                        class="h-6 px-1.5 rounded text-[11px] border-none cursor-pointer transition-colors"
-                        class:bg-[var(--hover-overlay)]={pageSize === size}
-                        class:text-[var(--text-primary)]={pageSize === size}
-                        class:font-semibold={pageSize === size}
-                        class:bg-transparent={pageSize !== size}
-                        class:text-[var(--text-tertiary)]={pageSize !== size}
-                        class:hover:text-[var(--text-secondary)]={pageSize !== size}
-                        onclick={() => setPageSize(size)}
-                    >
-                        {size}
-                    </button>
-                {/each}
-                <span class="text-[10px] text-[var(--text-tertiary)] ml-0.5">/ page</span>
-            </div>
-        {/if}
+                <!-- Per-page selector -->
+                <div class="flex items-center gap-0.5 shrink-0 border-l border-[var(--shell-border)] pl-3">
+                    {#each PAGE_SIZES as size (size)}
+                        <button
+                            class="h-6 px-1.5 rounded text-[11px] border-none cursor-pointer transition-colors"
+                            class:bg-[var(--hover-overlay)]={pageSize === size}
+                            class:text-[var(--text-primary)]={pageSize === size}
+                            class:font-semibold={pageSize === size}
+                            class:bg-transparent={pageSize !== size}
+                            class:text-[var(--text-tertiary)]={pageSize !== size}
+                            class:hover:text-[var(--text-secondary)]={pageSize !== size}
+                            onclick={() => setPageSize(size)}
+                        >
+                            {size}
+                        </button>
+                    {/each}
+                    <span class="text-[10px] text-[var(--text-tertiary)] ml-0.5">/ page</span>
+                </div>
+            {/if}
         </div>
 
         <!-- === Card List === -->
         <div class="flex-1 overflow-y-auto px-4 pb-2">
-        {#if loading}
-            <div class="flex flex-col items-center justify-center gap-2 h-[200px] text-[var(--text-tertiary)] text-sm">
-                <Loader2 size={20} class="animate-spin" /><span>Loading…</span>
-            </div>
-        {:else if error}
-            <div class="flex flex-col items-center justify-center gap-2 h-[200px] text-[var(--color-danger)] text-sm">
-                {error}
-            </div>
-        {:else if filteredEntries.length === 0}
-            <div class="flex flex-col items-center justify-center gap-3 h-[200px] text-[var(--text-tertiary)] text-sm">
-                <FileText size={32} strokeWidth={1} />
-                <span>
-                    {#if isSearching}
-                        No results for "{searchQuery}"
-                    {:else if activeTagIds.size > 0}
-                        No transcripts match selected tags
-                    {:else}
-                        No transcripts yet
-                    {/if}
-                </span>
-            </div>
-        {:else}
-            <div class="flex flex-col gap-1.5 pt-1">
-                {#each filteredEntries as entry (entry.id)}
-                    <button
-                        class="w-full text-left p-3 rounded-lg border cursor-pointer transition-all duration-150 group/card"
-                        class:bg-[var(--hover-overlay-blue)]={selection.isSelected(entry.id)}
-                        class:border-[var(--accent)]={selection.isSelected(entry.id)}
-                        class:bg-[var(--surface-secondary)]={!selection.isSelected(entry.id)}
-                        class:border-[var(--shell-border)]={!selection.isSelected(entry.id)}
-                        class:hover:border-[var(--accent-muted)]={!selection.isSelected(entry.id)}
-                        class:hover:bg-[var(--hover-overlay)]={!selection.isSelected(entry.id)}
-                        onclick={(e) => handleCardClick(entry.id, e)}
-                        ondblclick={() => handleCardDblClick(entry.id)}
-                    >
-                        <!-- Title row -->
-                        <div class="flex items-start justify-between gap-2 mb-1">
-                            <h3
-                                class="text-[18px] font-semibold text-[var(--text-primary)] leading-snug m-0 truncate flex-1"
-                            >
-                                {getTitle(entry)}
-                            </h3>
-                            <span class="text-[12px] text-[var(--text-tertiary)] font-mono shrink-0 pt-0.5">
-                                {formatRelativeDate(entry.created_at)}
-                            </span>
-                        </div>
-
-                        <!-- Text preview -->
-                        <p class="text-[15px] text-[var(--text-secondary)] leading-relaxed m-0 mb-2 line-clamp-2">
-                            {#if isSearching}
-                                {@html highlight(truncate(getDisplayText(entry)), searchQuery)}
-                            {:else}
-                                {truncate(getDisplayText(entry))}
-                            {/if}
-                        </p>
-
-                        <!-- Bottom row: tags + metadata -->
-                        <div class="flex items-center gap-2 flex-wrap pt-1.5 mt-0.5">
-                            {#each entry.tags as tag (tag.id)}
-                                <span
-                                    class="inline-flex items-center gap-1 h-5 px-1.5 rounded-full text-[10px] font-medium"
-                                    style="background: color-mix(in srgb, {tagColor(
-                                        tag,
-                                    )} 25%, transparent); color: var(--text-primary);"
-                                >
-                                    <span class="w-1.5 h-1.5 rounded-full" style="background: {tagColor(tag)}"></span>
-                                    {tag.name}
-                                </span>
-                            {/each}
-
-                            <div class="flex-1"></div>
-
-                            <span class="text-[11px] text-[var(--text-tertiary)] font-mono">
-                                {formatDuration(entry.duration_ms)}
-                            </span>
-                            <span class="text-[11px] text-[var(--text-tertiary)] font-mono">
-                                {wordCount(getDisplayText(entry)).toLocaleString()} words
-                            </span>
-                        </div>
-                    </button>
-                {/each}
-            </div>
-
-            {#if isSearching && hasMore}
-                <div class="flex justify-center py-3">
-                    <StyledButton size="sm" variant="secondary" onclick={loadMore} disabled={searching}>
-                        {#if searching}<Loader2 size={14} class="animate-spin" /> Loading…{:else}Load More ({searchTotal -
-                                searchResults.length} remaining){/if}
-                    </StyledButton>
-                </div>
-            {:else if !isSearching && totalPages > 1}
-                <div class="flex items-center justify-center gap-3 py-3 text-[13px]">
-                    <button
-                        class="flex items-center gap-1 h-7 px-2 rounded text-[var(--text-secondary)] bg-transparent border border-[var(--shell-border)] cursor-pointer transition-colors hover:bg-[var(--hover-overlay)] disabled:opacity-30 disabled:cursor-default"
-                        onclick={() => goToPage(currentPage - 1)}
-                        disabled={currentPage <= 1}
-                    >
-                        <ChevronLeft size={14} /> Prev
-                    </button>
-                    <span class="text-[var(--text-tertiary)] tabular-nums">
-                        Page {currentPage} of {totalPages}
+            {#if loading}
+                <EmptyState icon={Loader2} message="Loading…" height="fixed" spinning />
+            {:else if error}
+                <EmptyState message={error} height="fixed" />
+            {:else if filteredEntries.length === 0}
+                <EmptyState icon={FileText} height="fixed">
+                    <span>
+                        {#if isSearching}
+                            No results for "{searchQuery}"
+                        {:else if activeTagIds.size > 0}
+                            No transcripts match selected tags
+                        {:else}
+                            No transcripts yet
+                        {/if}
                     </span>
-                    <button
-                        class="flex items-center gap-1 h-7 px-2 rounded text-[var(--text-secondary)] bg-transparent border border-[var(--shell-border)] cursor-pointer transition-colors hover:bg-[var(--hover-overlay)] disabled:opacity-30 disabled:cursor-default"
-                        onclick={() => goToPage(currentPage + 1)}
-                        disabled={currentPage >= totalPages}
-                    >
-                        Next <ChevronRight size={14} />
-                    </button>
+                </EmptyState>
+            {:else}
+                <div class="flex flex-col gap-1.5 pt-1">
+                    {#each filteredEntries as entry (entry.id)}
+                        <button
+                            class="w-full text-left p-3 rounded-lg border cursor-pointer transition-all duration-150 group/card"
+                            class:bg-[var(--hover-overlay-blue)]={selection.isSelected(entry.id)}
+                            class:border-[var(--accent)]={selection.isSelected(entry.id)}
+                            class:bg-[var(--surface-secondary)]={!selection.isSelected(entry.id)}
+                            class:border-[var(--shell-border)]={!selection.isSelected(entry.id)}
+                            class:hover:border-[var(--accent-muted)]={!selection.isSelected(entry.id)}
+                            class:hover:bg-[var(--hover-overlay)]={!selection.isSelected(entry.id)}
+                            onclick={(e) => handleCardClick(entry.id, e)}
+                            ondblclick={() => handleCardDblClick(entry.id)}
+                        >
+                            <!-- Title row -->
+                            <div class="flex items-start justify-between gap-2 mb-1">
+                                <h3
+                                    class="text-[18px] font-semibold text-[var(--text-primary)] leading-snug m-0 truncate flex-1"
+                                >
+                                    {getTitle(entry)}
+                                </h3>
+                                <span class="text-[12px] text-[var(--text-tertiary)] font-mono shrink-0 pt-0.5">
+                                    {formatRelativeDate(entry.created_at)}
+                                </span>
+                            </div>
+
+                            <!-- Text preview -->
+                            <p class="text-[15px] text-[var(--text-secondary)] leading-relaxed m-0 mb-2 line-clamp-2">
+                                {#if isSearching}
+                                    {@html highlight(truncate(getDisplayText(entry)), searchQuery)}
+                                {:else}
+                                    {truncate(getDisplayText(entry))}
+                                {/if}
+                            </p>
+
+                            <!-- Bottom row: tags + metadata -->
+                            <div class="flex items-center gap-2 flex-wrap pt-1.5 mt-0.5">
+                                {#each entry.tags as tag (tag.id)}
+                                    <span
+                                        class="inline-flex items-center gap-1 h-5 px-1.5 rounded-full text-[10px] font-medium"
+                                        style="background: color-mix(in srgb, {tagColor(
+                                            tag,
+                                        )} 25%, transparent); color: var(--text-primary);"
+                                    >
+                                        <span class="w-1.5 h-1.5 rounded-full" style="background: {tagColor(tag)}"
+                                        ></span>
+                                        {tag.name}
+                                    </span>
+                                {/each}
+
+                                <div class="flex-1"></div>
+
+                                <span class="text-[11px] text-[var(--text-tertiary)] font-mono">
+                                    {formatDuration(entry.duration_ms)}
+                                </span>
+                                <span class="text-[11px] text-[var(--text-tertiary)] font-mono">
+                                    {wordCount(getDisplayText(entry)).toLocaleString()} words
+                                </span>
+                            </div>
+                        </button>
+                    {/each}
                 </div>
+
+                {#if isSearching && hasMore}
+                    <div class="flex justify-center py-3">
+                        <StyledButton size="sm" variant="secondary" onclick={loadMore} disabled={searching}>
+                            {#if searching}<Loader2 size={14} class="animate-spin" /> Loading…{:else}Load More ({searchTotal -
+                                    searchResults.length} remaining){/if}
+                        </StyledButton>
+                    </div>
+                {:else if !isSearching && totalPages > 1}
+                    <div class="flex items-center justify-center gap-3 py-3 text-[13px]">
+                        <button
+                            class="flex items-center gap-1 h-7 px-2 rounded text-[var(--text-secondary)] bg-transparent border border-[var(--shell-border)] cursor-pointer transition-colors hover:bg-[var(--hover-overlay)] disabled:opacity-30 disabled:cursor-default"
+                            onclick={() => goToPage(currentPage - 1)}
+                            disabled={currentPage <= 1}
+                        >
+                            <ChevronLeft size={14} /> Prev
+                        </button>
+                        <span class="text-[var(--text-tertiary)] tabular-nums">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            class="flex items-center gap-1 h-7 px-2 rounded text-[var(--text-secondary)] bg-transparent border border-[var(--shell-border)] cursor-pointer transition-colors hover:bg-[var(--hover-overlay)] disabled:opacity-30 disabled:cursor-default"
+                            onclick={() => goToPage(currentPage + 1)}
+                            disabled={currentPage >= totalPages}
+                        >
+                            Next <ChevronRight size={14} />
+                        </button>
+                    </div>
+                {/if}
             {/if}
-        {/if}
         </div>
 
         <!-- === Bottom Action Bar === -->
@@ -895,10 +892,14 @@
             {#each allTags as tag (tag.id)}
                 {@const isOn = selectedEntry ? selectedEntry.tags.some((t) => t.id === tag.id) : false}
                 {@const multiSelected = selection.isMulti
-                    ? (selection.ids.map((id) => filteredEntries.find((e) => e.id === id)).filter(Boolean) as Transcript[])
+                    ? (selection.ids
+                          .map((id) => filteredEntries.find((e) => e.id === id))
+                          .filter(Boolean) as Transcript[])
                     : []}
-                {@const allHave = selection.isMulti && multiSelected.every((t) => t.tags.some((tt) => tt.id === tag.id))}
-                {@const someHave = selection.isMulti && !allHave && multiSelected.some((t) => t.tags.some((tt) => tt.id === tag.id))}
+                {@const allHave =
+                    selection.isMulti && multiSelected.every((t) => t.tags.some((tt) => tt.id === tag.id))}
+                {@const someHave =
+                    selection.isMulti && !allHave && multiSelected.some((t) => t.tags.some((tt) => tt.id === tag.id))}
                 <button
                     class="w-full flex items-center gap-2 px-3 py-1.5 border-none bg-transparent text-left text-sm cursor-pointer transition-colors duration-150 hover:bg-[var(--hover-overlay)] text-[var(--text-primary)]"
                     onclick={() => toggleTagOnSelected(tag.id)}

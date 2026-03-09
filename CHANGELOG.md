@@ -2,6 +2,21 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.3.11 — EmptyState Component Extraction (ISS-040)
+
+**Date:** 2026-03-09
+**Status:** Hotfix / Polish
+
+### Changed
+- **ISS-040** — Extracted a shared `EmptyState` component, eliminating eight copy-pasted idle/loading/error placeholder patterns across three views.
+  - **`EmptyState.svelte`**: new component supporting an optional Lucide icon, message string, fixed or full height, spinning animation, and a `children` snippet slot for complex inline content.
+  - **`RefineView`**: select-transcript idle, refining spinner, refinement error, and ready-to-refine waiting states ported to `EmptyState`.
+  - **`SettingsView`**: settings-loading spinner ported to `EmptyState`.
+  - **`TranscriptsView`**: transcript-list loading, error, and empty-filtered-list states ported to `EmptyState`.
+  - **Button and panel audits**: all 26 raw `<button>` elements individually reviewed; every one is structurally specialized (hero mic button, tag pills, menu items, tab controls, etc.) — none converted. `WorkspacePanel` adoption audit confirmed it is already correctly scoped.
+
+---
+
 ## v5.3.10 — Transcriptions Width Constraint + Refinement Test Contract Fix (ISS-039)
 
 **Date:** 2026-03-09

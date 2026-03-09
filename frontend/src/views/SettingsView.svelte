@@ -16,6 +16,7 @@
     import OutputCard from "../lib/components/OutputCard.svelte";
     import AsrModelCard from "../lib/components/AsrModelCard.svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
+    import EmptyState from "../lib/components/EmptyState.svelte";
     import type { DownloadProgressData, EngineStatusData } from "../lib/events";
 
     /* ===== Tabs ===== */
@@ -184,11 +185,7 @@
 
 <div class="flex flex-col h-full">
     {#if loading}
-        <div
-            class="flex-1 flex flex-col items-center justify-center gap-[var(--space-2)] text-[var(--text-tertiary)] text-[var(--text-sm)]"
-        >
-            <Loader2 size={24} class="spin" /><span>Loading settings…</span>
-        </div>
+        <EmptyState icon={Loader2} message="Loading settings…" spinning />
     {:else}
         <!-- Unified scroll area — tab bar is sticky inside so both it and content share the same
              width reference for mx-auto. When a scrollbar appears it affects both equally,
