@@ -227,6 +227,7 @@ class RecordingSession:
     def handle_import(self, intent: Any) -> None:
         """Import an audio file for transcription (runs decode+transcribe on a background thread)."""
         file_path: str = intent.file_path
+        cleanup: bool = getattr(intent, "cleanup_source", False)
         if not file_path:
             self._emit("transcription_error", {"message": "No file path provided"})
             return
@@ -261,6 +262,9 @@ class RecordingSession:
             except Exception as e:
                 logger.exception("Audio file import failed: %s", path.name)
                 self._emit("transcription_error", {"message": f"Import failed: {e}"})
+            finally:
+                if cleanup:
+                    path.unlink(missing_ok=True)
 
         t = threading.Thread(target=_import_worker, daemon=True, name="audio-import")
         t.start()

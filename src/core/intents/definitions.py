@@ -248,4 +248,5 @@ class ImportAudioFileIntent(InteractionIntent):
     """Import an audio file from disk for transcription."""
 
     file_path: str = ""
+    cleanup_source: bool = False
     source: IntentSource = IntentSource.API

@@ -257,8 +257,15 @@ export function exportFile(content: string, filename: string): Promise<{ path: s
     });
 }
 
-export function importAudioFile(): Promise<{ status: string; file: string; dispatched: boolean }> {
-    return request("/import-audio", { method: "POST" });
+export async function importAudioFile(file: File): Promise<{ status: string; file: string; dispatched: boolean }> {
+    const form = new FormData();
+    form.append("data", file, file.name);
+    const res = await fetch(`${BASE}/import-audio`, { method: "POST", body: form });
+    if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`API ${res.status}: ${body}`);
+    }
+    return res.json();
 }
 
 export function restartEngine(): Promise<{ status: string }> {

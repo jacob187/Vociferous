@@ -7,11 +7,16 @@ from __future__ import annotations
 import functools
 import importlib.metadata
 import logging
+import os
+import tempfile
 import threading
 import tomllib
 from pathlib import Path
 
 from litestar import Response, get, post, put
+from litestar.datastructures import UploadFile
+from litestar.enums import RequestEncodingType
+from litestar.params import Body
 
 from src.api.deps import get_coordinator
 
@@ -141,34 +146,47 @@ async def export_file(data: dict) -> Response:
     return Response(content={"path": save_path})
 
 
-_AUDIO_FILE_TYPES = ("Audio Files (*.wav;*.mp3;*.m4a;*.flac;*.ogg;*.webm;*.wma;*.aac;*.opus)",)
+_ALLOWED_AUDIO_EXTENSIONS = frozenset(
+    (".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm", ".wma", ".aac", ".opus")
+)
 
 
 @post("/api/import-audio")
-async def import_audio_file() -> Response:
+async def import_audio_file(
+    data: UploadFile = Body(media_type=RequestEncodingType.MULTI_PART),
+) -> Response:
     """
-    Show a native open-file dialog for audio import, then dispatch transcription.
+    Accept an uploaded audio file, save to temp, dispatch transcription.
 
     The heavy lifting (decode + transcribe) runs on a background thread.
+    The temp file is cleaned up after processing.
     Results arrive via WebSocket: transcription_complete / transcription_error.
     """
-    import asyncio
-
     from src.core.intents.definitions import ImportAudioFileIntent
 
     coordinator = get_coordinator()
 
-    loop = asyncio.get_running_loop()
-    file_path: str | None = await loop.run_in_executor(None, coordinator.show_open_dialog, _AUDIO_FILE_TYPES)
+    original_name = data.filename or "upload.wav"
+    ext = Path(original_name).suffix.lower()
+    if ext not in _ALLOWED_AUDIO_EXTENSIONS:
+        return Response(content={"error": f"Unsupported format: {ext}"}, status_code=400)
 
-    if file_path is None:
-        return Response(content={"error": "cancelled"}, status_code=400)
+    content = await data.read()
+    if not content:
+        return Response(content={"error": "Empty file"}, status_code=400)
 
-    intent = ImportAudioFileIntent(file_path=file_path)
+    fd, tmp_path = tempfile.mkstemp(suffix=ext, prefix="vociferous_import_")
+    try:
+        os.write(fd, content)
+    finally:
+        os.close(fd)
+
+    intent = ImportAudioFileIntent(file_path=tmp_path, cleanup_source=True)
     success = coordinator.command_bus.dispatch(intent)
-    filename = Path(file_path).name
 
-    return Response(content={"status": "importing", "file": filename, "dispatched": success})
+    return Response(
+        content={"status": "importing", "file": original_name, "dispatched": success}
+    )
 
 
 @get("/api/models", sync_to_thread=True)
