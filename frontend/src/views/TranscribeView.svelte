@@ -655,7 +655,7 @@
 
     <!-- Session tag bar (idle/recording — selects tags auto-applied to every new transcript) -->
     {#if (viewState === "idle" || viewState === "recording") && allTags.filter((t) => !t.is_system).length > 0}
-        <div class="shrink-0 flex items-center justify-center gap-[var(--space-2)] py-[var(--space-1)] px-[var(--space-1)]">
+        <div class="shrink-0 flex items-center justify-center gap-[var(--space-2)] py-[var(--space-1)] px-[var(--space-1)]" title="Selected tags are auto-applied to every new recording until cleared">
             <Bookmark
                 size={13}
                 class={sessionTagIds.size > 0

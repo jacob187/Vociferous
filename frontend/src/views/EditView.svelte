@@ -24,7 +24,7 @@
     import { ws } from "../lib/ws";
     import { toast } from "../lib/toast.svelte";
     import { formatRelativeDate, formatDuration, wordCount, formatWpm } from "../lib/formatters";
-    import { countFillers } from "../lib/textAnalysis";
+    import { countFillers, fleschKincaidGrade } from "../lib/textAnalysis";
     import StyledButton from "../lib/components/StyledButton.svelte";
     import TagBar from "../lib/components/TagBar.svelte";
     import { ArrowLeft, Check, X, Hammer, RotateCcw, Pencil } from "lucide-svelte";
@@ -47,6 +47,13 @@
     let isDirty = $derived(editText !== originalText);
     let wc = $derived(wordCount(editText));
     let fillerCount = $derived(editText ? countFillers(editText) : 0);
+    let fkGrade = $derived(wc >= 3 ? fleschKincaidGrade(editText) : null);
+    let speechPct = $derived.by(() => {
+        const d = transcript?.duration_ms;
+        const s = transcript?.speech_duration_ms;
+        if (!d || !s || d <= 0) return null;
+        return Math.round((s / d) * 100);
+    });
     let assignedTagIds = $derived(new Set(transcript?.tags.map((t) => t.id) ?? []));
     let isRefined = $derived(transcript?.tags.some((t) => t.is_system && t.name === "Refined") ?? false);
 
@@ -391,10 +398,20 @@
             </span>
         {/if}
 
+        {#if speechPct !== null}
+            <span class="text-[11px] text-[var(--text-tertiary)]">·</span>
+            <span class="text-[13px] text-[var(--text-tertiary)] tabular-nums">{speechPct}% speech</span>
+        {/if}
+
+        {#if fkGrade !== null}
+            <span class="text-[11px] text-[var(--text-tertiary)]">·</span>
+            <span class="text-[13px] text-[var(--text-tertiary)] tabular-nums">grade {fkGrade}</span>
+        {/if}
+
         {#if fillerCount > 0}
             <span class="text-[11px] text-[var(--text-tertiary)]">·</span>
             <span class="text-[13px] text-[var(--text-tertiary)] tabular-nums">
-                {fillerCount} filler{fillerCount !== 1 ? "s" : ""}
+                {fillerCount} filler{fillerCount !== 1 ? "s" : ""}{wc > 0 ? ` (${(fillerCount / wc * 100).toFixed(1)}%)` : ""}
             </span>
         {/if}
 

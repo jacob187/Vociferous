@@ -2,6 +2,25 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.6.9 — EditView Metrics & Session Tag Tooltip (ISS-063, ISS-064, ISS-069)
+
+**Date:** 2026-03-09
+**Status:** Enhancement / UX
+
+### Changed
+- **ISS-063** — EditView stats strip expanded with three new metrics.
+  - **Active Speech %**: Shows ratio of speech to total recording duration (when VAD data available).
+  - **Reading level**: Flesch-Kincaid grade level computed from the current editor text (requires ≥3 words).
+  - **Filler density**: Filler count now includes percentage of total words (e.g., "3 fillers (1.2%)").
+
+### Added
+- **ISS-069** — Session tags bar now has a tooltip explaining that selected tags are auto-applied to every new recording until cleared.
+
+### Internal
+- **ISS-064** — Analytics rationalization audit completed. All displayed metrics across EditView, TranscribeView, and UserView reviewed. Keep/remove recommendations produced. Silence-estimation metrics in UserView (Total Silence, Avg. Pauses) flagged as imprecise — they use estimated speech time from word count rather than measured VAD data.
+
+---
+
 ## v5.6.8 — MOTD Enrichment & Orrery Performance (ISS-070, ISS-071)
 
 **Date:** 2026-03-09
