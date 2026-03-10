@@ -9,6 +9,7 @@
     import { toast, type ToastVariant } from "../toast.svelte";
     import { X, CheckCircle, AlertTriangle, AlertCircle, Info } from "lucide-svelte";
     import StyledButton from "./StyledButton.svelte";
+    import ToggleSwitch from "./ToggleSwitch.svelte";
 
     const iconMap: Record<ToastVariant, typeof CheckCircle> = {
         success: CheckCircle,
@@ -58,9 +59,7 @@
 <!-- ── Bottom strip (toasts + confirmations) ── -->
 <div
     class="shrink-0 relative transition-[max-height,border-color] duration-200 overflow-hidden
-    {isActive()
-        ? 'border-t border-[var(--shell-border)] max-h-60'
-        : 'max-h-0'}"
+    {isActive() ? 'border-t border-[var(--shell-border)] max-h-60' : 'max-h-0'}"
 >
     <!-- Backdrop: only when confirm is active; covers everything above the strip -->
     {#if toast.activeConfirm}
@@ -95,37 +94,22 @@
                     >
                         {c.title}
                     </h3>
-                    <p
-                        id="confirm-msg"
-                        class="text-[var(--text-secondary)] text-[var(--text-sm)] leading-relaxed m-0"
-                    >
+                    <p id="confirm-msg" class="text-[var(--text-secondary)] text-[var(--text-sm)] leading-relaxed m-0">
                         {c.message}
                     </p>
                 </div>
                 {#if c.checkboxLabel}
-                    <label class="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                            type="checkbox"
-                            class="accent-[var(--accent)] cursor-pointer"
-                            bind:checked={checkboxChecked}
-                        />
+                    <div class="flex items-center gap-2 select-none">
+                        <ToggleSwitch bind:checked={checkboxChecked} />
                         <span class="text-[var(--text-secondary)] text-[var(--text-sm)]">{c.checkboxLabel}</span>
-                    </label>
+                    </div>
                 {/if}
                 <div class="flex justify-end gap-2">
-                    <StyledButton
-                        size="sm"
-                        variant="secondary"
-                        onclick={() => resolveWith(c.id, false)}
-                    >
+                    <StyledButton size="sm" variant="secondary" onclick={() => resolveWith(c.id, false)}>
                         {c.cancelLabel ?? "Cancel"}
                     </StyledButton>
                     {#if c.alternativeLabel}
-                        <StyledButton
-                            size="sm"
-                            variant="secondary"
-                            onclick={() => resolveWith(c.id, true, true)}
-                        >
+                        <StyledButton size="sm" variant="secondary" onclick={() => resolveWith(c.id, true, true)}>
                             {c.alternativeLabel}
                         </StyledButton>
                     {/if}

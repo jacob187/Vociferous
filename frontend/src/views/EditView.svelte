@@ -28,6 +28,7 @@
     import StyledButton from "../lib/components/StyledButton.svelte";
     import TagBar from "../lib/components/TagBar.svelte";
     import ActionBar from "../lib/components/ActionBar.svelte";
+    import ToggleSwitch from "../lib/components/ToggleSwitch.svelte";
     import { ArrowLeft, Check, X, Hammer, RotateCcw, Pencil, Copy } from "lucide-svelte";
 
     /* ===== State ===== */
@@ -355,15 +356,12 @@
         </div>
 
         {#if transcript}
-            <label class="shrink-0 flex items-center gap-1.5 cursor-pointer select-none mt-0.5" title="Toggle analytics inclusion">
-                <input
-                    type="checkbox"
-                    class="accent-[var(--accent)] cursor-pointer"
-                    checked={transcript.include_in_analytics}
-                    onchange={toggleAnalyticsInclusion}
-                />
-                <span class="text-[12px] text-[var(--text-tertiary)] whitespace-nowrap">Include in analytics</span>
-            </label>
+            <div class="shrink-0 flex items-center gap-1.5 mt-0.5" title="Toggle analytics inclusion">
+                <ToggleSwitch checked={transcript.include_in_analytics} onChange={toggleAnalyticsInclusion} />
+                <span class="text-[12px] text-[var(--text-tertiary)] whitespace-nowrap select-none"
+                    >Include in analytics</span
+                >
+            </div>
         {/if}
     </div>
 
