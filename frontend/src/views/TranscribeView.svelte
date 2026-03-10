@@ -14,7 +14,7 @@
     import { ws } from "../lib/ws";
     import { onMount } from "svelte";
     import RecordingControls from "../lib/components/RecordingControls.svelte";
-    import { Mic, Copy, Check, Pencil, Trash2, Save, Undo2, Loader2, Sparkles, Home } from "lucide-svelte";
+    import { Mic, Copy, Check, Pencil, Trash2, Save, Undo2, Loader2, Sparkles, Home, X } from "lucide-svelte";
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
@@ -443,6 +443,7 @@
                 .catch(() => {
                     appendTargetTitle = `Transcript #${appendTarget}`;
                 });
+            startRecording();
         }
     });
 
@@ -745,7 +746,9 @@
         >
             <PlusCircle size={13} class="text-[var(--accent)] shrink-0" />
             <span class="text-[var(--text-sm)] text-[var(--text-secondary)] flex-1 truncate">
-                Appending to: <span class="font-semibold text-[var(--text-primary)]">{appendTargetTitle || `Transcript #${appendTargetId}`}</span>
+                Appending to: <span class="font-semibold text-[var(--text-primary)]"
+                    >{appendTargetTitle || `Transcript #${appendTargetId}`}</span
+                >
             </span>
             <button
                 class="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] bg-transparent border-none cursor-pointer p-0 leading-none transition-colors"

@@ -296,9 +296,12 @@ class RecordingSession:
                 motd_manager.maybe_schedule()
 
             # Schedule SLM-based auto-titling for the new transcript.
-            title_gen = self._title_generator_provider()
-            if title_gen is not None and transcript is not None:
-                title_gen.schedule(transcript.id, text)
+            # Skip initial title when auto-refine is enabled — refinement
+            # completion will retitle with better text, avoiding double work.
+            if not settings.output.auto_refine:
+                title_gen = self._title_generator_provider()
+                if title_gen is not None and transcript is not None:
+                    title_gen.schedule(transcript.id, text)
 
             if settings.output.auto_copy_to_clipboard:
                 _copy_to_system_clipboard(text)

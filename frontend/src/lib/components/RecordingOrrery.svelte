@@ -66,15 +66,16 @@
         return segs.join("");
     }
 
-    function retargetBlob() {
+    function retargetBlob(amplitude: number) {
+        const deform = BLOB_DEFORM * Math.min(1, amplitude * 3);
         for (let i = 0; i < BLOB_N; i++) {
-            blobTargets[i] = BLOB_BASE + (Math.random() - 0.5) * 2 * BLOB_DEFORM;
+            blobTargets[i] = BLOB_BASE + (Math.random() - 0.5) * 2 * deform;
         }
     }
 
-    function tickBlob(now: number, isSpeaking: boolean): boolean {
+    function tickBlob(now: number, isSpeaking: boolean, amplitude: number): boolean {
         if (isSpeaking && now - lastRetarget > RETARGET_MS) {
-            retargetBlob();
+            retargetBlob(amplitude);
             lastRetarget = now;
         } else if (!isSpeaking) {
             for (let i = 0; i < BLOB_N; i++) blobTargets[i] = BLOB_BASE;
@@ -131,11 +132,11 @@
         if (blobPathEl) blobPathEl.style.opacity = (0.45 + smooth * 0.5).toFixed(3);
 
         // Toggle speaking class (only on actual state change)
-        const nowSpeaking = smooth > 0.01;
+        const nowSpeaking = smooth > 0.05;
         if (nowSpeaking !== speaking) speaking = nowSpeaking;
 
-        // Tick blob deformation
-        const blobChanged = tickBlob(now, nowSpeaking);
+        // Tick blob deformation — pass smoothed amplitude for proportional deformation
+        const blobChanged = tickBlob(now, nowSpeaking, smooth);
 
         if (smooth > 0.001 || al > 0.001 || blobChanged) {
             glowRaf = requestAnimationFrame(glowTick);
@@ -197,7 +198,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        overflow: hidden;
+        overflow: visible;
     }
 
     .mic-center {
@@ -213,7 +214,7 @@
         justify-content: center;
         color: var(--orange-4);
         border-radius: 50%;
-        background-color: var(--surface-primary, #181825);
+        background-color: transparent;
         border: 2px solid transparent; /* layout preservation; blob is the visual ring */
         box-shadow:
             0 0 20px rgba(255, 160, 60, 0.14),

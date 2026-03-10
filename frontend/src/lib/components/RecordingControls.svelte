@@ -28,7 +28,7 @@
 <div class="flex flex-col items-center justify-center gap-[var(--space-4)]">
     {#if isRecording}
         <button
-            class="w-[160px] h-[160px] rounded-full cursor-pointer p-0 bg-transparent border-none focus:outline-none"
+            class="w-[160px] h-[160px] rounded-full cursor-pointer p-0 bg-transparent border-none focus:outline-none overflow-visible"
             onclick={onstop}
             aria-label="Stop recording"
             title="Stop recording and transcribe"

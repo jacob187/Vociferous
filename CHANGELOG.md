@@ -2,6 +2,21 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.8.6 — Recording UI & Auto-Title Fixes (ISS-082)
+
+**Date:** 2026-03-10
+**Status:** Hotfix / Bug Fix
+
+### Fixed
+- **ISS-082** — Three post-5.8.5 regressions and a latent bug:
+  - **Continue button**: clicking "Continue" in TranscriptsView now auto-starts recording instead of landing on a blank idle screen.
+  - **Recording circle double-render**: removed static `background-color` from the mic button so the blob-fill SVG path is the only visible background — the deforming edge and fill now move as one unified shape.
+  - **Glow clipping**: changed `overflow: hidden` to `overflow: visible` on the recording display and the wrapping button so the ambient glow radiates freely.
+  - **Blob deformation responsiveness**: raised the speaking threshold from 0.01 to 0.05 and made deformation amplitude proportional to the smoothed audio level — the blob now stays still in silence and scales organically with actual speech volume.
+  - **Double titling**: when `auto_refine` is enabled the initial post-transcription title generation is now skipped; only the refinement-completion retitle fires, eliminating redundant SLM work.
+
+---
+
 ## v5.8.5 — Transcript Continuation / Append (ISS-049)
 
 **Date:** 2026-03-10

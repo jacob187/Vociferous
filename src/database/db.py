@@ -614,9 +614,9 @@ class TranscriptDB:
             ).fetchone()
             if row is None:
                 return
-            new_raw = row["raw_text"] + "\n" + raw_text
+            new_raw = row["raw_text"] + "\n\n" + raw_text
             current_norm: str = row["normalized_text"] or ""
-            new_norm = (current_norm + "\n" + raw_text) if current_norm else ""
+            new_norm = (current_norm + "\n\n" + raw_text) if current_norm else ""
             self._conn.execute(
                 """UPDATE transcripts
                    SET raw_text = ?, normalized_text = ?,
