@@ -27,6 +27,7 @@
     import { countFillers, fleschKincaidGrade } from "../lib/textAnalysis";
     import StyledButton from "../lib/components/StyledButton.svelte";
     import TagBar from "../lib/components/TagBar.svelte";
+    import ActionBar from "../lib/components/ActionBar.svelte";
     import { ArrowLeft, Check, X, Hammer, RotateCcw, Pencil } from "lucide-svelte";
 
     /* ===== State ===== */
@@ -385,9 +386,7 @@
     </div>
 
     <!-- ── Footer ── -->
-    <div
-        class="shrink-0 flex items-center gap-2 px-5 py-3 border-t border-[var(--shell-border)] bg-[var(--surface-secondary)]"
-    >
+    <ActionBar>
         <!-- Statistics strip -->
         <span class="text-[13px] text-[var(--text-tertiary)] tabular-nums">
             {wc.toLocaleString()} word{wc !== 1 ? "s" : ""}
@@ -441,5 +440,5 @@
             <Check size={13} />
             {saving ? "Saving…" : "Save"}
         </StyledButton>
-    </div>
+    </ActionBar>
 </div>

@@ -2,6 +2,20 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.8.1 — Centralized ActionBar Component (ISS-079)
+
+**Date:** 2026-03-09
+**Status:** Maintenance
+
+### Changed
+- **ISS-079** — Extracted `ActionBar.svelte` as the single canonical action bar component.
+  - Defines the pill-style layout once: `shrink-0` outer wrapper with `px-4 py-2`, stable scrollbar gutter, and a `rounded-lg bg-[var(--surface-secondary)] px-3 py-1.5` inner pill.
+  - `TranscriptsView`, `EditView`, and `RefineView` all migrated to use it.
+  - Removes the flat `border-t` pattern from EditView and RefineView in favour of the floating pill (consistent with TranscriptsView).
+  - Optional `gap` prop (default `gap-2`) for the single case (bulk-refine status bar) that needs wider spacing.
+
+---
+
 ## v5.8.0 — UserView Tabbed Layout & Radar Analytics (ISS-035, ISS-037)
 
 **Date:** 2026-03-09

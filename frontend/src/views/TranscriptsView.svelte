@@ -43,6 +43,7 @@
     import StyledButton from "../lib/components/StyledButton.svelte";
     import EmptyState from "../lib/components/EmptyState.svelte";
     import TagBar from "../lib/components/TagBar.svelte";
+    import ActionBar from "../lib/components/ActionBar.svelte";
     import { formatDuration, wordCount, formatRelativeDate } from "../lib/formatters";
 
     /* ===== State ===== */
@@ -873,57 +874,53 @@
 
         <!-- === Bottom Action Bar === -->
         {#if bulkRefineActive}
-            <div class="shrink-0 px-4 py-2 overflow-y-auto" style="scrollbar-gutter: stable">
-                <div class="flex items-center gap-3 bg-[var(--surface-secondary)] rounded-lg px-3 py-1.5">
-                    <Loader2 size={14} class="animate-spin text-[var(--accent)] shrink-0" />
-                    <span class="text-sm text-[var(--text-secondary)]">
-                        Refining {bulkRefineCompleted} of {bulkRefineTotal}…
-                        {#if bulkRefineFailed > 0}
-                            <span class="text-[var(--text-warning)]">({bulkRefineFailed} failed)</span>
-                        {/if}
-                    </span>
-                    <div class="flex-1 h-1.5 rounded-full bg-[var(--shell-border)] overflow-hidden">
-                        <div
-                            class="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
-                            style="width: {bulkRefineTotal > 0
-                                ? ((bulkRefineCompleted + bulkRefineFailed) / bulkRefineTotal) * 100
-                                : 0}%"
-                        ></div>
-                    </div>
-                    <StyledButton size="sm" variant="secondary" onclick={handleCancelBulkRefine}>
-                        <X size={13} /> Cancel
-                    </StyledButton>
-                </div>
-            </div>
-        {:else if selection.hasSelection}
-            <div class="shrink-0 px-4 py-2 overflow-y-auto" style="scrollbar-gutter: stable">
-                <div class="flex items-center gap-2 bg-[var(--surface-secondary)] rounded-lg px-3 py-1.5">
-                    <StyledButton size="sm" variant="destructive" onclick={handleDelete}>
-                        <Trash2 size={13} />
-                        {selection.isMulti ? `Delete ${selection.count}` : "Delete"}
-                    </StyledButton>
-
-                    <div class="flex-1"></div>
-
-                    {#if selection.count === 1}
-                        <StyledButton size="sm" variant="secondary" onclick={editSelected}>
-                            <Pencil size={13} /> Edit
-                        </StyledButton>
-                        <StyledButton size="sm" variant="secondary" onclick={copySelectedText}>
-                            {#if copied}<Check size={13} /> Copied{:else}<Copy size={13} /> Copy{/if}
-                        </StyledButton>
+            <ActionBar gap="gap-3">
+                <Loader2 size={14} class="animate-spin text-[var(--accent)] shrink-0" />
+                <span class="text-sm text-[var(--text-secondary)]">
+                    Refining {bulkRefineCompleted} of {bulkRefineTotal}…
+                    {#if bulkRefineFailed > 0}
+                        <span class="text-[var(--text-warning)]">({bulkRefineFailed} failed)</span>
                     {/if}
-
-                    <StyledButton size="sm" variant="secondary" onclick={openTagAssign}>
-                        <TagIcon size={13} /> Tag
-                    </StyledButton>
-
-                    <StyledButton size="sm" variant="primary" onclick={handleBulkRefine}>
-                        <Sparkles size={13} />
-                        {selection.isMulti ? `Refine ${selection.count}` : "Refine"}
-                    </StyledButton>
+                </span>
+                <div class="flex-1 h-1.5 rounded-full bg-[var(--shell-border)] overflow-hidden">
+                    <div
+                        class="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
+                        style="width: {bulkRefineTotal > 0
+                            ? ((bulkRefineCompleted + bulkRefineFailed) / bulkRefineTotal) * 100
+                            : 0}%"
+                    ></div>
                 </div>
-            </div>
+                <StyledButton size="sm" variant="secondary" onclick={handleCancelBulkRefine}>
+                    <X size={13} /> Cancel
+                </StyledButton>
+            </ActionBar>
+        {:else if selection.hasSelection}
+            <ActionBar>
+                <StyledButton size="sm" variant="destructive" onclick={handleDelete}>
+                    <Trash2 size={13} />
+                    {selection.isMulti ? `Delete ${selection.count}` : "Delete"}
+                </StyledButton>
+
+                <div class="flex-1"></div>
+
+                {#if selection.count === 1}
+                    <StyledButton size="sm" variant="secondary" onclick={editSelected}>
+                        <Pencil size={13} /> Edit
+                    </StyledButton>
+                    <StyledButton size="sm" variant="secondary" onclick={copySelectedText}>
+                        {#if copied}<Check size={13} /> Copied{:else}<Copy size={13} /> Copy{/if}
+                    </StyledButton>
+                {/if}
+
+                <StyledButton size="sm" variant="secondary" onclick={openTagAssign}>
+                    <TagIcon size={13} /> Tag
+                </StyledButton>
+
+                <StyledButton size="sm" variant="primary" onclick={handleBulkRefine}>
+                    <Sparkles size={13} />
+                    {selection.isMulti ? `Refine ${selection.count}` : "Refine"}
+                </StyledButton>
+            </ActionBar>
         {/if}
     </div>
 </div>

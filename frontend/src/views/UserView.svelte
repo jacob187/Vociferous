@@ -694,7 +694,6 @@
                     {/if}
                 </section>
             {/if}
-                {/if}
 
                 <!-- ═══ Overview: About Footer ═══ -->
                 {#if activeTab === "overview"}

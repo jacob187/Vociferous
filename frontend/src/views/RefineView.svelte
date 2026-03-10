@@ -8,6 +8,7 @@
     import MarkdownBody from "../lib/components/MarkdownBody.svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
     import EmptyState from "../lib/components/EmptyState.svelte";
+    import ActionBar from "../lib/components/ActionBar.svelte";
     import {
         Sparkles,
         Copy,
@@ -408,9 +409,7 @@
     </div>
 
     <!-- Action Bar -->
-    <div
-        class="flex items-center gap-[var(--space-2)] py-[var(--space-3)] px-[var(--space-4)] border-t border-[var(--shell-border)]"
-    >
+    <ActionBar>
         {#if hasRefined}
             <StyledButton
                 variant="danger-reveal"
@@ -448,5 +447,5 @@
                 {/if}
             </StyledButton>
         {/if}
-    </div>
+    </ActionBar>
 </div>
