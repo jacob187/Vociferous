@@ -192,6 +192,13 @@ class TestTemplates:
             total_words="500",
             avg_pace=120,
             vocab_pct="30%",
+            verbatim_fillers=12,
+            verbatim_filler_density="3.2%",
+            refined_count=3,
+            time_saved="2m",
+            today_count=2,
+            today_words="150",
+            days_active_this_week=4,
         )
         assert "5" in result
         assert "120" in result

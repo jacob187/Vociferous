@@ -127,26 +127,39 @@
         background-color: var(--surface-primary, #181825);
         border: 2px solid color-mix(in srgb, var(--orange-4) 70%, transparent);
         box-shadow:
-            0 0 24px rgba(255, 160, 60, 0.16),
-            inset 0 0 16px rgba(255, 183, 51, 0.08);
-        animation: button-breathe 4s ease-in-out infinite;
+            0 0 20px rgba(255, 160, 60, 0.14),
+            inset 0 0 16px rgba(255, 183, 51, 0.06);
+        transform: translateZ(0);
     }
 
-    .mic-button.speaking {
+    /* Breathing glow overlay — animates opacity (GPU-composited) instead of
+       box-shadow (full repaint). Fixes ISS-071 stutter at 4K. */
+    .mic-button::after {
+        content: "";
+        position: absolute;
+        inset: -2px;
+        border-radius: 50%;
+        box-shadow:
+            0 0 30px rgba(255, 160, 60, 0.24),
+            inset 0 0 16px rgba(255, 183, 51, 0.12);
+        opacity: 0;
+        will-change: opacity;
+        animation: button-breathe 4s ease-in-out infinite;
+        pointer-events: none;
+    }
+
+    .mic-button.speaking::after {
         animation: none;
+        opacity: 0;
     }
 
     @keyframes button-breathe {
         0%,
         100% {
-            box-shadow:
-                0 0 20px rgba(255, 160, 60, 0.14),
-                inset 0 0 16px rgba(255, 183, 51, 0.06);
+            opacity: 0;
         }
         50% {
-            box-shadow:
-                0 0 30px rgba(255, 160, 60, 0.24),
-                inset 0 0 16px rgba(255, 183, 51, 0.12);
+            opacity: 1;
         }
     }
 
@@ -196,9 +209,10 @@
         height: 100%;
         border-radius: 50%;
         border: 1.5px solid rgba(255, 183, 51, 0.35);
-        transform: translate(-50%, -50%) scale(1);
+        transform: translate(-50%, -50%) scale(1) translateZ(0);
         opacity: 0;
         pointer-events: none;
+        will-change: transform, opacity;
     }
 
     .ripple-ring.active {
@@ -211,11 +225,11 @@
 
     @keyframes ripple-expand {
         0% {
-            transform: translate(-50%, -50%) scale(1);
+            transform: translate3d(-50%, -50%, 0) scale(1);
             opacity: 0.35;
         }
         100% {
-            transform: translate(-50%, -50%) scale(3.2);
+            transform: translate3d(-50%, -50%, 0) scale(3.2);
             opacity: 0;
         }
     }

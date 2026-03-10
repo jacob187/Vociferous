@@ -13,6 +13,7 @@ Statistics are split into three views:
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from src.core.text_analysis import compute_text_metrics, flesch_kincaid_grade, std_dev
@@ -199,6 +200,25 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
     refined_vocab_ratio = len(set(refined_all_words)) / len(refined_all_words) if refined_all_words else 0
     refined_filler_density = refined_filler_count / refined_total_words if refined_total_words else 0
 
+    # ── Session-level stats (for MOTD variety — ISS-070) ──
+    now = datetime.now(timezone.utc)
+    today_str = now.strftime("%Y-%m-%d")
+    week_start = now.toordinal() - now.weekday()  # Monday = 0
+    today_count = 0
+    today_words = 0
+    active_days: set[int] = set()
+    for t in transcripts:
+        try:
+            dt = datetime.fromisoformat(t.created_at.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            continue
+        if dt.strftime("%Y-%m-%d") == today_str:
+            today_count += 1
+            today_words += len((t.normalized_text or t.raw_text or "").split())
+        ordinal = dt.toordinal()
+        if ordinal >= week_start:
+            active_days.add(ordinal)
+
     return {
         # ── Overall (backward-compatible) ──
         "count": count,
@@ -234,4 +254,8 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
         "distribution_words": per_transcript_word_counts,
         "distribution_fk_verbatim": per_transcript_fk_verbatim,
         "distribution_fk_refined": per_transcript_fk_refined,
+        # ── Session-level (ISS-070 MOTD variety) ──
+        "today_count": today_count,
+        "today_words": today_words,
+        "days_active_this_week": len(active_days),
     }

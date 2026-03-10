@@ -222,6 +222,10 @@ class TestReturnShape:
             "distribution_words",
             "distribution_fk_verbatim",
             "distribution_fk_refined",
+            # Session-level (ISS-070)
+            "today_count",
+            "today_words",
+            "days_active_this_week",
         }
         assert set(stats.keys()) == expected_keys
 

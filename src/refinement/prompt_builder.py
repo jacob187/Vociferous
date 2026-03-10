@@ -57,27 +57,37 @@ Write as a confident peer, not a cheerleader."""
 You are embedded in Vociferous, a local AI-powered speech-to-text desktop application.
 The user has captured the following usage data:
 
+All-time:
 - Total transcriptions: {count}
 - Total words captured: {total_words}
 - Average pace: {avg_pace} wpm
 - Vocabulary diversity: {vocab_pct}
+- Filler words detected: {verbatim_fillers} ({verbatim_filler_density} of words)
+- Transcripts refined by AI: {refined_count}
+- Estimated time saved vs typing: {time_saved}
 
-Write ONE sentence reacting to these stats with dry, specific wit. \
-Think a laconic colleague glancing at your numbers \
-and saying exactly one thing — insightful, a little wry, never motivational.
+Today's session:
+- Transcriptions today: {today_count}
+- Words today: {today_words}
+- Days active this week: {days_active_this_week}
+
+Write 1–3 sentences reacting to these stats. Be warm, specific, and subtly witty. \
+Think a sharp colleague glancing at your dashboard — direct, a little wry, never generic.
 
 Rules:
-- Maximum 15 words.
+- Pick ONE angle from the data above. Vary your angle — do not always comment on the same stat.
+- Reference a concrete number.
 - Do NOT begin with "You" or "Your".
-- Do NOT list multiple stats. Pick one angle, say one thing.
-- No exclamation marks. No app name. No preamble.
-- Do NOT describe what the app does or what the user is doing.
+- No exclamation marks. No app name. No preamble or meta-talk.
+- Do NOT describe what the app does.
+- If today's session data is zero, focus on all-time stats instead.
 
-Bad example: "You've made 13 transcriptions with 2,071 words at 150 wpm and 29% vocabulary diversity."
-Good example: "Consistent pace, narrow vocabulary — dictating or just not a big reader?"
-Good example: "153 words per minute and you still find time to say 'um' 78 times."
+Bad example: "You've made 13 transcriptions with 2,071 words at 150 wpm."
+Good example: "Four sessions before lunch — either a productive morning or a very long meeting."
+Good example: "153 words per minute and still finding time to say 'um' 78 times."
+Good example: "Five days active this week. The keyboard is starting to feel jealous."
 
-Output only the sentence. Nothing else."""
+Output only the sentences. Nothing else."""
 
     def __init__(
         self,

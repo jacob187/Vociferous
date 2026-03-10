@@ -2,9 +2,23 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
-## v5.6.8 — RESERVED — MOTD Enrichment & Orrery Performance (ISS-070, ISS-071)
+## v5.6.8 — MOTD Enrichment & Orrery Performance (ISS-070, ISS-071)
 
-> **RESERVED** — Do not use this version number. Work in progress.
+**Date:** 2026-03-09
+**Status:** Hotfix / Enhancement
+
+### Changed
+- **ISS-070** — TranscribeView greeting/MOTD now uses richer data context for more varied, dynamic output.
+  - MOTD prompt receives 11 data points (up from 4): filler count/density, refinement count, time saved, today's session count/words, days active this week.
+  - `compute_usage_stats` now computes per-day session metrics (`today_count`, `today_words`, `days_active_this_week`).
+  - MOTD allowed to be 1–3 sentences (up from a strict 15-word one-liner).
+  - Prompt rewritten with more varied examples and angle-switching guidance.
+
+### Fixed
+- **ISS-071** — Recording orrery animation stutter at full 4K resolved.
+  - Replaced `box-shadow` keyframe animation (triggers full repaint) with an opacity-animated `::after` pseudo-element (GPU-composited).
+  - Added `will-change: transform, opacity` and `translateZ(0)` GPU layer promotion to ripple rings.
+  - All animation keyframes now use `translate3d` for consistent compositor-layer handling.
 
 ---
 
