@@ -83,8 +83,8 @@
         for (const e of entries) {
             if (e.duration_ms && e.duration_ms > 0) {
                 const dur = e.duration_ms / 1000;
-                const expected = (safeText(e).split(/\s+/).filter(Boolean).length / SPEAKING_SPEED_WPM) * 60;
-                total += Math.max(0, dur - expected);
+                const speech = (e.speech_duration_ms || 0) / 1000;
+                total += Math.max(0, dur - speech);
             }
         }
         return total;
@@ -96,8 +96,8 @@
         for (const e of entries) {
             if (e.duration_ms && e.duration_ms > 0) {
                 const dur = e.duration_ms / 1000;
-                const expected = (safeText(e).split(/\s+/).filter(Boolean).length / SPEAKING_SPEED_WPM) * 60;
-                total += Math.max(0, dur - expected);
+                const speech = (e.speech_duration_ms || 0) / 1000;
+                total += Math.max(0, dur - speech);
                 withDuration++;
             }
         }
@@ -283,7 +283,7 @@
         { title: "Average Length", text: "Mean duration per transcription: total_time ÷ transcription_count" },
         {
             title: "Total Silence",
-            text: `Total accumulated silence (pauses) across all recordings. Calculated by summing the difference between actual recording duration and expected speech time for each entry.`,
+            text: `Total accumulated silence (pauses) across all recordings. Calculated as: recording_duration − VAD_speech_duration for each entry.`,
         },
         {
             title: "Vocabulary",
@@ -291,7 +291,7 @@
         },
         {
             title: "Average Pauses",
-            text: `Estimated average silence per recording based on word density. Calculated by comparing actual recording duration against expected speech time (based on ${SPEAKING_SPEED_WPM} WPM).`,
+            text: `Average silence per recording. Calculated as: (recording_duration − VAD_speech_duration) ÷ recording_count.`,
         },
         {
             title: "Filler Words",

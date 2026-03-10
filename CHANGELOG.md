@@ -2,6 +2,21 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.6.10 — UserView Silence Metrics Use Measured VAD Data (ISS-073)
+
+**Date:** 2026-03-09
+**Status:** Bugfix / Analytics accuracy
+
+### Fixed
+- **ISS-073** — UserView "Total Silence" and "Avg. Pauses" metrics now use measured VAD `speech_duration_ms` instead of a word-count heuristic.
+  - Previously: silence estimated as `duration − (word_count ÷ 150 WPM × 60)` — a back-of-napkin guess.
+  - Now: silence computed as `duration_ms − speech_duration_ms` — actual Whisper VAD timing data.
+  - Old transcripts (pre-VAD, `speech_duration_ms = 0`) degrade gracefully: silence = full duration.
+  - Explanation text updated to reflect the new calculation method.
+  - Aligns UserView with backend sorting, which already uses `duration_ms − speech_duration_ms`.
+
+---
+
 ## v5.6.9 — EditView Metrics & Session Tag Tooltip (ISS-063, ISS-064, ISS-069)
 
 **Date:** 2026-03-09

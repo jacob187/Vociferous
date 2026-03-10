@@ -655,7 +655,10 @@
 
     <!-- Session tag bar (idle/recording — selects tags auto-applied to every new transcript) -->
     {#if (viewState === "idle" || viewState === "recording") && allTags.filter((t) => !t.is_system).length > 0}
-        <div class="shrink-0 flex items-center justify-center gap-[var(--space-2)] py-[var(--space-1)] px-[var(--space-1)]" title="Selected tags are auto-applied to every new recording until cleared">
+        <div
+            class="shrink-0 flex items-center justify-center gap-[var(--space-2)] py-[var(--space-1)] px-[var(--space-1)]"
+            title="Selected tags are auto-applied to every new recording until cleared"
+        >
             <Bookmark
                 size={13}
                 class={sessionTagIds.size > 0
@@ -700,12 +703,7 @@
         {#if viewState === "idle" || viewState === "recording"}
             <div class="flex-1 flex flex-col min-h-0">
                 <div class="flex-1 min-h-0 flex flex-col items-center justify-center gap-[var(--space-4)]">
-                    <RecordingControls
-                        {isRecording}
-                        {audioLevel}
-                        onstart={startRecording}
-                        onstop={stopRecording}
-                    />
+                    <RecordingControls {isRecording} {audioLevel} onstart={startRecording} onstop={stopRecording} />
                 </div>
 
                 {#if recentSessions.length > 0}

@@ -287,14 +287,20 @@
                         />
                         <button
                             class="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-transparent border-none text-[var(--accent)] hover:bg-[var(--hover-overlay)] cursor-pointer"
-                            onmousedown={(e: MouseEvent) => { e.preventDefault(); commitTitleEdit(); }}
+                            onmousedown={(e: MouseEvent) => {
+                                e.preventDefault();
+                                commitTitleEdit();
+                            }}
                             title="Confirm rename"
                         >
                             <Check size={14} />
                         </button>
                         <button
                             class="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-transparent border-none text-[var(--text-tertiary)] hover:bg-[var(--hover-overlay)] cursor-pointer"
-                            onmousedown={(e: MouseEvent) => { e.preventDefault(); cancelTitleEdit(); }}
+                            onmousedown={(e: MouseEvent) => {
+                                e.preventDefault();
+                                cancelTitleEdit();
+                            }}
                             title="Cancel rename"
                         >
                             <X size={14} />
@@ -411,7 +417,9 @@
         {#if fillerCount > 0}
             <span class="text-[11px] text-[var(--text-tertiary)]">·</span>
             <span class="text-[13px] text-[var(--text-tertiary)] tabular-nums">
-                {fillerCount} filler{fillerCount !== 1 ? "s" : ""}{wc > 0 ? ` (${(fillerCount / wc * 100).toFixed(1)}%)` : ""}
+                {fillerCount} filler{fillerCount !== 1 ? "s" : ""}{wc > 0
+                    ? ` (${((fillerCount / wc) * 100).toFixed(1)}%)`
+                    : ""}
             </span>
         {/if}
 
