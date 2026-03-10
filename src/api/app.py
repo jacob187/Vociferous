@@ -19,7 +19,7 @@ from litestar.config.cors import CORSConfig
 from litestar.exceptions import HTTPException, WebSocketDisconnect
 from litestar.handlers import websocket
 from litestar.openapi import OpenAPIConfig
-from litestar.response import File, Response
+from litestar.response import Response
 from litestar.static_files import StaticFilesConfig
 
 from src.api.deps import set_coordinator

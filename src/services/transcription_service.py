@@ -227,7 +227,7 @@ def _collapse_repeated_phrases(text: str, min_phrase_words: int = 3, max_phrase_
     # Try phrase lengths from longest to shortest (greedy — catch big loops first)
     for phrase_len in range(min(max_phrase_words, len(words) // 3), min_phrase_words - 1, -1):
         # Build a regex that matches the phrase repeated 3+ times
-        # We work on the current result, not the original, because a longer
+        # Applying iteratively on the current result — not the original — because a longer
         # match may have already cleaned part of it.
         result_words = result.split()
         i = 0

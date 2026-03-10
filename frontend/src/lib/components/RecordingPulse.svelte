@@ -222,7 +222,7 @@
         transform: translateZ(0);
     }
 
-    /* Breathing glow overlay — GPU-composited opacity animation (ISS-071) */
+    /* Breathing glow overlay — GPU-composited opacity animation. */
     .mic-button::after {
         content: "";
         position: absolute;

@@ -10,10 +10,9 @@ import json
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
+
 from src.core.exceptions import ConfigError
 from src.core.resource_manager import ResourceManager
-
 
 # Log file configuration
 LOG_DIR = ResourceManager.get_user_log_dir()

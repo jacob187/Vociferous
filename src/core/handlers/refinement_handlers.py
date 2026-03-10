@@ -102,7 +102,7 @@ class RefinementHandlers:
             start_time = time.monotonic()
             _slm = self._slm_runtime_provider()
             try:
-                # ALWAYS refine from the immutable original, never a previous variant.
+                # Refine from the immutable original, never a previous variant.
                 text = transcript.normalized_text or transcript.raw_text
 
                 self._emit(
@@ -262,7 +262,13 @@ class RefinementHandlers:
                         failed += 1
                         self._emit(
                             "bulk_refinement_progress",
-                            {"completed": completed, "failed": failed, "total": total, "current_transcript_id": tid, "skipped": True},
+                            {
+                                "completed": completed,
+                                "failed": failed,
+                                "total": total,
+                                "current_transcript_id": tid,
+                                "skipped": True,
+                            },
                         )
                         continue
 
@@ -270,14 +276,22 @@ class RefinementHandlers:
                     try:
                         _slm = self._slm_runtime_provider()
                         refined = _slm.refine_text_sync(
-                            text, level=intent.level, instructions=intent.instructions,
+                            text,
+                            level=intent.level,
+                            instructions=intent.instructions,
                         )
                     except Exception as e:
                         logger.exception("Bulk refine: inference failed for transcript %d", tid)
                         failed += 1
                         self._emit(
                             "bulk_refinement_progress",
-                            {"completed": completed, "failed": failed, "total": total, "current_transcript_id": tid, "error": str(e)},
+                            {
+                                "completed": completed,
+                                "failed": failed,
+                                "total": total,
+                                "current_transcript_id": tid,
+                                "error": str(e),
+                            },
                         )
                         continue
 

@@ -141,7 +141,7 @@ def _v3_projects_to_tags(conn: sqlite3.Connection) -> None:
             "INSERT INTO tags (name, color) VALUES (?, ?)",
             (p["name"], p["color"]),
         )
-        project_to_tag[p["id"]] = cur.lastrowid  # type: ignore[assignment]
+        project_to_tag[p["id"]] = cur.lastrowid
 
     # Migrate transcript → project assignments to transcript_tags junction rows
     assigned = conn.execute("SELECT id, project_id FROM transcripts WHERE project_id IS NOT NULL").fetchall()
@@ -255,9 +255,7 @@ def _v6_analytics_inclusion(conn: sqlite3.Connection) -> None:
     """
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(transcripts)").fetchall()}
     if "include_in_analytics" not in cols:
-        conn.execute(
-            "ALTER TABLE transcripts ADD COLUMN include_in_analytics INTEGER NOT NULL DEFAULT 1"
-        )
+        conn.execute("ALTER TABLE transcripts ADD COLUMN include_in_analytics INTEGER NOT NULL DEFAULT 1")
     logger.info("v6 migration: include_in_analytics column ensured on transcripts")
 
 

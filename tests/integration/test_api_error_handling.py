@@ -167,12 +167,11 @@ class TestTranscriptErrors:
         assert resp.status_code == 404
 
     def test_delete_nonexistent_transcript(self, api):
-        """DELETE a non-existent transcript → 200 but no event emitted."""
+        """DELETE a non-existent transcript returns 404."""
         client, coord, events = api
         resp = client.delete("/api/transcripts/99999")
-        assert resp.status_code == 200
-        assert resp.json()["deleted"] is True
-        # Handler checks DB return — no event for ghost IDs
+        assert resp.status_code == 404
+        assert "error" in resp.json()
         assert len(events.of_type("transcript_deleted")) == 0
 
     def test_search_empty_query(self, api):
@@ -299,10 +298,10 @@ class TestHealthEdgeCases:
 # ── Transcript DB-Unavailable Paths ───────────────────────────────────────
 
 
-class TestDbUnavailable:
+class TestDatabaseUnavailable:
     """Behavior when the database is None (not yet initialized)."""
 
-    def test_list_transcripts_db_none(self, api):
+    def test_list_transcripts_database_none(self, api):
         """List returns empty when db is None."""
         client, coord, _ = api
         coord.db = None
@@ -312,14 +311,14 @@ class TestDbUnavailable:
         assert data["items"] == []
         assert data["total"] == 0
 
-    def test_get_transcript_db_none(self, api):
+    def test_get_transcript_database_none(self, api):
         """Get returns 503 when db is None."""
         client, coord, _ = api
         coord.db = None
         resp = client.get("/api/transcripts/1")
         assert resp.status_code == 503
 
-    def test_search_db_none(self, api):
+    def test_search_database_none(self, api):
         """Search returns empty envelope when db is None."""
         client, coord, _ = api
         coord.db = None

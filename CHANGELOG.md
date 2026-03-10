@@ -16,6 +16,24 @@
 
 ---
 
+## v5.8.8 — Code Quality Pass
+
+**Date:** 2026-03-10
+**Status:** Hotfix / Maintenance
+
+### Fixed
+- **Duplicate dict keys** — `InsightManager._generate_task()` had three keys (`time_saved`, `verbatim_fillers`, `verbatim_filler_density`) silently duplicated in the format dict. Duplicate entries removed; values were identical, so no behaviour change.
+- **FTS5 quote escaping** — `TranscriptDB.search()` and `search_count()` stripped inner double-quotes from query tokens instead of doubling them per FTS5 spec. Fixed: `"` → `""`.
+- **DELETE 404 on missing transcript** — `DELETE /api/transcripts/{id}` returned HTTP 200 when the transcript did not exist. Now pre-validates existence and returns 404.
+- **Stale type: ignore** — Unused `# type: ignore[assignment]` removed from `migrations.py` line 144.
+- **Unused imports** — Removed `litestar.response.File` from `api/app.py`, `pathlib.Path` from `log_manager.py`, `flesch_kincaid_grade` from `usage_stats.py`, `typing.Any` from `prompt_builder.py`.
+
+### Changed
+- **RecordingOrrery → RecordingPulse** — `RecordingOrrery.svelte` renamed to `RecordingPulse.svelte`; all references updated. The solar-system terminology was vestigial.
+- **Comment cleanup** — Removed issue-ticket references, first-person phrasing, and AI-directive capitalisation from inline comments across `refinement_handlers.py`, `transcription_service.py`, `insight_manager.py`, `usage_stats.py`, and `prompt_builder.py` module docstring.
+
+---
+
 ## v5.8.7 — Deferred Items Reconciliation
 
 **Date:** 2026-03-10

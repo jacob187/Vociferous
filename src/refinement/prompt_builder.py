@@ -3,14 +3,9 @@ PromptBuilder — Centralised prompt construction for all SLM interactions.
 
 Owns all prompt templates, ChatML formatting, and few-shot examples.
 Used by RefinementEngine (grammar pipeline) and InsightManager (freeform generation).
-
-Extraction from engine.py per ISS-010: prompt logic was inline, blocking
-ISS-011 (custom prompts) and tangled with ISS-007/008 coupling.
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 
 class PromptBuilder:

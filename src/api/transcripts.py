@@ -55,13 +55,19 @@ async def get_transcript(transcript_id: int) -> Response:
 @delete("/api/transcripts/{transcript_id:int}", status_code=200)
 async def delete_transcript(transcript_id: int) -> Response:
     """Delete a transcript via CommandBus intent."""
+    import asyncio
+
     coordinator = get_coordinator()
+    if coordinator.db is None:
+        return Response(content={"error": "Database not available"}, status_code=503)
+
+    transcript = await asyncio.to_thread(coordinator.db.get_transcript, transcript_id)
+    if transcript is None:
+        return Response(content={"error": "Not found"}, status_code=404)
+
     from src.core.intents.definitions import DeleteTranscriptIntent
 
-    intent = DeleteTranscriptIntent(transcript_id=transcript_id)
-    success = coordinator.command_bus.dispatch(intent)
-    if not success:
-        return Response(content={"error": "Delete failed"}, status_code=500)
+    coordinator.command_bus.dispatch(DeleteTranscriptIntent(transcript_id=transcript_id))
     return Response(content={"deleted": True})
 
 

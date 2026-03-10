@@ -1,30 +1,30 @@
 <script lang="ts">
     /**
-     * RecordingControls — Mic button and recording orrery visualizer.
+     * RecordingControls — Mic button and active-recording pulse visualizer.
      *
-     * Extracted from TranscribeView to reduce its line count. This component owns
-     * the visual recording controls but delegates state transitions to the parent
-     * via callbacks and bound props. The recording status bar lives in TranscribeView.
+     * Extracted from TranscribeView to reduce its line count. Owns the visual
+     * recording controls and delegates state transitions to the parent via
+     * callbacks. The recording status bar lives in TranscribeView.
      */
 
     import { Mic } from "lucide-svelte";
-    import RecordingOrrery from "./RecordingOrrery.svelte";
+    import RecordingPulse from "./RecordingPulse.svelte";
 
     interface Props {
         /** Whether a recording is currently active. */
         isRecording: boolean;
-        /** Current audio level (0–1) for the orrery visualizer. */
+        /** Current audio level (0–1) for the pulse visualizer. */
         audioLevel: number;
         /** Called when the user clicks the idle mic button. */
         onstart: () => void;
-        /** Called when the user clicks the orrery (stop recording). */
+        /** Called when the user clicks the active recording button (stop). */
         onstop: () => void;
     }
 
     let { isRecording, audioLevel, onstart, onstop }: Props = $props();
 </script>
 
-<!-- Mic / Orrery button -->
+<!-- Mic / Pulse button -->
 <div class="flex flex-col items-center justify-center gap-[var(--space-4)]">
     {#if isRecording}
         <button
@@ -33,7 +33,7 @@
             aria-label="Stop recording"
             title="Stop recording and transcribe"
         >
-            <RecordingOrrery {audioLevel} size={160} />
+            <RecordingPulse {audioLevel} size={160} />
         </button>
     {:else}
         <button

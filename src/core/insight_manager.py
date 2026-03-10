@@ -239,7 +239,7 @@ class InsightManager:
                 "time_saved": self._fmt_duration(stats.get("time_saved_seconds", 0)),
                 "avg_length": self._fmt_duration(stats.get("avg_seconds", 0)),
                 "avg_pace": avg_pace,
-                # Legacy keys (MOTD still uses these)
+                # Backward-compatible keys still consumed by MOTD templates.
                 "vocab_pct": f"{stats.get('vocab_ratio', 0):.0%}",
                 # Verbatim pipeline
                 "verbatim_vocab_pct": f"{stats.get('verbatim_vocab_ratio', 0):.0%}",
@@ -249,13 +249,10 @@ class InsightManager:
                 "verbatim_avg_sentence_len": stats.get("verbatim_avg_sentence_length", 0),
                 # Refinement section (pre-built block or empty string)
                 "refinement_section": refinement_section,
-                # Session-level (ISS-070 — MOTD variety)
+                # Session-level
                 "today_count": stats.get("today_count", 0),
                 "today_words": f"{stats.get('today_words', 0):,}",
                 "days_active_this_week": stats.get("days_active_this_week", 0),
-                "time_saved": self._fmt_duration(stats.get("time_saved_seconds", 0)),
-                "verbatim_fillers": stats.get("verbatim_filler_count", 0),
-                "verbatim_filler_density": f"{stats.get('verbatim_filler_density', 0):.1%}",
                 "refined_count": refined_count,
             }
             prompt = self._prompt_template.format_map(fmt)

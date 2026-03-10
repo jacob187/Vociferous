@@ -306,9 +306,9 @@ class TranscriptDB:
             items, _ = self.recent(limit=limit, offset=offset)
             return items
         tokens = query.split()
-        # Wrap each token in double-quotes (FTS5 phrase) with prefix wildcard.
+        # Wrap each token as an FTS5 phrase with prefix wildcard.
         # Inner double-quotes are escaped by doubling them per FTS5 syntax.
-        fts_terms = " ".join(f'"{token.replace(chr(34), "")}"*' for token in tokens)
+        fts_terms = " ".join(f'"{token.replace(chr(34), chr(34) * 2)}"*' for token in tokens)
         with self._write_lock:
             rows = self._conn.execute(
                 """SELECT t.*
@@ -330,7 +330,7 @@ class TranscriptDB:
                 row = self._conn.execute("SELECT COUNT(*) FROM transcripts").fetchone()
             return row[0] if row else 0
         tokens = query.split()
-        fts_terms = " ".join(f'"{t.replace(chr(34), "")}"*' for t in tokens)
+        fts_terms = " ".join(f'"{t.replace(chr(34), chr(34) * 2)}"*' for t in tokens)
         with self._write_lock:
             row = self._conn.execute(
                 "SELECT COUNT(*) FROM transcripts_fts WHERE transcripts_fts MATCH ?",
