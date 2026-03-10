@@ -442,6 +442,7 @@ async def dispatch_intent(data: dict) -> Response:
         "refine_transcript": defs.RefineTranscriptIntent,
         "rename_transcript": defs.RenameTranscriptIntent,
         "retitle_transcript": defs.RetitleTranscriptIntent,
+        "append_to_transcript": defs.AppendToTranscriptIntent,
         "set_analytics_inclusion": defs.SetAnalyticsInclusionIntent,
         "create_tag": defs.CreateTagIntent,
         "update_tag": defs.UpdateTagIntent,

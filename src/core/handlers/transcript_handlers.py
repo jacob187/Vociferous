@@ -79,6 +79,18 @@ class TranscriptHandlers:
             db.update_display_name(intent.transcript_id, title)
             self._emit("transcript_updated", {"id": intent.transcript_id})
 
+    def handle_append(self, intent: Any) -> None:
+        """Append a new recording segment to an existing transcript."""
+        db = self._db_provider()
+        if db:
+            db.append_to_transcript(
+                intent.transcript_id,
+                intent.raw_text,
+                intent.duration_ms,
+                intent.speech_duration_ms,
+            )
+            self._emit("transcript_updated", {"id": intent.transcript_id})
+
     def handle_set_analytics_inclusion(self, intent: Any) -> None:
         """Set the include_in_analytics flag for a transcript."""
         db = self._db_provider()

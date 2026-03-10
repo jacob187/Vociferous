@@ -430,6 +430,7 @@ class ApplicationCoordinator:
         from src.core.handlers.title_handlers import TitleHandlers
         from src.core.handlers.transcript_handlers import TranscriptHandlers
         from src.core.intents.definitions import (
+            AppendToTranscriptIntent,
             AssignTagsIntent,
             BatchDeleteTranscriptsIntent,
             BatchToggleTagIntent,
@@ -495,6 +496,7 @@ class ApplicationCoordinator:
         bus.register(CommitEditsIntent, transcript.handle_commit_edits)
         bus.register(RevertToRawIntent, transcript.handle_revert_to_raw)
         bus.register(RenameTranscriptIntent, transcript.handle_rename)
+        bus.register(AppendToTranscriptIntent, transcript.handle_append)
         bus.register(SetAnalyticsInclusionIntent, transcript.handle_set_analytics_inclusion)
         bus.register(RefineTranscriptIntent, refinement.handle_refine)
         bus.register(CommitRefinementIntent, refinement.handle_commit_refinement)

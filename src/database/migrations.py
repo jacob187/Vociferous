@@ -233,6 +233,19 @@ def _v5_system_tags(conn: sqlite3.Connection) -> None:
     logger.info("v5 migration: is_system column ensured + Refined system tag seeded")
 
 
+def _v7_compound_tag(conn: sqlite3.Connection) -> None:
+    """v7 — Seed the 'Compound' system tag for transcript continuation/append.
+
+    Transcripts that have had additional recordings appended to them receive
+    this tag automatically. Fresh installs get it immediately; existing databases
+    get it here alongside the already-seeded 'Refined' tag.
+    """
+    existing = conn.execute("SELECT id FROM tags WHERE name = 'Compound' AND is_system = 1").fetchone()
+    if not existing:
+        conn.execute("INSERT INTO tags (name, color, is_system) VALUES ('Compound', NULL, 1)")
+    logger.info("v7 migration: Compound system tag ensured")
+
+
 def _v6_analytics_inclusion(conn: sqlite3.Connection) -> None:
     """v6 — Add include_in_analytics flag to transcripts.
 
@@ -257,6 +270,7 @@ MIGRATIONS: list[tuple[str, object]] = [
     ("v4 drop projects + variants — simplified transcript model", _v4_drop_projects_and_variants),
     ("v5 system tags — is_system column + Refined tag seeded", _v5_system_tags),
     ("v6 analytics inclusion flag — include_in_analytics column on transcripts", _v6_analytics_inclusion),
+    ("v7 compound system tag — seed Compound tag for transcript continuation", _v7_compound_tag),
 ]
 
 

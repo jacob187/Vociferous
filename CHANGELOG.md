@@ -2,6 +2,23 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.8.5 — Transcript Continuation / Append (ISS-049)
+
+**Date:** 2026-03-10
+**Status:** Patch / Feature
+
+### Added
+- **ISS-049** — Recordings can now be appended to an existing transcript instead of always creating a new one. Appended transcripts receive the "Compound" system tag automatically.
+  - **TranscriptsView**: single-selected transcript gains a "Continue" action in the action bar — navigates to TranscribeView in append mode targeting that transcript.
+  - **TranscribeView (IDLE/RECORDING)**: when in append mode an accent-coloured banner identifies the target transcript; a dismiss button exits append mode without recording.
+  - **TranscribeView (READY)**: an "Append to Previous" button appears after transcription completes, merging the new recording into the most recently created other transcript and removing the temporary standalone entry.
+  - `append_to_transcript()` DB method: appends new text (with newline separator) to `raw_text` and — if present — `normalized_text`; sums `duration_ms` and `speech_duration_ms`; applies the Compound system tag.
+  - `AppendToTranscriptIntent` dispatched via `/api/intents`; `TranscriptHandlers.handle_append` persists and emits `transcript_updated`.
+  - v7 DB migration seeds the "Compound" system tag (idempotent).
+  - Analytics: compound transcripts count as one session; combined duration and word totals flow through `compute_usage_stats()` unmodified.
+
+---
+
 ## v5.8.4 — Analytics Exclusion Controls (ISS-052)
 
 **Date:** 2026-03-10

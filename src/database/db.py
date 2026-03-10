@@ -593,6 +593,41 @@ class TranscriptDB:
             include_in_analytics=bool(row["include_in_analytics"]),
         )
 
+    def append_to_transcript(
+        self,
+        transcript_id: int,
+        raw_text: str,
+        duration_ms: int,
+        speech_duration_ms: int,
+    ) -> None:
+        """Append new recording text to an existing transcript and update totals.
+
+        Appends *raw_text* (preceded by a newline) to both raw_text and — if
+        normalized_text is non-empty — to normalized_text as well.  Duration
+        and speech_duration are summed.  The 'Compound' system tag is applied
+        after the update.
+        """
+        with self._write_lock:
+            row = self._conn.execute(
+                "SELECT raw_text, normalized_text FROM transcripts WHERE id = ?",
+                (transcript_id,),
+            ).fetchone()
+            if row is None:
+                return
+            new_raw = row["raw_text"] + "\n" + raw_text
+            current_norm: str = row["normalized_text"] or ""
+            new_norm = (current_norm + "\n" + raw_text) if current_norm else ""
+            self._conn.execute(
+                """UPDATE transcripts
+                   SET raw_text = ?, normalized_text = ?,
+                       duration_ms = duration_ms + ?,
+                       speech_duration_ms = speech_duration_ms + ?
+                   WHERE id = ?""",
+                (new_raw, new_norm, duration_ms, speech_duration_ms, transcript_id),
+            )
+            self._conn.commit()
+        self.add_system_tag_to_transcript(transcript_id, "Compound")
+
     def set_analytics_inclusion(self, transcript_id: int, include: bool) -> None:
         """Set the include_in_analytics flag for a transcript."""
         with self._write_lock:

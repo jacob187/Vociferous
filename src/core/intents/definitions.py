@@ -203,6 +203,17 @@ class SetAnalyticsInclusionIntent(InteractionIntent):
 
 
 @dataclass(frozen=True, slots=True)
+class AppendToTranscriptIntent(InteractionIntent):
+    """Append a new recording segment's text to an existing transcript."""
+
+    transcript_id: int = 0
+    raw_text: str = ""
+    duration_ms: int = 0
+    speech_duration_ms: int = 0
+    source: IntentSource = IntentSource.API
+
+
+@dataclass(frozen=True, slots=True)
 class RetitleTranscriptIntent(InteractionIntent):
     """Re-generate the SLM title for a single transcript."""
 

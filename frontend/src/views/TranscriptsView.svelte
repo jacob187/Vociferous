@@ -39,6 +39,7 @@
         ArrowUpDown,
         Minus,
         Hammer,
+        Mic,
     } from "lucide-svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
     import EmptyState from "../lib/components/EmptyState.svelte";
@@ -270,6 +271,11 @@
     function editSelected() {
         if (!selectedEntry) return;
         nav.navigateToEdit(selectedEntry.id, { view: "transcripts", transcriptId: selectedEntry.id });
+    }
+
+    function continueRecording() {
+        if (!selectedEntry) return;
+        nav.navigateToAppendMode(selectedEntry.id);
     }
 
     function refineSelected() {
@@ -904,6 +910,9 @@
                 <div class="flex-1"></div>
 
                 {#if selection.count === 1}
+                    <StyledButton size="sm" variant="secondary" onclick={continueRecording} title="Continue recording — append to this transcript">
+                        <Mic size={13} /> Continue
+                    </StyledButton>
                     <StyledButton size="sm" variant="secondary" onclick={editSelected}>
                         <Pencil size={13} /> Edit
                     </StyledButton>

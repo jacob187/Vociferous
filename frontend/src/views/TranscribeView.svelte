@@ -37,6 +37,7 @@
         refineTranscript,
         commitRefinement,
     } from "../lib/api";
+    import { PlusCircle } from "lucide-svelte";
     import type { Transcript, Tag } from "../lib/api";
     import TagBar from "../lib/components/TagBar.svelte";
     import { toast } from "../lib/toast.svelte";
@@ -150,6 +151,15 @@
         }
     }
 
+    /* ===== Append mode ===== */
+    let appendTargetId = $state<number | null>(null);
+    let appendTargetTitle = $state("");
+
+    function cancelAppendMode() {
+        appendTargetId = null;
+        appendTargetTitle = "";
+    }
+
     /* ===== Audio level (voice reactivity) ===== */
     let audioLevel = $state(0);
 
@@ -181,6 +191,9 @@
     }
 
     /* ===== Derived state ===== */
+    /** Most recent transcript that is not the current one (for append-to-previous). */
+    let prevTranscript = $derived(recentSessions.find((t) => t.id !== transcriptId) ?? null);
+
     let wordCount = $derived(
         viewState !== "idle"
             ? (viewState === "editing" ? editText : transcriptText).split(/\s+/).filter(Boolean).length
@@ -297,7 +310,31 @@
                     viewState = "transcribing";
                 }
             }),
-            ws.on("transcription_complete", (data) => {
+            ws.on("transcription_complete", async (data) => {
+                /* ── Append mode: merge into target transcript ── */
+                if (appendTargetId !== null) {
+                    const targetId = appendTargetId;
+                    appendTargetId = null;
+                    appendTargetTitle = "";
+                    try {
+                        await dispatchIntent("append_to_transcript", {
+                            transcript_id: targetId,
+                            raw_text: data.text,
+                            duration_ms: data.duration_ms ?? 0,
+                            speech_duration_ms: data.speech_duration_ms ?? 0,
+                        });
+                        /* Clean up the temporary transcript the ASR pipeline created */
+                        if (data.id) await apiDeleteTranscript(data.id);
+                        toast.success("Recording appended");
+                    } catch (e: any) {
+                        toast.error(`Append failed: ${e.message}`);
+                    }
+                    await openTranscript(targetId, "view");
+                    loadRecentSessions();
+                    return;
+                }
+
+                /* ── Normal flow ── */
                 transcriptText = data.text;
                 transcriptId = data.id;
                 durationMs = data.duration_ms ?? 0;
@@ -387,6 +424,26 @@
         if (pendingRequest != null) {
             void openTranscript(pendingRequest.id, pendingRequest.mode);
         }
+        const appendTarget = nav.consumeAppendTarget();
+        if (appendTarget != null) {
+            viewState = "idle";
+            transcriptText = "";
+            transcriptId = null;
+            transcriptTitle = "";
+            transcriptTimestamp = "";
+            durationMs = 0;
+            speechDurationMs = 0;
+            assignedTagIds = new Set();
+            appendTargetId = appendTarget;
+            appendTargetTitle = "";
+            getTranscript(appendTarget)
+                .then((t) => {
+                    appendTargetTitle = t.display_name?.trim() || `Transcript #${t.id}`;
+                })
+                .catch(() => {
+                    appendTargetTitle = `Transcript #${appendTarget}`;
+                });
+        }
     });
 
     /* ===== Actions ===== */
@@ -468,6 +525,34 @@
     function goToRefine() {
         if (transcriptId == null) return;
         nav.navigate("refine", transcriptId);
+    }
+
+    async function appendToPrevious() {
+        if (!transcriptId || !transcriptText || !prevTranscript) return;
+        const targetTitle = prevTranscript.display_name?.trim() || `Transcript #${prevTranscript.id}`;
+        const confirmed = await toast.confirm({
+            title: "Append to previous recording?",
+            message: `This will append the current recording to "${targetTitle}". The current standalone entry will be removed.`,
+            confirmLabel: "Append",
+            cancelLabel: "Keep separate",
+        });
+        if (!confirmed) return;
+        const currentId = transcriptId;
+        const targetId = prevTranscript.id;
+        try {
+            await dispatchIntent("append_to_transcript", {
+                transcript_id: targetId,
+                raw_text: transcriptText,
+                duration_ms: durationMs,
+                speech_duration_ms: speechDurationMs,
+            });
+            await apiDeleteTranscript(currentId);
+            toast.success("Appended to previous recording");
+            await openTranscript(targetId, "view");
+            loadRecentSessions();
+        } catch (e: any) {
+            toast.error(`Append failed: ${e.message}`);
+        }
     }
 
     function returnToDashboard() {
@@ -653,6 +738,25 @@
         </div>
     {/if}
 
+    <!-- Append mode banner -->
+    {#if appendTargetId !== null && (viewState === "idle" || viewState === "recording")}
+        <div
+            class="shrink-0 flex items-center gap-[var(--space-2)] px-[var(--space-2)] py-[var(--space-1)] rounded-[var(--radius-md)] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] border border-[var(--accent-muted)]"
+        >
+            <PlusCircle size={13} class="text-[var(--accent)] shrink-0" />
+            <span class="text-[var(--text-sm)] text-[var(--text-secondary)] flex-1 truncate">
+                Appending to: <span class="font-semibold text-[var(--text-primary)]">{appendTargetTitle || `Transcript #${appendTargetId}`}</span>
+            </span>
+            <button
+                class="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] bg-transparent border-none cursor-pointer p-0 leading-none transition-colors"
+                onclick={cancelAppendMode}
+                title="Cancel append mode"
+            >
+                <X size={13} />
+            </button>
+        </div>
+    {/if}
+
     <!-- Session tag bar (idle/recording — selects tags auto-applied to every new transcript) -->
     {#if (viewState === "idle" || viewState === "recording") && allTags.filter((t) => !t.is_system).length > 0}
         <div
@@ -820,6 +924,11 @@
 
                 <div class="flex-1"></div>
 
+                {#if viewState === "ready" && prevTranscript}
+                    <StyledButton variant="ghost" size="sm" onclick={appendToPrevious}>
+                        <PlusCircle size={14} /> Append to Previous
+                    </StyledButton>
+                {/if}
                 {#if refinementEnabled}
                     <StyledButton variant="ghost" size="sm" onclick={goToRefine} disabled={transcriptId == null}>
                         <Sparkles size={14} /> Refine

@@ -26,6 +26,8 @@ class NavigationStore {
     pendingTranscriptMode: PendingTranscriptMode = $state("view");
     editReturnTarget: EditReturnTarget | null = $state(null);
     isNavigationLocked: boolean = $state(false);
+    /** Transcript ID to append subsequent recordings to (append/continue mode). */
+    appendTargetId: number | null = $state(null);
 
     navigate(
         view: ViewId,
@@ -67,6 +69,20 @@ class NavigationStore {
             };
         this.beginEditSession(resolvedReturnTarget);
         this.navigate("edit", transcriptId, "edit", { force: true });
+    }
+
+    /** Navigate to TranscribeView in append mode targeting the given transcript. */
+    navigateToAppendMode(targetId: number): void {
+        if (this.isNavigationLocked) return;
+        this.appendTargetId = targetId;
+        this.navigate("transcribe");
+    }
+
+    /** Consume and clear the pending append target ID (one-shot). */
+    consumeAppendTarget(): number | null {
+        const id = this.appendTargetId;
+        this.appendTargetId = null;
+        return id;
     }
 
     /** Consume and clear the pending transcript ID (one-shot). */
