@@ -8,6 +8,7 @@
     import StatCard from "../lib/components/StatCard.svelte";
     import ActivityHeatmap from "../lib/components/ActivityHeatmap.svelte";
     import DistributionChart from "../lib/components/DistributionChart.svelte";
+    import RadarChart, { type RadarAxis } from "../lib/components/RadarChart.svelte";
     import {
         Timer,
         MessageSquareText,
@@ -35,12 +36,20 @@
     const DEFAULT_TYPING_WPM = 40;
     const TRANSCRIPT_EXPORT_LIMIT = 10000;
 
+    /* ── Tabs ── */
+    type UserTab = "overview" | "analytics";
+    const TABS: { id: UserTab; label: string }[] = [
+        { id: "overview", label: "Overview" },
+        { id: "analytics", label: "Advanced Analytics" },
+    ];
+
     /* ── State ── */
     let entries: Transcript[] = $state([]);
     let loading = $state(true);
     let userName = $state("");
     let typingWpm = $state(DEFAULT_TYPING_WPM);
     let showExplanations = $state(false);
+    let activeTab = $state<UserTab>("overview");
     let healthInfo: { version: string; transcripts: number } | null = $state(null);
     let slmInsight = $state("");
     let refreshingInsight = $state(false);
@@ -110,6 +119,66 @@
             total += countFillers(safeText(e));
         }
         return total;
+    });
+
+    /* ── Radar Chart Axes (6 normalized metrics) ── */
+    let radarAxes = $derived.by(() => {
+        const axes: RadarAxis[] = [];
+
+        // 1. Speed (WPM) — 200 WPM = 1.0
+        const speechSeconds = recordedSeconds > 0 ? recordedSeconds : totalWords / SPEAKING_SPEED_WPM * 60;
+        const wpm = speechSeconds > 0 ? (totalWords / speechSeconds) * 60 : 0;
+        const speedNorm = Math.min(1, Math.max(0, wpm / 200));
+        axes.push({
+            label: "Speed",
+            value: `${Math.round(wpm)} WPM`,
+            normalized: speedNorm,
+        });
+
+        // 2. Session Depth (Avg duration in minutes) — 5 min = 1.0
+        const avgMinutes = avgSeconds / 60;
+        const depthNorm = Math.min(1, Math.max(0, avgMinutes / 5));
+        axes.push({
+            label: "Session Depth",
+            value: `${Math.round(avgSeconds)}s`,
+            normalized: depthNorm,
+        });
+
+        // 3. Clean Speech (inverted filler ratio) — 15% fillers = 0.0, 0% = 1.0
+        const fillerRatio = totalWords > 0 ? (fillerCount / totalWords) * 100 : 0;
+        const cleanNorm = Math.min(1, Math.max(0, 1 - fillerRatio / 15));
+        axes.push({
+            label: "Clean Speech",
+            value: `${fillerRatio.toFixed(1)}% fillers`,
+            normalized: cleanNorm,
+        });
+
+        // 4. Activity (log of transcription count) — 1000 transcripts = 1.0
+        const activityNorm = Math.min(1, Math.max(0, Math.log10(count + 1) / 3));
+        axes.push({
+            label: "Activity",
+            value: `${count} recordings`,
+            normalized: activityNorm,
+        });
+
+        // 5. Vocabulary (FK Grade) — Grade 12 = 1.0
+        const vocabNorm = Math.min(1, Math.max(0, verbatimAvgFkGrade / 12));
+        axes.push({
+            label: "Vocabulary",
+            value: `Grade ${verbatimAvgFkGrade.toFixed(1)}`,
+            normalized: vocabNorm,
+        });
+
+        // 6. Time Saved (log of minutes saved) — 1 hour saved = 1.0
+        const minutesSaved = timeSavedSeconds / 60;
+        const timeSavedNorm = Math.min(1, Math.max(0, Math.log10(minutesSaved + 1) / Math.log10(60)));
+        axes.push({
+            label: "Time Saved",
+            value: `${Math.round(minutesSaved)} min`,
+            normalized: timeSavedNorm,
+        });
+
+        return axes;
     });
 
     /* ── Verbatim vs Refined Metrics ── */
@@ -373,10 +442,38 @@
                     </button>
                 </div>
 
-                <!-- ═══ 1. Activity Heatmap ═══ -->
-                {#if count >= 2}
-                    <ActivityHeatmap {entries} />
-                {/if}
+                <!-- ═══ Tab Bar ═══ -->
+                <div class="sticky top-0 z-10 flex gap-[var(--space-2)] border-b border-[var(--shell-border)] bg-[var(--surface-primary)] -mx-[var(--space-5)] px-[var(--space-5)] overflow-x-auto">
+                    {#each TABS as tab}
+                        <button
+                            class="px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 transition-colors whitespace-nowrap {activeTab === tab.id
+                                ? 'border-[var(--accent)] text-[var(--accent)]'
+                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
+                            onclick={() => (activeTab = tab.id)}
+                        >
+                            {tab.label}
+                        </button>
+                    {/each}
+                </div>
+
+                <!-- ═══ Overview Tab ═══ -->
+                {#if activeTab === "overview"}
+                    <!-- ═══ Activity Heatmap ═══ -->
+                    {#if count >= 2}
+                        <ActivityHeatmap {entries} />
+                    {/if}
+
+                    <!-- ═══ Radar Chart ═══ -->
+                    <div class="flex flex-col items-center gap-[var(--space-3)]">
+                        <RadarChart axes={radarAxes} />
+                    </div>
+
+                <!-- ═══ Advanced Analytics Tab ═══ -->
+                {:else if activeTab === "analytics"}
+                    <!-- ═══ Activity Heatmap ═══ -->
+                    {#if count >= 2}
+                        <ActivityHeatmap {entries} />
+                    {/if}
 
                 <!-- ═══ 2. Productivity Impact (lifetime) ═══ -->
                 <div class="flex flex-col gap-[var(--space-3)]">
@@ -597,11 +694,14 @@
                     {/if}
                 </section>
             {/if}
+                {/if}
 
-            <div class="h-px bg-[var(--shell-border)]"></div>
+                <!-- ═══ Overview: About Footer ═══ -->
+                {#if activeTab === "overview"}
+                    <div class="h-px bg-[var(--shell-border)]"></div>
 
-            <!-- ═══ 6. About ═══ -->
-            <footer
+                    <!-- ═══ About ═══ -->
+                    <footer
                 class="rounded-[var(--radius-lg)] border border-[var(--shell-border)] bg-[var(--surface-secondary)] p-[var(--space-5)] flex flex-col items-center gap-[var(--space-3)]"
             >
                 <h2 class="text-2xl font-[var(--weight-emphasis)] text-[var(--accent)] m-0">Vociferous</h2>
@@ -637,8 +737,10 @@
                     </a>
                 </div>
 
-                <p class="text-[var(--text-xs)] text-[var(--accent)] m-0">Created by Andrew Brown</p>
-            </footer>
+                    <p class="text-[var(--text-xs)] text-[var(--accent)] m-0">Created by Andrew Brown</p>
+                </footer>
+                {/if}
+            {/if}
         </div>
     </div>
 </div>

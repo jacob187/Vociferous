@@ -2,6 +2,25 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.8.0 — UserView Tabbed Layout & Radar Analytics (ISS-035, ISS-037)
+
+**Date:** 2026-03-09
+**Status:** Minor Release / Analytics
+
+### Added
+- **ISS-035** — UserView now uses a tabbed interface (Overview / Advanced Analytics) to prevent information overload.
+  - Overview tab: personalized header, activity heatmap, and new radar chart visualization.
+  - Advanced Analytics tab: all original stat cards, distribution charts, and methodology details.
+  - Tab state managed in-memory; defaults to Overview.
+
+- **ISS-037** — Custom SVG radar chart displays 6 key speech analytics metrics.
+  - Metrics: Speed (WPM), Session Depth (avg duration), Clean Speech (inverse filler %), Activity (transcript count), Vocabulary (FK grade), Time Saved (log minutes).
+  - Each metric normalized 0–1 against realistic ceilings (200 WPM, 5-min avg, 15% fillers, 1000 transcripts, grade 12, 1 hour saved).
+  - All-time aggregates; fully responsive SVG with concentric scale rings and labeled axes.
+  - Zero external chart dependencies—pure Svelte + SVG.
+
+---
+
 ## v5.7.1 — UI Polish & Recording Blob Animation (ISS-074, ISS-075, ISS-076, ISS-077)
 
 **Date:** 2026-03-09
