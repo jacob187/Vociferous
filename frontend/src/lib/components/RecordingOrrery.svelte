@@ -40,6 +40,7 @@
     let blobTargets: number[] = Array.from({ length: BLOB_N }, () => BLOB_BASE);
     let lastRetarget = 0;
     let blobPathEl: SVGPathElement | undefined = $state();
+    let blobFillEl: SVGPathElement | undefined = $state();
 
     function computeBlobPath(radii: number[]): string {
         const n = radii.length;
@@ -71,7 +72,7 @@
         }
     }
 
-    function tickBlob(now: number, isSpeaking: boolean) {
+    function tickBlob(now: number, isSpeaking: boolean): boolean {
         if (isSpeaking && now - lastRetarget > RETARGET_MS) {
             retargetBlob();
             lastRetarget = now;
@@ -84,11 +85,17 @@
             if (Math.abs(diff) > 0.01) {
                 blobRadii[i] += diff * BLOB_LERP;
                 changed = true;
+            } else if (blobRadii[i] !== blobTargets[i]) {
+                blobRadii[i] = blobTargets[i];
+                changed = true;
             }
         }
         if (changed) {
-            blobPathEl?.setAttribute("d", computeBlobPath(blobRadii));
+            const d = computeBlobPath(blobRadii);
+            blobPathEl?.setAttribute("d", d);
+            blobFillEl?.setAttribute("d", d);
         }
+        return changed;
     }
 
     /* ── Audio-reactive glow + dynamic button ── */
@@ -128,9 +135,9 @@
         if (nowSpeaking !== speaking) speaking = nowSpeaking;
 
         // Tick blob deformation
-        tickBlob(now, nowSpeaking);
+        const blobChanged = tickBlob(now, nowSpeaking);
 
-        if (smooth > 0.001 || al > 0.001) {
+        if (smooth > 0.001 || al > 0.001 || blobChanged) {
             glowRaf = requestAnimationFrame(glowTick);
         } else {
             glowRaf = undefined;
@@ -140,8 +147,11 @@
             glowEl!.style.transform = "";
             glowEl!.style.opacity = "";
             if (blobPathEl) blobPathEl.style.opacity = "";
-            // Final blob tick to settle back to circle
-            tickBlob(now, false);
+            // Definitively reset blob to perfect circle
+            const circleD = computeBlobPath(Array.from({ length: BLOB_N }, () => BLOB_BASE));
+            blobPathEl?.setAttribute("d", circleD);
+            blobFillEl?.setAttribute("d", circleD);
+            for (let i = 0; i < BLOB_N; i++) blobRadii[i] = BLOB_BASE;
         }
     }
 
@@ -168,8 +178,9 @@
 <div class="recording-display" bind:this={containerEl}>
     <div class="mic-center" style="width: {micSizePx}px; height: {micSizePx}px;">
         <div class="mic-glow" class:speaking bind:this={glowEl}></div>
-        <!-- Amorphous blob ring (replaces static border + sonar ripples) -->
+        <!-- Amorphous blob ring + filled background that tracks deformation -->
         <svg class="blob-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <path bind:this={blobFillEl} d={initialBlobPath} class="blob-fill" />
             <path bind:this={blobPathEl} d={initialBlobPath} class="blob-path" class:speaking />
         </svg>
         <div class="mic-button" class:speaking bind:this={micBtnEl}>
@@ -186,6 +197,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        overflow: hidden;
     }
 
     .mic-center {
@@ -274,6 +286,12 @@
             transform: translate3d(-50%, -50%, 0) scale(0.95);
             opacity: 0.5;
         }
+    }
+
+    /* ── Blob fill — dark background that follows deformation ── */
+    .blob-fill {
+        fill: var(--surface-primary, #181825);
+        stroke: none;
     }
 
     /* ── Amorphous blob ring ── */

@@ -126,7 +126,7 @@
         const axes: RadarAxis[] = [];
 
         // 1. Speed (WPM) — 200 WPM = 1.0
-        const speechSeconds = recordedSeconds > 0 ? recordedSeconds : totalWords / SPEAKING_SPEED_WPM * 60;
+        const speechSeconds = recordedSeconds > 0 ? recordedSeconds : (totalWords / SPEAKING_SPEED_WPM) * 60;
         const wpm = speechSeconds > 0 ? (totalWords / speechSeconds) * 60 : 0;
         const speedNorm = Math.min(1, Math.max(0, wpm / 200));
         axes.push({
@@ -443,10 +443,13 @@
                 </div>
 
                 <!-- ═══ Tab Bar ═══ -->
-                <div class="sticky top-0 z-10 flex gap-[var(--space-2)] border-b border-[var(--shell-border)] bg-[var(--surface-primary)] -mx-[var(--space-5)] px-[var(--space-5)] overflow-x-auto">
+                <div
+                    class="sticky top-0 z-10 flex gap-[var(--space-2)] border-b border-[var(--shell-border)] bg-[var(--surface-primary)] -mx-[var(--space-5)] px-[var(--space-5)] overflow-x-auto"
+                >
                     {#each TABS as tab}
                         <button
-                            class="px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 transition-colors whitespace-nowrap {activeTab === tab.id
+                            class="px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 transition-colors duration-[var(--transition-fast)] whitespace-nowrap cursor-pointer bg-transparent {activeTab ===
+                            tab.id
                                 ? 'border-[var(--accent)] text-[var(--accent)]'
                                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
                             onclick={() => (activeTab = tab.id)}
@@ -468,232 +471,233 @@
                         <RadarChart axes={radarAxes} />
                     </div>
 
-                <!-- ═══ Advanced Analytics Tab ═══ -->
+                    <!-- ═══ Advanced Analytics Tab ═══ -->
                 {:else if activeTab === "analytics"}
                     <!-- ═══ Activity Heatmap ═══ -->
                     {#if count >= 2}
                         <ActivityHeatmap {entries} />
                     {/if}
 
-                <!-- ═══ 2. Productivity Impact (lifetime) ═══ -->
-                <div class="flex flex-col gap-[var(--space-3)]">
-                    <span
-                        class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
-                        >Productivity Impact</span
-                    >
-                    <div class="grid grid-cols-2 gap-[var(--space-4)]">
-                        <StatCard
-                            icon={Timer}
-                            value={formatDuration(timeSavedSeconds)}
-                            label="Time Saved"
-                            sublabel="vs manual typing"
-                            variant="featured"
-                        />
-                        <StatCard
-                            icon={MessageSquareText}
-                            value={formatCount(totalWords)}
-                            label="Words Captured"
-                            sublabel="Total transcribed words"
-                            variant="featured"
-                        />
-                    </div>
-                </div>
-
-                <!-- ═══ 2b. Refinement Impact (only shown if refinements exist) ═══ -->
-                {#if hasRefinements}
+                    <!-- ═══ 2. Productivity Impact (lifetime) ═══ -->
                     <div class="flex flex-col gap-[var(--space-3)]">
                         <span
                             class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
-                            >Refinement Impact</span
+                            >Productivity Impact</span
+                        >
+                        <div class="grid grid-cols-2 gap-[var(--space-4)]">
+                            <StatCard
+                                icon={Timer}
+                                value={formatDuration(timeSavedSeconds)}
+                                label="Time Saved"
+                                sublabel="vs manual typing"
+                                variant="featured"
+                            />
+                            <StatCard
+                                icon={MessageSquareText}
+                                value={formatCount(totalWords)}
+                                label="Words Captured"
+                                sublabel="Total transcribed words"
+                                variant="featured"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- ═══ 2b. Refinement Impact (only shown if refinements exist) ═══ -->
+                    {#if hasRefinements}
+                        <div class="flex flex-col gap-[var(--space-3)]">
+                            <span
+                                class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
+                                >Refinement Impact</span
+                            >
+                            <div class="grid grid-cols-3 gap-[var(--space-3)]">
+                                <StatCard
+                                    icon={FileCheck2}
+                                    value={formatCount(refinedCount)}
+                                    label="Transcripts Refined"
+                                    sublabel="{Math.round((refinedCount / count) * 100)}% of total"
+                                />
+                                <StatCard
+                                    icon={Eraser}
+                                    value={formatCount(fillersRemoved)}
+                                    label="Fillers Removed"
+                                    sublabel="by refinement"
+                                />
+                                <StatCard
+                                    icon={GraduationCap}
+                                    value="{verbatimFkForRefined} → {refinedAvgFkGrade}"
+                                    label="Reading Level"
+                                    sublabel="Verbatim → Refined ({fkGradeDelta > 0 ? '+' : ''}{fkGradeDelta})"
+                                />
+                            </div>
+                        </div>
+                    {/if}
+
+                    <!-- ═══ 3. Usage & Activity (lifetime) ═══ -->
+                    <div class="flex flex-col gap-[var(--space-3)]">
+                        <span
+                            class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
+                            >Usage & Activity</span
+                        >
+                        <div class="grid grid-cols-4 gap-[var(--space-3)]">
+                            <StatCard
+                                icon={BarChart3}
+                                value={formatCount(count)}
+                                label="Transcriptions"
+                                sublabel="Total recordings"
+                            />
+                            <StatCard
+                                icon={Clock}
+                                value={formatDuration(recordedSeconds)}
+                                label="Time Recorded"
+                                sublabel="Total audio duration"
+                            />
+                            <StatCard
+                                icon={Gauge}
+                                value={formatDuration(avgSeconds)}
+                                label="Avg. Length"
+                                sublabel="Per recording"
+                            />
+                            <StatCard
+                                icon={PauseCircle}
+                                value={totalSilence > 0 ? formatDuration(totalSilence) : "—"}
+                                label="Total Silence"
+                                sublabel="Accumulated pauses"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- ═══ 4. Speech Quality (lifetime) ═══ -->
+                    <div class="flex flex-col gap-[var(--space-3)]">
+                        <span
+                            class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
+                            >Speech Quality</span
                         >
                         <div class="grid grid-cols-3 gap-[var(--space-3)]">
                             <StatCard
-                                icon={FileCheck2}
-                                value={formatCount(refinedCount)}
-                                label="Transcripts Refined"
-                                sublabel="{Math.round((refinedCount / count) * 100)}% of total"
+                                icon={BookOpen}
+                                value={lexicalComplexity > 0 ? formatPercent(lexicalComplexity) : "—"}
+                                label="Vocabulary"
+                                sublabel="Unique words ratio"
                             />
                             <StatCard
-                                icon={Eraser}
-                                value={formatCount(fillersRemoved)}
-                                label="Fillers Removed"
-                                sublabel="by refinement"
+                                icon={Volume2}
+                                value={avgSilence > 0 ? formatDuration(avgSilence) : "—"}
+                                label="Avg. Pauses"
+                                sublabel="Silence between speech"
                             />
+                            <StatCard
+                                icon={MessageCircle}
+                                value={fillerCount > 0 ? formatCount(fillerCount) : "—"}
+                                label="Filler Words"
+                                sublabel="um, uh, like, you know"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- ═══ 4b. Readability (lifetime) ═══ -->
+                    <div class="flex flex-col gap-[var(--space-3)]">
+                        <span
+                            class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
+                            >Readability</span
+                        >
+                        <div class="grid grid-cols-2 gap-[var(--space-3)]">
                             <StatCard
                                 icon={GraduationCap}
-                                value="{verbatimFkForRefined} → {refinedAvgFkGrade}"
-                                label="Reading Level"
-                                sublabel="Verbatim → Refined ({fkGradeDelta > 0 ? '+' : ''}{fkGradeDelta})"
-                            />
-                        </div>
-                    </div>
-                {/if}
-
-                <!-- ═══ 3. Usage & Activity (lifetime) ═══ -->
-                <div class="flex flex-col gap-[var(--space-3)]">
-                    <span
-                        class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
-                        >Usage & Activity</span
-                    >
-                    <div class="grid grid-cols-4 gap-[var(--space-3)]">
-                        <StatCard
-                            icon={BarChart3}
-                            value={formatCount(count)}
-                            label="Transcriptions"
-                            sublabel="Total recordings"
-                        />
-                        <StatCard
-                            icon={Clock}
-                            value={formatDuration(recordedSeconds)}
-                            label="Time Recorded"
-                            sublabel="Total audio duration"
-                        />
-                        <StatCard
-                            icon={Gauge}
-                            value={formatDuration(avgSeconds)}
-                            label="Avg. Length"
-                            sublabel="Per recording"
-                        />
-                        <StatCard
-                            icon={PauseCircle}
-                            value={totalSilence > 0 ? formatDuration(totalSilence) : "—"}
-                            label="Total Silence"
-                            sublabel="Accumulated pauses"
-                        />
-                    </div>
-                </div>
-
-                <!-- ═══ 4. Speech Quality (lifetime) ═══ -->
-                <div class="flex flex-col gap-[var(--space-3)]">
-                    <span
-                        class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
-                        >Speech Quality</span
-                    >
-                    <div class="grid grid-cols-3 gap-[var(--space-3)]">
-                        <StatCard
-                            icon={BookOpen}
-                            value={lexicalComplexity > 0 ? formatPercent(lexicalComplexity) : "—"}
-                            label="Vocabulary"
-                            sublabel="Unique words ratio"
-                        />
-                        <StatCard
-                            icon={Volume2}
-                            value={avgSilence > 0 ? formatDuration(avgSilence) : "—"}
-                            label="Avg. Pauses"
-                            sublabel="Silence between speech"
-                        />
-                        <StatCard
-                            icon={MessageCircle}
-                            value={fillerCount > 0 ? formatCount(fillerCount) : "—"}
-                            label="Filler Words"
-                            sublabel="um, uh, like, you know"
-                        />
-                    </div>
-                </div>
-
-                <!-- ═══ 4b. Readability (lifetime) ═══ -->
-                <div class="flex flex-col gap-[var(--space-3)]">
-                    <span
-                        class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
-                        >Readability</span
-                    >
-                    <div class="grid grid-cols-2 gap-[var(--space-3)]">
-                        <StatCard
-                            icon={GraduationCap}
-                            value="Grade {hasRefinements ? verbatimFkForRefined : verbatimAvgFkGrade}"
-                            label="FK Grade (Sentence Complexity)"
-                            sublabel={hasRefinements ? `Verbatim · lower = more readable` : "Lower = more readable"}
-                        />
-                        <StatCard
-                            icon={BookOpen}
-                            value="{hasRefinements ? verbatimPolyForRefined : verbatimPolyRatio}%"
-                            label="Complex Words (Vocabulary)"
-                            sublabel={hasRefinements ? `Verbatim · 3+ syllable words` : "3+ syllable words"}
-                        />
-                        {#if hasRefinements}
-                            <StatCard
-                                icon={Sparkles}
-                                value="Grade {refinedAvgFkGrade}"
+                                value="Grade {hasRefinements ? verbatimFkForRefined : verbatimAvgFkGrade}"
                                 label="FK Grade (Sentence Complexity)"
-                                sublabel="Refined · {fkGradeDelta > 0 ? '+' : ''}{fkGradeDelta} from verbatim"
+                                sublabel={hasRefinements ? `Verbatim · lower = more readable` : "Lower = more readable"}
                             />
                             <StatCard
-                                icon={Sparkles}
-                                value="{refinedPolyRatio}%"
+                                icon={BookOpen}
+                                value="{hasRefinements ? verbatimPolyForRefined : verbatimPolyRatio}%"
                                 label="Complex Words (Vocabulary)"
-                                sublabel="Refined · {Math.round((refinedPolyRatio - verbatimPolyForRefined) * 10) / 10 >
-                                0
-                                    ? '+'
-                                    : ''}{Math.round((refinedPolyRatio - verbatimPolyForRefined) * 10) /
-                                    10}% from verbatim"
+                                sublabel={hasRefinements ? `Verbatim · 3+ syllable words` : "3+ syllable words"}
                             />
-                        {/if}
-                    </div>
-                </div>
-
-                <!-- ═══ 5. Distribution Charts ═══ -->
-                <DistributionChart
-                    title="Word Count Distribution"
-                    series={[
-                        { label: "Words per transcript", values: perTranscriptWordCounts, color: "var(--accent)" },
-                    ]}
-                    xLabel="Words"
-                />
-
-                {#if hasRefinements}
-                    <DistributionChart
-                        title="Reading Level Distribution"
-                        series={[
-                            { label: "Verbatim", values: perTranscriptFkVerbatim, color: "var(--text-tertiary)" },
-                            { label: "Refined", values: perTranscriptFkRefined, color: "var(--accent)" },
-                        ]}
-                        xLabel="Flesch-Kincaid Grade"
-                    />
-                {:else if perTranscriptFkVerbatim.length >= 2}
-                    <DistributionChart
-                        title="Reading Level Distribution"
-                        series={[{ label: "Verbatim", values: perTranscriptFkVerbatim, color: "var(--accent)" }]}
-                        xLabel="Flesch-Kincaid Grade"
-                    />
-                {/if}
-
-                <div class="h-px bg-[var(--shell-border)]"></div>
-
-                <!-- ═══ 6. Calculation Details (collapsible) ═══ -->
-                <section class="flex flex-col items-center gap-[var(--space-4)]">
-                    <button
-                        class="flex items-center gap-[var(--space-2)] bg-none border-none text-[var(--text-secondary)] text-[var(--text-sm)] cursor-pointer py-[var(--space-2)] px-[var(--space-4)] rounded-[var(--radius-md)] transition-[color,background] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:bg-[var(--hover-overlay)]"
-                        onclick={() => (showExplanations = !showExplanations)}
-                    >
-                        {#if showExplanations}
-                            <ChevronDown size={14} />
-                            Hide Calculation Details
-                        {:else}
-                            <ChevronRight size={14} />
-                            Show Calculation Details
-                        {/if}
-                    </button>
-
-                    {#if showExplanations}
-                        <div class="flex flex-col gap-[var(--space-2)] w-full">
-                            {#each explanations as exp}
-                                <div
-                                    class="w-full rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-secondary)] px-[var(--space-4)] py-[var(--space-3)] flex items-start gap-[var(--space-4)]"
-                                >
-                                    <strong
-                                        class="min-w-[160px] text-[var(--text-sm)] text-accent font-semibold leading-[var(--leading-normal)]"
-                                        >{exp.title}</strong
-                                    >
-                                    <span
-                                        class="text-[var(--text-sm)] text-[var(--text-secondary)] leading-[var(--leading-relaxed)] text-left"
-                                        >{exp.text}</span
-                                    >
-                                </div>
-                            {/each}
+                            {#if hasRefinements}
+                                <StatCard
+                                    icon={Sparkles}
+                                    value="Grade {refinedAvgFkGrade}"
+                                    label="FK Grade (Sentence Complexity)"
+                                    sublabel="Refined · {fkGradeDelta > 0 ? '+' : ''}{fkGradeDelta} from verbatim"
+                                />
+                                <StatCard
+                                    icon={Sparkles}
+                                    value="{refinedPolyRatio}%"
+                                    label="Complex Words (Vocabulary)"
+                                    sublabel="Refined · {Math.round((refinedPolyRatio - verbatimPolyForRefined) * 10) /
+                                        10 >
+                                    0
+                                        ? '+'
+                                        : ''}{Math.round((refinedPolyRatio - verbatimPolyForRefined) * 10) /
+                                        10}% from verbatim"
+                                />
+                            {/if}
                         </div>
+                    </div>
+
+                    <!-- ═══ 5. Distribution Charts ═══ -->
+                    <DistributionChart
+                        title="Word Count Distribution"
+                        series={[
+                            { label: "Words per transcript", values: perTranscriptWordCounts, color: "var(--accent)" },
+                        ]}
+                        xLabel="Words"
+                    />
+
+                    {#if hasRefinements}
+                        <DistributionChart
+                            title="Reading Level Distribution"
+                            series={[
+                                { label: "Verbatim", values: perTranscriptFkVerbatim, color: "var(--text-tertiary)" },
+                                { label: "Refined", values: perTranscriptFkRefined, color: "var(--accent)" },
+                            ]}
+                            xLabel="Flesch-Kincaid Grade"
+                        />
+                    {:else if perTranscriptFkVerbatim.length >= 2}
+                        <DistributionChart
+                            title="Reading Level Distribution"
+                            series={[{ label: "Verbatim", values: perTranscriptFkVerbatim, color: "var(--accent)" }]}
+                            xLabel="Flesch-Kincaid Grade"
+                        />
                     {/if}
-                </section>
-            {/if}
+
+                    <div class="h-px bg-[var(--shell-border)]"></div>
+
+                    <!-- ═══ 6. Calculation Details (collapsible) ═══ -->
+                    <section class="flex flex-col items-center gap-[var(--space-4)]">
+                        <button
+                            class="flex items-center gap-[var(--space-2)] bg-none border-none text-[var(--text-secondary)] text-[var(--text-sm)] cursor-pointer py-[var(--space-2)] px-[var(--space-4)] rounded-[var(--radius-md)] transition-[color,background] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:bg-[var(--hover-overlay)]"
+                            onclick={() => (showExplanations = !showExplanations)}
+                        >
+                            {#if showExplanations}
+                                <ChevronDown size={14} />
+                                Hide Calculation Details
+                            {:else}
+                                <ChevronRight size={14} />
+                                Show Calculation Details
+                            {/if}
+                        </button>
+
+                        {#if showExplanations}
+                            <div class="flex flex-col gap-[var(--space-2)] w-full">
+                                {#each explanations as exp}
+                                    <div
+                                        class="w-full rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-secondary)] px-[var(--space-4)] py-[var(--space-3)] flex items-start gap-[var(--space-4)]"
+                                    >
+                                        <strong
+                                            class="min-w-[160px] text-[var(--text-sm)] text-accent font-semibold leading-[var(--leading-normal)]"
+                                            >{exp.title}</strong
+                                        >
+                                        <span
+                                            class="text-[var(--text-sm)] text-[var(--text-secondary)] leading-[var(--leading-relaxed)] text-left"
+                                            >{exp.text}</span
+                                        >
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                    </section>
+                {/if}
 
                 <!-- ═══ Overview: About Footer ═══ -->
                 {#if activeTab === "overview"}
@@ -701,43 +705,45 @@
 
                     <!-- ═══ About ═══ -->
                     <footer
-                class="rounded-[var(--radius-lg)] border border-[var(--shell-border)] bg-[var(--surface-secondary)] p-[var(--space-5)] flex flex-col items-center gap-[var(--space-3)]"
-            >
-                <h2 class="text-2xl font-[var(--weight-emphasis)] text-[var(--accent)] m-0">Vociferous</h2>
-                <p class="text-[var(--text-sm)] text-[var(--text-secondary)] m-0">Local AI Speech to Text</p>
-
-                <p
-                    class="text-[var(--text-sm)] text-[var(--text-tertiary)] text-center leading-[var(--leading-relaxed)] max-w-[520px] m-0"
-                >
-                    Powered by CTranslate2 language models. Fully local, privacy-first speech-to-text that runs entirely
-                    on your machine. No cloud, no data collection, no internet.
-                </p>
-
-                {#if healthInfo}
-                    <p class="text-[var(--text-xs)] text-[var(--text-tertiary)] font-mono m-0">v{healthInfo.version}</p>
-                {/if}
-
-                <div class="flex gap-[var(--space-3)]">
-                    <a
-                        class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-md)] text-[var(--text-secondary)] text-[var(--text-sm)] no-underline transition-[color,border-color] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
-                        href="https://www.linkedin.com/in/abrown7521/"
-                        target="_blank"
-                        rel="noopener"
+                        class="rounded-[var(--radius-lg)] border border-[var(--shell-border)] bg-[var(--surface-secondary)] p-[var(--space-5)] flex flex-col items-center gap-[var(--space-3)]"
                     >
-                        <Linkedin size={15} /> LinkedIn
-                    </a>
-                    <a
-                        class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-md)] text-[var(--text-secondary)] text-[var(--text-sm)] no-underline transition-[color,border-color] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
-                        href="https://github.com/WanderingAstronomer/Vociferous"
-                        target="_blank"
-                        rel="noopener"
-                    >
-                        <Github size={15} /> GitHub
-                    </a>
-                </div>
+                        <h2 class="text-2xl font-[var(--weight-emphasis)] text-[var(--accent)] m-0">Vociferous</h2>
+                        <p class="text-[var(--text-sm)] text-[var(--text-secondary)] m-0">Local AI Speech to Text</p>
 
-                    <p class="text-[var(--text-xs)] text-[var(--accent)] m-0">Created by Andrew Brown</p>
-                </footer>
+                        <p
+                            class="text-[var(--text-sm)] text-[var(--text-tertiary)] text-center leading-[var(--leading-relaxed)] max-w-[520px] m-0"
+                        >
+                            Powered by CTranslate2 language models. Fully local, privacy-first speech-to-text that runs
+                            entirely on your machine. No cloud, no data collection, no internet.
+                        </p>
+
+                        {#if healthInfo}
+                            <p class="text-[var(--text-xs)] text-[var(--text-tertiary)] font-mono m-0">
+                                v{healthInfo.version}
+                            </p>
+                        {/if}
+
+                        <div class="flex gap-[var(--space-3)]">
+                            <a
+                                class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-md)] text-[var(--text-secondary)] text-[var(--text-sm)] no-underline transition-[color,border-color] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
+                                href="https://www.linkedin.com/in/abrown7521/"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <Linkedin size={15} /> LinkedIn
+                            </a>
+                            <a
+                                class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-md)] text-[var(--text-secondary)] text-[var(--text-sm)] no-underline transition-[color,border-color] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
+                                href="https://github.com/WanderingAstronomer/Vociferous"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <Github size={15} /> GitHub
+                            </a>
+                        </div>
+
+                        <p class="text-[var(--text-xs)] text-[var(--accent)] m-0">Created by Andrew Brown</p>
+                    </footer>
                 {/if}
             {/if}
         </div>

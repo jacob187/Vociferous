@@ -656,16 +656,18 @@
     <!-- Session tag bar (idle/recording — selects tags auto-applied to every new transcript) -->
     {#if (viewState === "idle" || viewState === "recording") && allTags.filter((t) => !t.is_system).length > 0}
         <div
-            class="shrink-0 flex items-center justify-center gap-[var(--space-2)] py-[var(--space-1)] px-[var(--space-1)]"
+            class="shrink-0 flex flex-col items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-1)]"
             title="Selected tags are auto-applied to every new recording until cleared"
         >
-            <Bookmark
-                size={13}
-                class={sessionTagIds.size > 0
-                    ? "text-[var(--accent)] shrink-0"
-                    : "text-[var(--text-tertiary)] shrink-0"}
-            />
-            <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] shrink-0 select-none">Session tags</span>
+            <div class="flex items-center gap-[var(--space-1)]">
+                <Bookmark
+                    size={13}
+                    class={sessionTagIds.size > 0
+                        ? "text-[var(--accent)] shrink-0"
+                        : "text-[var(--text-tertiary)] shrink-0"}
+                />
+                <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] shrink-0 select-none">Session tags</span>
+            </div>
             <TagBar
                 tags={allTags.filter((t) => !t.is_system)}
                 activeIds={sessionTagIds}

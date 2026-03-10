@@ -199,28 +199,10 @@ body {
    SCROLLBAR
    ========================================================================== */
 
-::-webkit-scrollbar {
-    width: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--surface-secondary);
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--accent-muted);
-    border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--accent);
-}
-
-/* Standard scrollbar properties (Firefox / future browsers) */
-* {
-    scrollbar-width: thin;
-    scrollbar-color: var(--accent-muted) var(--surface-secondary);
-}
+/* WebKit scrollbar styling lives in index.html <style> block.
+   scrollbar-color / scrollbar-width are NOT set here because in WebKit
+   their presence disables ::-webkit-scrollbar pseudo-elements entirely,
+   and WebKitGTK's scrollbar-color implementation renders incorrectly. */
 
 /* ==========================================================================
    UTILITY CLASSES

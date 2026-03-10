@@ -5,6 +5,22 @@
         <link rel="icon" type="image/svg+xml" href="/vite.svg" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Vociferous</title>
+        <style>
+            /* GTK/WebKitGTK scrollbar fix — hardcoded inline to bypass CSS variable limitations */
+            ::-webkit-scrollbar {
+                width: 8px !important;
+            }
+            ::-webkit-scrollbar-track {
+                background: #2a2a2a !important;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: #4a8ac0 !important;
+                border-radius: 4px !important;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: #5a9fd4 !important;
+            }
+        </style>
     </head>
 
     <body class="bg-neutral-950 text-neutral-100 min-h-screen">

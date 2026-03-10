@@ -232,18 +232,20 @@ def create_app(coordinator: ApplicationCoordinator) -> Litestar:
         mini_html = frontend_dist / "mini.html"
 
         if index_html.is_file():
+            _index_content = index_html.read_bytes()
 
             @get("/", media_type=MediaType.HTML, sync_to_thread=False)
-            def serve_index() -> File:
-                return File(path=index_html, media_type=MediaType.HTML)
+            def serve_index() -> Response:
+                return Response(content=_index_content, media_type=MediaType.HTML)
 
             spa_handlers.append(serve_index)
 
         if mini_html.is_file():
+            _mini_content = mini_html.read_bytes()
 
             @get("/mini.html", media_type=MediaType.HTML, sync_to_thread=False)
-            def serve_mini() -> File:
-                return File(path=mini_html, media_type=MediaType.HTML)
+            def serve_mini() -> Response:
+                return Response(content=_mini_content, media_type=MediaType.HTML)
 
             spa_handlers.append(serve_mini)
 

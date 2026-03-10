@@ -107,7 +107,7 @@
 
 <div class="flex flex-col h-screen overflow-hidden">
     <TitleBar isRecording={recordingActive} />
-    <div class="flex flex-1 bg-[var(--shell-bg)] text-[var(--text-primary)] overflow-clip">
+    <div class="flex flex-1 min-h-0 bg-[var(--shell-bg)] text-[var(--text-primary)] overflow-clip">
         {#if !appReady}
             <!-- Waiting for initial status check -->
         {:else}

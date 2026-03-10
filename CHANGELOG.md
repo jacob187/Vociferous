@@ -2,6 +2,24 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.8.2 — UI Polish and Interaction Fixes (ISS-080)
+
+**Date:** 2026-03-10
+**Status:** Bug Fix / Polish
+
+### Changed
+- **ISS-080** — Browser-session UI audit: fixed a batch of visual and interaction issues across TranscribeView, EditView, UserView, and the recording orrery.
+  - `TranscribeView`: Session tags label (bookmark icon + "Session tags") now stacks above the tag row instead of sitting inline as a horizontal peer.
+  - `RecordingOrrery`: Mic glow clipped with `overflow: hidden` on `.recording-display`; added `blob-fill` SVG path so the dark background correctly tracks blob deformation; definitively resets blob radii and paths to a perfect circle when audio stops.
+  - `App.svelte`: Added `min-h-0` to the root flex wrapper, fixing a classic flex overflow bug that caused the nav rail footer (User/Settings) to clip off-screen on content-heavy views.
+  - `app.css`: Scrollbar thumb color corrected from near-invisible `--accent-muted` to visible `--blue-5` accent.
+  - `EditView`: Added Copy button with clipboard + "Copied" confirm toggle; Discard button restyled to `destructive` variant and repositioned to the far left of the action bar; stats strip centered between two `flex-1` spacers; "grade" metric label capitalized to "Grade".
+  - `UserView`: Tab buttons (`Overview` / `Advanced Analytics`) given `cursor-pointer` and `bg-transparent` to match Settings tab affordances.
+  - `RadarChart`: All axis label and value text switched to `text-anchor="middle"` for consistent centering; `LABEL_OFFSET` increased from 30 → 46 to give labels clear breathing room from the outer ring.
+  - `src/api/app.py`: Replaced Litestar `File` response with plain `Response(bytes)` for both `serve_index` and `serve_mini`, eliminating the `Content-Disposition: attachment` header that caused browsers to download the SPA instead of rendering it.
+
+---
+
 ## v5.8.1 — Centralized ActionBar Component (ISS-079)
 
 **Date:** 2026-03-09

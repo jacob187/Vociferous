@@ -6,8 +6,8 @@
 -->
 <script lang="ts">
     export interface RadarAxis {
-        label: string;      // "Speed", "Activity", etc.
-        value: string;      // Formatted display value (e.g., "142 WPM")
+        label: string; // "Speed", "Activity", etc.
+        value: string; // Formatted display value (e.g., "142 WPM")
         normalized: number; // 0.0–1.0
     }
 
@@ -18,7 +18,7 @@
     let { axes }: Props = $props();
 
     // SVG constants
-    const SIZE = 300;
+    const SIZE = 380;
     const CENTER = SIZE / 2;
     const RADIUS = 110;
     const SCALE_RINGS = [0.25, 0.5, 0.75, 1.0];
@@ -59,7 +59,7 @@
     }
 
     // Offset for label positioning (slightly beyond the outer ring)
-    const LABEL_OFFSET = 15;
+    const LABEL_OFFSET = 46;
 </script>
 
 <div class="flex justify-center w-full">
@@ -83,20 +83,6 @@
                 stroke-width="1"
                 opacity="0.4"
             />
-        {/each}
-
-        <!-- Scale ring labels (percentages) -->
-        {#each SCALE_RINGS.slice(1) as ring}
-            <text
-                x={CENTER}
-                y={CENTER - ring * RADIUS + 4}
-                font-size="9"
-                fill="var(--text-tertiary)"
-                text-anchor="middle"
-                opacity="0.5"
-            >
-                {Math.round(ring * 100)}%
-            </text>
         {/each}
 
         <!-- Axis lines and labels -->
@@ -123,7 +109,7 @@
                 font-size="11"
                 font-weight="500"
                 fill="var(--text-secondary)"
-                text-anchor={getTextAnchor(angle)}
+                text-anchor="middle"
                 dominant-baseline="middle"
             >
                 {axis.label}
@@ -135,7 +121,7 @@
                 y={labelY + 12}
                 font-size="9"
                 fill="var(--accent)"
-                text-anchor={getTextAnchor(angle)}
+                text-anchor="middle"
                 dominant-baseline="middle"
                 font-weight="600"
             >

@@ -28,7 +28,7 @@
     import StyledButton from "../lib/components/StyledButton.svelte";
     import TagBar from "../lib/components/TagBar.svelte";
     import ActionBar from "../lib/components/ActionBar.svelte";
-    import { ArrowLeft, Check, X, Hammer, RotateCcw, Pencil } from "lucide-svelte";
+    import { ArrowLeft, Check, X, Hammer, RotateCcw, Pencil, Copy } from "lucide-svelte";
 
     /* ===== State ===== */
 
@@ -37,6 +37,7 @@
     let loading = $state(true);
     let saving = $state(false);
     let error = $state("");
+    let copied = $state(false);
     let allTags: Tag[] = $state([]);
     let tagMenuOpen = $state(false);
     let editingTitle = $state(false);
@@ -388,6 +389,12 @@
 
     <!-- ── Footer ── -->
     <ActionBar>
+        <StyledButton size="sm" variant="destructive" onclick={discard}>
+            <X size={13} /> Discard
+        </StyledButton>
+
+        <div class="flex-1"></div>
+
         <!-- Statistics strip -->
         <span class="text-[13px] text-[var(--text-tertiary)] tabular-nums">
             {wc.toLocaleString()} word{wc !== 1 ? "s" : ""}
@@ -411,7 +418,7 @@
 
         {#if fkGrade !== null}
             <span class="text-[11px] text-[var(--text-tertiary)]">·</span>
-            <span class="text-[13px] text-[var(--text-tertiary)] tabular-nums">grade {fkGrade}</span>
+            <span class="text-[13px] text-[var(--text-tertiary)] tabular-nums">Grade {fkGrade}</span>
         {/if}
 
         {#if fillerCount > 0}
@@ -433,8 +440,22 @@
 
         <div class="flex-1"></div>
 
-        <StyledButton size="sm" variant="secondary" onclick={discard}>
-            <X size={13} /> Discard
+        <StyledButton
+            size="sm"
+            variant="secondary"
+            onclick={() => {
+                if (editText) {
+                    navigator.clipboard.writeText(editText);
+                    copied = true;
+                    setTimeout(() => (copied = false), 1500);
+                }
+            }}
+        >
+            {#if copied}
+                <Check size={13} /> Copied
+            {:else}
+                <Copy size={13} /> Copy
+            {/if}
         </StyledButton>
 
         <StyledButton size="sm" variant="primary" onclick={save} disabled={!isDirty || saving}>
