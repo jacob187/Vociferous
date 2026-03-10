@@ -224,6 +224,47 @@ class RecordingSession:
         else:
             self.handle_begin(intent)
 
+    def handle_import(self, intent: Any) -> None:
+        """Import an audio file for transcription (runs decode+transcribe on a background thread)."""
+        file_path: str = intent.file_path
+        if not file_path:
+            self._emit("transcription_error", {"message": "No file path provided"})
+            return
+
+        path = Path(file_path)
+        if not path.is_file():
+            self._emit("transcription_error", {"message": f"File not found: {path.name}"})
+            return
+
+        display_name = path.stem  # filename without extension
+
+        def _import_worker() -> None:
+            try:
+                import numpy as np
+                from faster_whisper.audio import decode_audio
+
+                # decode_audio returns float32 at target sample rate (uses ffmpeg)
+                float_audio = decode_audio(str(path), sampling_rate=16000)
+
+                # Convert to int16 for the standard AudioPipeline (VAD, normalization)
+                int16_audio = (float_audio * 32768).clip(-32768, 32767).astype(np.int16)
+
+                if len(int16_audio) == 0:
+                    self._emit("transcription_error", {"message": "Audio file is empty"})
+                    return
+
+                self._transcribe_and_store(
+                    int16_audio,
+                    source_tag="Imported",
+                    display_name=display_name,
+                )
+            except Exception as e:
+                logger.exception("Audio file import failed: %s", path.name)
+                self._emit("transcription_error", {"message": f"Import failed: {e}"})
+
+        t = threading.Thread(target=_import_worker, daemon=True, name="audio-import")
+        t.start()
+
     # --- Pipeline ---
 
     def _recording_loop(self) -> None:
@@ -271,7 +312,14 @@ class RecordingSession:
             self._emit("recording_stopped", {"cancelled": False})
             self._emit("transcription_error", {"message": str(e)})
 
-    def _transcribe_and_store(self, audio_data: Any, *, spool_path: Path | None = None) -> None:
+    def _transcribe_and_store(
+        self,
+        audio_data: Any,
+        *,
+        spool_path: Path | None = None,
+        source_tag: str | None = None,
+        display_name: str | None = None,
+    ) -> None:
         """Run transcription on audio data, store result, and emit events."""
         if self._shutdown_event.is_set():
             logger.debug("Transcription skipped — shutdown in progress")
@@ -324,7 +372,10 @@ class RecordingSession:
                     raw_text=text,
                     duration_ms=duration_ms,
                     speech_duration_ms=speech_duration_ms,
+                    display_name=display_name,
                 )
+                if source_tag and transcript:
+                    db.add_system_tag_to_transcript(transcript.id, source_tag)
 
             self._emit(
                 "transcription_complete",

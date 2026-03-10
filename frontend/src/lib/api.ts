@@ -257,6 +257,10 @@ export function exportFile(content: string, filename: string): Promise<{ path: s
     });
 }
 
+export function importAudioFile(): Promise<{ status: string; file: string; dispatched: boolean }> {
+    return request("/import-audio", { method: "POST" });
+}
+
 export function restartEngine(): Promise<{ status: string }> {
     return request("/engine/restart", { method: "POST" });
 }

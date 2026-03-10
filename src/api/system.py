@@ -141,6 +141,38 @@ async def export_file(data: dict) -> Response:
     return Response(content={"path": save_path})
 
 
+_AUDIO_FILE_TYPES = ("Audio Files (*.wav;*.mp3;*.m4a;*.flac;*.ogg;*.webm;*.wma;*.aac;*.opus)",)
+
+
+@post("/api/import-audio")
+async def import_audio_file() -> Response:
+    """
+    Show a native open-file dialog for audio import, then dispatch transcription.
+
+    The heavy lifting (decode + transcribe) runs on a background thread.
+    Results arrive via WebSocket: transcription_complete / transcription_error.
+    """
+    import asyncio
+
+    from src.core.intents.definitions import ImportAudioFileIntent
+
+    coordinator = get_coordinator()
+
+    loop = asyncio.get_running_loop()
+    file_path: str | None = await loop.run_in_executor(
+        None, coordinator.show_open_dialog, _AUDIO_FILE_TYPES
+    )
+
+    if file_path is None:
+        return Response(content={"error": "cancelled"}, status_code=400)
+
+    intent = ImportAudioFileIntent(file_path=file_path)
+    success = coordinator.command_bus.dispatch(intent)
+    filename = Path(file_path).name
+
+    return Response(content={"status": "importing", "file": filename, "dispatched": success})
+
+
 @get("/api/models", sync_to_thread=True)
 def list_models() -> dict:
     from src.core.model_registry import get_model_catalog
@@ -451,6 +483,7 @@ async def dispatch_intent(data: dict) -> Response:
         "update_config": defs.UpdateConfigIntent,
         "restart_engine": defs.RestartEngineIntent,
         "refresh_insight": defs.RefreshInsightIntent,
+        "import_audio_file": defs.ImportAudioFileIntent,
     }
 
     intent_cls = intent_map.get(intent_type_name)

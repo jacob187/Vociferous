@@ -83,3 +83,21 @@ class WindowController:
         except Exception:
             logger.exception("Native save dialog failed")
             return None
+
+    def show_open_dialog(self, file_types: tuple[str, ...] = ()) -> str | None:
+        """Show a native open-file dialog and return the chosen path, or None if cancelled."""
+        if self._main_window is None:
+            return None
+        try:
+            import webview
+
+            result = self._main_window.create_file_dialog(
+                webview.OPEN_DIALOG,
+                file_types=file_types,
+            )
+            if result and len(result) > 0:
+                return str(result[0])
+            return None
+        except Exception:
+            logger.exception("Native open dialog failed")
+            return None

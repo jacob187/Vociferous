@@ -14,7 +14,7 @@
     import { ws } from "../lib/ws";
     import { onMount } from "svelte";
     import RecordingControls from "../lib/components/RecordingControls.svelte";
-    import { Mic, Copy, Check, Pencil, Trash2, Save, Undo2, Loader2, Sparkles, Home, X } from "lucide-svelte";
+    import { Mic, Copy, Check, Pencil, Trash2, Save, Undo2, Loader2, Sparkles, Home, X, FileAudio } from "lucide-svelte";
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
@@ -36,6 +36,7 @@
         updateTag,
         refineTranscript,
         commitRefinement,
+        importAudioFile,
     } from "../lib/api";
     import { PlusCircle } from "lucide-svelte";
     import type { Transcript, Tag } from "../lib/api";
@@ -460,6 +461,17 @@
         ws.send("cancel_recording");
     }
 
+    async function importAudio() {
+        try {
+            const result = await importAudioFile();
+            if (result.status === "importing") {
+                viewState = "transcribing";
+            }
+        } catch {
+            // User cancelled the file dialog — do nothing
+        }
+    }
+
     function toggleRecording() {
         if (isRecording) stopRecording();
         else startRecording();
@@ -813,6 +825,11 @@
             <div class="flex-1 flex flex-col min-h-0">
                 <div class="flex-1 min-h-0 flex flex-col items-center justify-center gap-[var(--space-4)]">
                     <RecordingControls {isRecording} {audioLevel} onstart={startRecording} onstop={stopRecording} />
+                    {#if viewState === "idle"}
+                        <StyledButton variant="ghost" size="sm" onclick={importAudio}>
+                            <FileAudio size={14} /> Import Audio File
+                        </StyledButton>
+                    {/if}
                 </div>
 
                 {#if recentSessions.length > 0}

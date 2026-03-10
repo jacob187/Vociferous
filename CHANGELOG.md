@@ -2,6 +2,27 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.9.3 — Audio File Import (ISS-018)
+
+**Date:** 2026-03-10
+**Status:** Feature
+
+### Added
+- **Import audio files for transcription** — Users can now import pre-recorded audio files (WAV, MP3, M4A, FLAC, OGG, WEBM, WMA, AAC, Opus) via a native OS file dialog. The imported audio runs through the full ASR pipeline: `decode_audio` (ffmpeg) → AudioPipeline (RMS normalization, highpass filter, Silero VAD) → faster-whisper transcription → database storage.
+- **"Import Audio File" button** on the TranscribeView idle screen, positioned below the mic controls.
+- **Native file picker** via `WindowController.show_open_dialog()` (pywebview `OPEN_DIALOG`), mirrors the existing export save dialog pattern.
+- **`ImportAudioFileIntent`** — New intent following the H-pattern. Dispatched by the `/api/import-audio` endpoint after the file dialog returns a path.
+- Imported transcripts are automatically tagged with the **"Imported"** system tag and titled with the source filename (without extension).
+- Results arrive via the existing `transcription_complete` / `transcription_error` WebSocket events — no new event types needed.
+
+### Technical Notes
+- Audio decoding uses `faster_whisper.audio.decode_audio()` (ffmpeg-based, already a dependency). No new packages required.
+- Decoding runs on a background thread to keep the API event loop responsive.
+- The full AudioPipeline (VAD + normalization) is applied to imported audio — prevents Whisper hallucination on silence-heavy files.
+- Handler count in `_register_handlers` increased from 25 to 26. Test `test_handler_count_matches_intent_count` needs its assertion updated (tests/ locked by teal-quasar).
+
+---
+
 ## v5.9.2 — Advanced Sampling Settings (ISS-025)
 
 **Date:** 2026-03-10

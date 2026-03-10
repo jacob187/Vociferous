@@ -456,6 +456,7 @@ class ApplicationCoordinator:
             CreateTagIntent,
             DeleteTagIntent,
             DeleteTranscriptIntent,
+            ImportAudioFileIntent,
             RefineTranscriptIntent,
             RefreshInsightIntent,
             RenameTranscriptIntent,
@@ -502,6 +503,7 @@ class ApplicationCoordinator:
         bus.register(StopRecordingIntent, self.recording_session.handle_stop)
         bus.register(CancelRecordingIntent, self.recording_session.handle_cancel)
         bus.register(ToggleRecordingIntent, self.recording_session.handle_toggle)
+        bus.register(ImportAudioFileIntent, self.recording_session.handle_import)
         bus.register(DeleteTranscriptIntent, transcript.handle_delete)
         bus.register(BatchDeleteTranscriptsIntent, transcript.handle_batch_delete)
         bus.register(ClearTranscriptsIntent, transcript.handle_clear)
@@ -718,3 +720,7 @@ class ApplicationCoordinator:
     def show_save_dialog(self, suggested_name: str) -> str | None:
         """Show a native save-file dialog and return the chosen path, or None if cancelled."""
         return self.window.show_save_dialog(suggested_name)
+
+    def show_open_dialog(self, file_types: tuple[str, ...] = ()) -> str | None:
+        """Show a native open-file dialog and return the chosen path, or None if cancelled."""
+        return self.window.show_open_dialog(file_types)
