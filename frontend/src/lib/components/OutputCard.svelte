@@ -177,7 +177,9 @@
         >
             <ChevronDown
                 size={14}
-                class="transition-transform duration-[var(--transition-fast)] {advancedOpen ? 'rotate-0' : '-rotate-90'}"
+                class="transition-transform duration-[var(--transition-fast)] {advancedOpen
+                    ? 'rotate-0'
+                    : '-rotate-90'}"
             />
             Advanced Sampling
         </button>

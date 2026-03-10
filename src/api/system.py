@@ -159,9 +159,7 @@ async def import_audio_file() -> Response:
     coordinator = get_coordinator()
 
     loop = asyncio.get_running_loop()
-    file_path: str | None = await loop.run_in_executor(
-        None, coordinator.show_open_dialog, _AUDIO_FILE_TYPES
-    )
+    file_path: str | None = await loop.run_in_executor(None, coordinator.show_open_dialog, _AUDIO_FILE_TYPES)
 
     if file_path is None:
         return Response(content={"error": "cancelled"}, status_code=400)

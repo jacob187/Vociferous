@@ -16,11 +16,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
-    from src.services.audio_cache import AudioCacheManager
-    from src.services.audio_spool import AudioSpoolWriter
     from src.core.settings import VociferousSettings
     from src.database.db import TranscriptDB
+    from src.services.audio_cache import AudioCacheManager
     from src.services.audio_service import AudioService
+    from src.services.audio_spool import AudioSpoolWriter
 
 logger = logging.getLogger(__name__)
 

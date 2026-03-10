@@ -14,7 +14,20 @@
     import { ws } from "../lib/ws";
     import { onMount } from "svelte";
     import RecordingControls from "../lib/components/RecordingControls.svelte";
-    import { Mic, Copy, Check, Pencil, Trash2, Save, Undo2, Loader2, Sparkles, Home, X, FileAudio } from "lucide-svelte";
+    import {
+        Mic,
+        Copy,
+        Check,
+        Pencil,
+        Trash2,
+        Save,
+        Undo2,
+        Loader2,
+        Sparkles,
+        Home,
+        X,
+        FileAudio,
+    } from "lucide-svelte";
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
