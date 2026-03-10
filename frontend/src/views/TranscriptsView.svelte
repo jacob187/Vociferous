@@ -14,6 +14,7 @@
         deleteTag,
         assignTags,
         batchToggleTag,
+        retranscribeTranscript,
         type Transcript,
         type Tag,
         type SearchResult,
@@ -40,6 +41,7 @@
         Minus,
         Hammer,
         Mic,
+        RefreshCw,
     } from "lucide-svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
     import EmptyState from "../lib/components/EmptyState.svelte";
@@ -919,6 +921,23 @@
                     <StyledButton size="sm" variant="secondary" onclick={copySelectedText}>
                         {#if copied}<Check size={13} /> Copied{:else}<Copy size={13} /> Copy{/if}
                     </StyledButton>
+                    {#if selectedEntry?.has_audio_cached}
+                        <StyledButton
+                            size="sm"
+                            variant="secondary"
+                            onclick={async () => {
+                                if (!selectedEntry) return;
+                                try {
+                                    await retranscribeTranscript(selectedEntry.id);
+                                    toast.info("Re-transcription queued");
+                                } catch {
+                                    toast.error("Failed to queue re-transcription");
+                                }
+                            }}
+                        >
+                            <RefreshCw size={13} /> Re-transcribe
+                        </StyledButton>
+                    {/if}
                 {/if}
 
                 <StyledButton size="sm" variant="secondary" onclick={openTagAssign}>

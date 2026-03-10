@@ -58,6 +58,7 @@ from src.api.transcripts import (
     refine_transcript,
     rename_transcript,
     retitle_transcript,
+    retranscribe_transcript,
     search_transcripts,
 )
 from src.core.resource_manager import ResourceManager
@@ -269,6 +270,7 @@ def create_app(coordinator: ApplicationCoordinator) -> Litestar:
             commit_refinement,
             rename_transcript,
             retitle_transcript,
+            retranscribe_transcript,
             search_transcripts,
             # Tags
             list_tags,

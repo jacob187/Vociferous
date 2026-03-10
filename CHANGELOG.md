@@ -2,6 +2,31 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.9.4 — Analytics Import Toggle + Re-Transcribe from Cached Audio
+
+**Date:** 2026-03-10
+**Status:** Feature
+
+### Added
+- **Exclude Imported from Analytics** toggle in Settings → Output tab. When enabled, newly imported audio transcripts are automatically excluded from analytics/usage stats. Existing imports are unaffected.
+- **`has_audio_cached` column** on the transcripts table (migration v8). Tracks whether a transcript's source audio WAV is still present in the audio cache.
+- **`RetranscribeIntent`** — New intent + handler. Loads cached audio WAV, decodes to int16, and re-runs the full ASR pipeline. Text is updated via `update_normalized_text()`.
+- **`POST /api/transcripts/{id}/retranscribe`** endpoint dispatches `RetranscribeIntent`.
+- **Re-transcribe button** shown conditionally (when `has_audio_cached` is true) in three locations:
+  - **EditView** action bar (left side, beside Discard)
+  - **TranscribeView** ready/viewing state (beside Copy)
+  - **TranscriptsView** single-select action bar (beside Copy)
+- Audio cache eviction now clears `has_audio_cached` on pruned transcripts automatically.
+- Stale flag guard: if the cached WAV is missing when re-transcribe fires, the handler clears the flag and emits `transcript_updated`.
+
+### Technical Notes
+- `AudioCacheManager.store()` now returns `tuple[Path | None, list[int]]` — the stored path plus IDs of evicted transcripts whose WAVs were pruned.
+- `AudioCacheManager.prune()` now returns `list[int]` of evicted transcript IDs (parsed from `{id}.wav` filenames).
+- Handler count increased from 26 to 27. Test assertion updated.
+- Re-transcription runs on a background thread (same model reuse pattern as import/recording).
+
+---
+
 ## v5.9.3 — Audio File Import (ISS-018)
 
 **Date:** 2026-03-10

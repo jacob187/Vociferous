@@ -49,6 +49,7 @@ class Transcript:
     speech_duration_ms: int = 0
     created_at: str = ""
     include_in_analytics: bool = True
+    has_audio_cached: bool = False
     # Populated by joins, not stored in transcripts table
     tags: list[Tag] = field(default_factory=list)
 
@@ -71,7 +72,8 @@ CREATE TABLE IF NOT EXISTS transcripts (
     duration_ms INTEGER DEFAULT 0,
     speech_duration_ms INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now')),
-    include_in_analytics INTEGER NOT NULL DEFAULT 1
+    include_in_analytics INTEGER NOT NULL DEFAULT 1,
+    has_audio_cached INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_transcripts_timestamp ON transcripts(timestamp);
@@ -591,6 +593,7 @@ class TranscriptDB:
             speech_duration_ms=row["speech_duration_ms"],
             created_at=row["created_at"],
             include_in_analytics=bool(row["include_in_analytics"]),
+            has_audio_cached=bool(row["has_audio_cached"]),
         )
 
     def append_to_transcript(
@@ -634,6 +637,15 @@ class TranscriptDB:
             self._conn.execute(
                 "UPDATE transcripts SET include_in_analytics = ? WHERE id = ?",
                 (1 if include else 0, transcript_id),
+            )
+            self._conn.commit()
+
+    def set_audio_cached(self, transcript_id: int, cached: bool) -> None:
+        """Set the has_audio_cached flag for a transcript."""
+        with self._write_lock:
+            self._conn.execute(
+                "UPDATE transcripts SET has_audio_cached = ? WHERE id = ?",
+                (1 if cached else 0, transcript_id),
             )
             self._conn.commit()
 

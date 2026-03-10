@@ -27,6 +27,7 @@
         Home,
         X,
         FileAudio,
+        RefreshCw,
     } from "lucide-svelte";
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
@@ -50,6 +51,7 @@
         refineTranscript,
         commitRefinement,
         importAudioFile,
+        retranscribeTranscript,
     } from "../lib/api";
     import { PlusCircle } from "lucide-svelte";
     import type { Transcript, Tag } from "../lib/api";
@@ -66,6 +68,7 @@
     let transcriptTimestamp = $state("");
     let durationMs = $state(0);
     let speechDurationMs = $state(0);
+    let hasAudioCached = $state(false);
     let copied = $state(false);
     let refinementEnabled = $state(true);
     let autoRefine = $state(false);
@@ -267,6 +270,7 @@
             transcriptTimestamp = formatTranscriptTimestamp(t.created_at || t.timestamp || "");
             durationMs = t.duration_ms ?? 0;
             speechDurationMs = t.speech_duration_ms ?? 0;
+            hasAudioCached = t.has_audio_cached ?? false;
             assignedTagIds = new Set((t.tags ?? []).map((tag: Tag) => tag.id));
             if (mode === "edit") {
                 if (!nav.isNavigationLocked) {
@@ -357,6 +361,7 @@
                 transcriptId = data.id;
                 durationMs = data.duration_ms ?? 0;
                 speechDurationMs = data.speech_duration_ms ?? 0;
+                hasAudioCached = true;
                 viewState = "ready";
                 /* Apply session tags first, then overlay any already-assigned tags */
                 if (sessionTagIds.size > 0 && data.id) {
@@ -976,6 +981,24 @@
                         <Copy size={14} /> Copy
                     {/if}
                 </StyledButton>
+
+                {#if hasAudioCached}
+                    <StyledButton
+                        variant="ghost"
+                        size="sm"
+                        onclick={async () => {
+                            if (transcriptId == null) return;
+                            try {
+                                await retranscribeTranscript(transcriptId);
+                                toast.info("Re-transcription queued");
+                            } catch {
+                                toast.error("Failed to queue re-transcription");
+                            }
+                        }}
+                    >
+                        <RefreshCw size={14} /> Re-transcribe
+                    </StyledButton>
+                {/if}
 
                 <div class="flex-1"></div>
 

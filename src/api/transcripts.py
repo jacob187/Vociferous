@@ -229,6 +229,17 @@ async def retitle_transcript(transcript_id: int) -> Response:
     return Response(content={"status": "queued"})
 
 
+@post("/api/transcripts/{transcript_id:int}/retranscribe")
+async def retranscribe_transcript(transcript_id: int) -> Response:
+    """Re-transcribe a transcript from its cached audio."""
+    from src.core.intents.definitions import RetranscribeIntent
+
+    coordinator = get_coordinator()
+    intent = RetranscribeIntent(transcript_id=transcript_id)
+    coordinator.command_bus.dispatch(intent)
+    return Response(content={"status": "queued"})
+
+
 @post("/api/transcripts/{transcript_id:int}/rename")
 async def rename_transcript(transcript_id: int, data: dict) -> Response:
     """Rename a transcript (set display_name) via CommandBus intent."""
@@ -259,6 +270,7 @@ def transcript_to_dict(transcript) -> dict:
         "speech_duration_ms": transcript.speech_duration_ms,
         "created_at": transcript.created_at,
         "include_in_analytics": transcript.include_in_analytics,
+        "has_audio_cached": transcript.has_audio_cached,
         "tags": [
             {"id": tag.id, "name": tag.name, "color": tag.color, "is_system": tag.is_system} for tag in transcript.tags
         ],

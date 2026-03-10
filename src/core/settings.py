@@ -98,6 +98,7 @@ class OutputSettings(BaseModel):
     auto_copy_to_clipboard: bool = True
     auto_retitle_on_refine: bool = True
     auto_refine: bool = False
+    exclude_imported_from_analytics: bool = False
 
 
 class DisplaySettings(BaseModel):

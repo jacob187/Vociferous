@@ -29,6 +29,7 @@ export interface Transcript {
     speech_duration_ms: number;
     created_at: string;
     include_in_analytics: boolean;
+    has_audio_cached: boolean;
     tags: Tag[];
 }
 
@@ -123,6 +124,10 @@ export function renameTranscript(id: number, title: string): Promise<{ status: s
         method: "POST",
         body: JSON.stringify({ title }),
     });
+}
+
+export function retranscribeTranscript(id: number): Promise<{ status: string }> {
+    return request(`/transcripts/${id}/retranscribe`, { method: "POST" });
 }
 
 // --- Tags ---

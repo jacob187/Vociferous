@@ -40,19 +40,20 @@ class AudioCacheManager:
     # Store & convert
     # ------------------------------------------------------------------
 
-    def store(self, transcript_id: int, pcm_path: Path, max_cache_minutes: float) -> Path | None:
+    def store(self, transcript_id: int, pcm_path: Path, max_cache_minutes: float) -> tuple[Path | None, list[int]]:
         """Convert raw PCM spool to WAV and cache it.  Prune if over limit.
 
-        Returns the WAV path on success, None if caching is disabled (max=0)
-        or the spool file is missing.
+        Returns (wav_path, evicted_ids).  wav_path is None if caching is
+        disabled (max=0) or the spool file is missing.  evicted_ids lists
+        transcript IDs whose cached audio was pruned.
         """
         if max_cache_minutes <= 0:
             self._delete_file(pcm_path)
-            return None
+            return None, []
 
         if not pcm_path.exists():
             logger.warning("Spool file missing, cannot cache: %s", pcm_path)
-            return None
+            return None, []
 
         wav_path = self._cache_dir / f"{transcript_id}.wav"
         try:
@@ -61,10 +62,10 @@ class AudioCacheManager:
             logger.info("Audio cached: %s (%.1fs)", wav_path.name, self._wav_duration_s(wav_path))
         except Exception:
             logger.exception("Failed to convert spool to WAV: %s", pcm_path)
-            return None
+            return None, []
 
-        self.prune(max_cache_minutes)
-        return wav_path
+        evicted = self.prune(max_cache_minutes)
+        return wav_path, evicted
 
     def get_path(self, transcript_id: int) -> Path | None:
         """Return the cached WAV path if it exists, else None."""
@@ -75,21 +76,32 @@ class AudioCacheManager:
     # Pruning
     # ------------------------------------------------------------------
 
-    def prune(self, max_minutes: float) -> None:
-        """Delete oldest WAV files until total cached duration <= max_minutes."""
+    def prune(self, max_minutes: float) -> list[int]:
+        """Delete oldest WAV files until total cached duration <= max_minutes.
+
+        Returns list of transcript IDs whose cached audio was evicted.
+        """
         if max_minutes <= 0:
-            return
+            return []
 
         wav_files = sorted(self._cache_dir.glob("*.wav"), key=lambda p: p.stat().st_mtime)
         total_s = sum(self._file_duration_s(f) for f in wav_files)
         max_s = max_minutes * 60.0
+        evicted: list[int] = []
 
         while total_s > max_s and wav_files:
             oldest = wav_files.pop(0)
             dur = self._file_duration_s(oldest)
+            # Parse transcript ID from filename (e.g. "42.wav" → 42)
+            try:
+                evicted.append(int(oldest.stem))
+            except ValueError:
+                pass
             self._delete_file(oldest)
             total_s -= dur
             logger.info("Pruned cached audio: %s (%.1fs, cache now %.1fs / %.1fs)", oldest.name, dur, total_s, max_s)
+
+        return evicted
 
     # ------------------------------------------------------------------
     # Startup: orphan spool detection

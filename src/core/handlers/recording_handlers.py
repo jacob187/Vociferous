@@ -269,6 +269,81 @@ class RecordingSession:
         t = threading.Thread(target=_import_worker, daemon=True, name="audio-import")
         t.start()
 
+    def handle_retranscribe(self, intent: Any) -> None:
+        """Re-transcribe a transcript from its cached audio WAV."""
+        transcript_id: int = intent.transcript_id
+        if not transcript_id:
+            self._emit("transcription_error", {"message": "No transcript ID provided"})
+            return
+
+        if self._audio_cache is None:
+            self._emit("transcription_error", {"message": "Audio cache not available"})
+            return
+
+        wav_path = self._audio_cache.get_path(transcript_id)
+        if wav_path is None:
+            self._emit("transcription_error", {"message": "No cached audio for this transcript"})
+            # Clear stale flag
+            db = self._db_provider()
+            if db:
+                db.set_audio_cached(transcript_id, False)
+                self._emit("transcript_updated", {"id": transcript_id})
+            return
+
+        def _retranscribe_worker() -> None:
+            try:
+                import numpy as np
+                from faster_whisper.audio import decode_audio
+
+                float_audio = decode_audio(str(wav_path), sampling_rate=16000)
+                int16_audio = (float_audio * 32768).clip(-32768, 32767).astype(np.int16)
+
+                if len(int16_audio) == 0:
+                    self._emit("transcription_error", {"message": "Cached audio is empty"})
+                    return
+
+                from src.services.transcription_service import create_local_model, transcribe
+
+                settings = self._settings_provider()
+
+                if self._asr_model is None:
+                    try:
+                        self._asr_model = create_local_model(settings)
+                    except Exception as model_err:
+                        logger.error("ASR model failed to load: %s", model_err)
+                        self._emit("transcription_error", {"message": "ASR model failed to load"})
+                        return
+
+                if self._audio_pipeline is None:
+                    from src.services.audio_pipeline import AudioPipeline
+                    self._audio_pipeline = AudioPipeline()
+
+                text, speech_duration_ms = transcribe(
+                    int16_audio,
+                    settings=settings,
+                    local_model=self._asr_model,
+                    audio_pipeline=self._audio_pipeline,
+                )
+
+                if not text.strip():
+                    self._emit("transcription_error", {"message": "No speech detected in cached audio"})
+                    return
+
+                db = self._db_provider()
+                if db:
+                    duration_ms = int(len(int16_audio) / 16000 * 1000)
+                    db.update_normalized_text(transcript_id, text)
+                    self._emit("transcript_updated", {"id": transcript_id})
+
+                logger.info("Re-transcription complete for transcript %d: %d chars", transcript_id, len(text))
+
+            except Exception as e:
+                logger.exception("Re-transcription failed for transcript %d", transcript_id)
+                self._emit("transcription_error", {"message": f"Re-transcription failed: {e}"})
+
+        t = threading.Thread(target=_retranscribe_worker, daemon=True, name="retranscribe")
+        t.start()
+
     # --- Pipeline ---
 
     def _recording_loop(self) -> None:
@@ -380,6 +455,8 @@ class RecordingSession:
                 )
                 if source_tag and transcript:
                     db.add_system_tag_to_transcript(transcript.id, source_tag)
+                    if source_tag == "Imported" and settings.output.exclude_imported_from_analytics:
+                        db.set_analytics_inclusion(transcript.id, False)
 
             self._emit(
                 "transcription_complete",
@@ -413,11 +490,17 @@ class RecordingSession:
             # Cache audio WAV for crash recovery / future re-transcription
             if spool_path is not None and transcript is not None and self._audio_cache is not None:
                 try:
-                    self._audio_cache.store(
+                    wav_path, evicted_ids = self._audio_cache.store(
                         transcript.id,
                         spool_path,
                         max_cache_minutes=settings.recording.audio_cache_minutes,
                     )
+                    if wav_path is not None and db is not None:
+                        db.set_audio_cached(transcript.id, True)
+                    # Clear has_audio_cached for transcripts whose WAVs were pruned
+                    if db is not None:
+                        for evicted_id in evicted_ids:
+                            db.set_audio_cached(evicted_id, False)
                 except Exception:
                     logger.warning("Audio cache store failed", exc_info=True)
                     self._cleanup_spool(spool_path)

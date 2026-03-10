@@ -259,6 +259,18 @@ def _v6_analytics_inclusion(conn: sqlite3.Connection) -> None:
     logger.info("v6 migration: include_in_analytics column ensured on transcripts")
 
 
+def _v8_audio_cache_flag(conn: sqlite3.Connection) -> None:
+    """v8 — Add has_audio_cached flag to transcripts.
+
+    Tracks whether a cached WAV file exists for a transcript, enabling
+    the re-transcribe button in the UI. Defaults to 0 (no cached audio).
+    """
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(transcripts)").fetchall()}
+    if "has_audio_cached" not in cols:
+        conn.execute("ALTER TABLE transcripts ADD COLUMN has_audio_cached INTEGER NOT NULL DEFAULT 0")
+    logger.info("v8 migration: has_audio_cached column ensured on transcripts")
+
+
 #: Ordered list of (human-readable description, migration function) pairs.
 #: Append here to add future migrations; do not edit existing entries.
 MIGRATIONS: list[tuple[str, object]] = [
@@ -269,6 +281,7 @@ MIGRATIONS: list[tuple[str, object]] = [
     ("v5 system tags — is_system column + Refined tag seeded", _v5_system_tags),
     ("v6 analytics inclusion flag — include_in_analytics column on transcripts", _v6_analytics_inclusion),
     ("v7 compound system tag — seed Compound tag for transcript continuation", _v7_compound_tag),
+    ("v8 audio cache flag — has_audio_cached column on transcripts", _v8_audio_cache_flag),
 ]
 
 

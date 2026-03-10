@@ -458,6 +458,7 @@ class ApplicationCoordinator:
             DeleteTranscriptIntent,
             ImportAudioFileIntent,
             RefineTranscriptIntent,
+            RetranscribeIntent,
             RefreshInsightIntent,
             RenameTranscriptIntent,
             RestartEngineIntent,
@@ -504,6 +505,7 @@ class ApplicationCoordinator:
         bus.register(CancelRecordingIntent, self.recording_session.handle_cancel)
         bus.register(ToggleRecordingIntent, self.recording_session.handle_toggle)
         bus.register(ImportAudioFileIntent, self.recording_session.handle_import)
+        bus.register(RetranscribeIntent, self.recording_session.handle_retranscribe)
         bus.register(DeleteTranscriptIntent, transcript.handle_delete)
         bus.register(BatchDeleteTranscriptsIntent, transcript.handle_batch_delete)
         bus.register(ClearTranscriptsIntent, transcript.handle_clear)

@@ -90,6 +90,18 @@
     <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
         <label
             class="text-[var(--text-sm)] text-[var(--text-primary)]"
+            for="setting-exclude-imported"
+            title="Automatically excludes imported audio file transcriptions from analytics calculations."
+            >Exclude Imports from Analytics</label
+        >
+        <ToggleSwitch
+            checked={getSafe(config, "output.exclude_imported_from_analytics", false)}
+            onChange={() => setSafe("output.exclude_imported_from_analytics", !getSafe(config, "output.exclude_imported_from_analytics", false))}
+        />
+    </div>
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <label
+            class="text-[var(--text-sm)] text-[var(--text-primary)]"
             for="setting-refinement"
             title="Uses a local language model to improve grammar and punctuation after transcription."
             >Grammar Refinement</label

@@ -250,3 +250,11 @@ class ImportAudioFileIntent(InteractionIntent):
     file_path: str = ""
     cleanup_source: bool = False
     source: IntentSource = IntentSource.API
+
+
+@dataclass(frozen=True, slots=True)
+class RetranscribeIntent(InteractionIntent):
+    """Re-transcribe a transcript from its cached audio."""
+
+    transcript_id: int = 0
+    source: IntentSource = IntentSource.API

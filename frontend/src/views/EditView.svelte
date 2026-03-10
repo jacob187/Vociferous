@@ -18,6 +18,7 @@
         assignTags,
         dispatchIntent,
         renameTranscript,
+        retranscribeTranscript,
         type Transcript,
         type Tag,
     } from "../lib/api";
@@ -29,7 +30,7 @@
     import TagBar from "../lib/components/TagBar.svelte";
     import ActionBar from "../lib/components/ActionBar.svelte";
     import ToggleSwitch from "../lib/components/ToggleSwitch.svelte";
-    import { ArrowLeft, Check, X, Hammer, RotateCcw, Pencil, Copy } from "lucide-svelte";
+    import { ArrowLeft, Check, X, Hammer, RotateCcw, Pencil, Copy, RefreshCw } from "lucide-svelte";
 
     /* ===== State ===== */
 
@@ -419,6 +420,24 @@
         <StyledButton size="sm" variant="destructive" onclick={discard}>
             <X size={13} /> Discard
         </StyledButton>
+
+        {#if transcript?.has_audio_cached}
+            <StyledButton
+                size="sm"
+                variant="secondary"
+                onclick={async () => {
+                    if (!transcript) return;
+                    try {
+                        await retranscribeTranscript(transcript.id);
+                        toast.info("Re-transcription queued");
+                    } catch {
+                        toast.error("Failed to queue re-transcription");
+                    }
+                }}
+            >
+                <RefreshCw size={13} /> Re-transcribe
+            </StyledButton>
+        {/if}
 
         <div class="flex-1"></div>
 
