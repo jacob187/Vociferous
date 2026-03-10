@@ -449,6 +449,7 @@ class ApplicationCoordinator:
             RestartEngineIntent,
             RetitleTranscriptIntent,
             RevertToRawIntent,
+            SetAnalyticsInclusionIntent,
             StopRecordingIntent,
             ToggleRecordingIntent,
             UpdateConfigIntent,
@@ -494,6 +495,7 @@ class ApplicationCoordinator:
         bus.register(CommitEditsIntent, transcript.handle_commit_edits)
         bus.register(RevertToRawIntent, transcript.handle_revert_to_raw)
         bus.register(RenameTranscriptIntent, transcript.handle_rename)
+        bus.register(SetAnalyticsInclusionIntent, transcript.handle_set_analytics_inclusion)
         bus.register(RefineTranscriptIntent, refinement.handle_refine)
         bus.register(CommitRefinementIntent, refinement.handle_commit_refinement)
         bus.register(BulkRefineTranscriptsIntent, refinement.handle_bulk_refine)

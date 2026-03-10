@@ -246,6 +246,7 @@ def transcript_to_dict(transcript) -> dict:
         "duration_ms": transcript.duration_ms,
         "speech_duration_ms": transcript.speech_duration_ms,
         "created_at": transcript.created_at,
+        "include_in_analytics": transcript.include_in_analytics,
         "tags": [
             {"id": tag.id, "name": tag.name, "color": tag.color, "is_system": tag.is_system} for tag in transcript.tags
         ],

@@ -194,6 +194,15 @@ class RenameTranscriptIntent(InteractionIntent):
 
 
 @dataclass(frozen=True, slots=True)
+class SetAnalyticsInclusionIntent(InteractionIntent):
+    """Set the include_in_analytics flag for a transcript."""
+
+    transcript_id: int = 0
+    include: bool = True
+    source: IntentSource = IntentSource.API
+
+
+@dataclass(frozen=True, slots=True)
 class RetitleTranscriptIntent(InteractionIntent):
     """Re-generate the SLM title for a single transcript."""
 

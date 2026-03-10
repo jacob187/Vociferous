@@ -167,6 +167,23 @@
         }
     }
 
+    async function toggleAnalyticsInclusion() {
+        if (!transcript?.id) return;
+        const newValue = !transcript.include_in_analytics;
+        // Optimistic update
+        transcript = { ...transcript, include_in_analytics: newValue };
+        try {
+            await dispatchIntent("set_analytics_inclusion", {
+                transcript_id: transcript.id,
+                include: newValue,
+            });
+        } catch (e: any) {
+            // Rollback
+            transcript = { ...transcript, include_in_analytics: !newValue };
+            toast.error(`Failed to update analytics setting: ${e.message}`);
+        }
+    }
+
     /* ===== Tag Actions ===== */
 
     async function handleTagToggle(tagId: number) {
@@ -336,6 +353,18 @@
                 <div class="h-7 w-48 bg-[var(--hover-overlay)] rounded animate-pulse"></div>
             {/if}
         </div>
+
+        {#if transcript}
+            <label class="shrink-0 flex items-center gap-1.5 cursor-pointer select-none mt-0.5" title="Toggle analytics inclusion">
+                <input
+                    type="checkbox"
+                    class="accent-[var(--accent)] cursor-pointer"
+                    checked={transcript.include_in_analytics}
+                    onchange={toggleAnalyticsInclusion}
+                />
+                <span class="text-[12px] text-[var(--text-tertiary)] whitespace-nowrap">Include in analytics</span>
+            </label>
+        {/if}
     </div>
 
     <!-- ── Refined Banner ── -->

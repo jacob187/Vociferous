@@ -78,3 +78,10 @@ class TranscriptHandlers:
                 return
             db.update_display_name(intent.transcript_id, title)
             self._emit("transcript_updated", {"id": intent.transcript_id})
+
+    def handle_set_analytics_inclusion(self, intent: Any) -> None:
+        """Set the include_in_analytics flag for a transcript."""
+        db = self._db_provider()
+        if db:
+            db.set_analytics_inclusion(intent.transcript_id, intent.include)
+            self._emit("transcript_updated", {"id": intent.transcript_id})

@@ -2,6 +2,20 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.8.4 — Analytics Exclusion Controls (ISS-052)
+
+**Date:** 2026-03-10
+**Status:** Patch / Feature
+
+### Added
+- **ISS-052** — Per-transcript "Include in analytics" toggle in EditView. Mic-sourced transcripts default to included; the flag persists through all downstream analytics.
+  - New `include_in_analytics INTEGER NOT NULL DEFAULT 1` column on the `transcripts` table (v6 migration, idempotent).
+  - `compute_usage_stats()` filters excluded transcripts before computing any metrics — WPM, word counts, FK grade, filler ratios, radar chart, session stats, and insight generation all respect the flag automatically.
+  - `SetAnalyticsInclusionIntent` dispatched via `/api/intents`; `TranscriptHandlers.handle_set_analytics_inclusion` persists to DB and emits `transcript_updated`.
+  - EditView: checkbox row below the tag bar, optimistic update with rollback on failure.
+
+---
+
 ## v5.8.3 — Bulk Refine Skip-Already-Refined (ISS-078)
 
 **Date:** 2026-03-10

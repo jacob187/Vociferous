@@ -93,6 +93,7 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
     Used as the stats_provider for both InsightManager and MOTDManager.
     """
     transcripts, _ = db.recent(limit=10000)
+    transcripts = [t for t in transcripts if t.include_in_analytics]
     if not transcripts:
         return {}
 

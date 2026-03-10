@@ -162,13 +162,13 @@ Agents are explicitly authorized to use `.vscode/agent_resources/agent_reports` 
 * **Ad Hoc Scripts**: Store scripts for data analysis/verification here.
 * **Persistent Context**: Use this meant to store "ring information".
 
-### 8.7 AI Workboard (`docs/agent_resources/board/workboard.md`)
+### 8.7 AI Workboard (`.agent_resources/workboard.md`)
 
 The repository uses a **single consolidated workboard file** for AI continuity. All tracking lives in one place — no splitting issues across multiple files.
 
 Canonical file:
 
-* `docs/agent_resources/board/workboard.md` — everything: kanban status table, full issue prose with acceptance criteria, code-level TODOs, deferred items, resolved history.
+* `.agent_resources/workboard.md` — everything: kanban status table, full issue prose with acceptance criteria, code-level TODOs, deferred items, resolved history.
 
 Mandatory behavior:
 
@@ -179,7 +179,7 @@ Mandatory behavior:
 
 ### 8.8 Multi-Agent Coordination
 
-Multiple AI agents may operate concurrently in this repository. The `docs/agent_resources/` directory is **gitignored** and serves as the shared local coordination surface. All agents can read and write files there without polluting the commit history.
+Multiple AI agents may operate concurrently in this repository. The `.agent_resources/` directory is **gitignored** and serves as the shared local coordination surface. All agents can read and write files there without polluting the commit history.
 
 #### 8.8.0 Agent Codename (Pick Once, Keep Forever)
 
@@ -196,12 +196,12 @@ Rules:
 1. Pick randomly. Don't always pick the first option — distribute across the list.
 2. Check `AGENT_LOCKS.md` for existing codenames. If yours is taken, pick another.
 3. Keep the same codename for the **entire session**. Do not change it mid-task.
-4. The codename appears only in `docs/agent_resources/` files. It never appears in commit messages, source code, or CHANGELOG entries.
+4. The codename appears only in `.agent_resources/` files. It never appears in commit messages, source code, or CHANGELOG entries.
 5. When your work is committed and your lock section is removed, the codename is retired for that session.
 
-#### 8.8.1 Agent Lockfile (`docs/agent_resources/AGENT_LOCKS.md`)
+#### 8.8.1 Agent Lockfile (`.agent_resources/AGENT_LOCKS.md`)
 
-Before starting implementation work, each agent **must** create or update `docs/agent_resources/AGENT_LOCKS.md` to declare the files it intends to modify. Before editing any source file, check the lockfile to see if another agent has claimed it.
+Before starting implementation work, each agent **must** create or update `.agent_resources/AGENT_LOCKS.md` to declare the files it intends to modify. Before editing any source file, check the lockfile to see if another agent has claimed it.
 
 Format:
 
@@ -221,7 +221,7 @@ Rules:
 1. **Check before you edit.** Read `AGENT_LOCKS.md` before modifying any file. If another agent has claimed it, do not touch it — find an alternative approach or wait.
 2. **Declare before you start.** Add your section (using your codename) before writing any code. Update it if your scope changes (new files needed, files no longer needed).
 3. **Release when done.** Remove your section from the lockfile after your release commit lands.
-4. **Shared files require coordination.** `CHANGELOG.md`, `pyproject.toml`, `README.md`, and `docs/agent_resources/workboard.md` are shared release infrastructure — they cannot be exclusively locked. Instead, each agent edits only its own section (e.g., its own RESERVED block in CHANGELOG) and avoids rewriting the entire file.
+4. **Shared files require coordination.** `CHANGELOG.md`, `pyproject.toml`, `README.md`, and `.agent_resources/workboard.md` are shared release infrastructure — they cannot be exclusively locked. Instead, each agent edits only its own section (e.g., its own RESERVED block in CHANGELOG) and avoids rewriting the entire file.
 
 #### 8.8.2 Working Tree Discipline
 

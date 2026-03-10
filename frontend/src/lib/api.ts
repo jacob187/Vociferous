@@ -28,6 +28,7 @@ export interface Transcript {
     duration_ms: number;
     speech_duration_ms: number;
     created_at: string;
+    include_in_analytics: boolean;
     tags: Tag[];
 }
 

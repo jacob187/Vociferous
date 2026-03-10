@@ -1,6 +1,6 @@
 # Vociferous — Workboard
 
-> Last updated: 2026-03-10 (Removed resolved ISS-047 duplicate; added ISS-080 to Resolved; added ISS-081 Refinement View Redesign)
+> Last updated: 2026-03-10 (ISS-052 resolved v5.8.4; ISS-078 resolved v5.8.3)
 
 ---
 
@@ -9,7 +9,6 @@
 | ID | Title | Area | Status | Notes |
 |----|-------|------|--------|-------|
 | ISS-049 | Transcript continuation/append | Transcribe / Feature | Backlog | Compound transcriptions — append to existing transcript. New "Compound" system tag. |
-| ISS-052 | Analytics exclusion controls | EditView + Settings | Backlog | Per-transcript include_in_analytics DB boolean (default true). Migration needed. Partially blocked on ISS-018 for imported-transcript default. |
 | ISS-081 | Refinement View Redesign | RefineView / Design | Backlog | Design-first — no code until spec agreed. Prerequisite for ISS-011. |
 | ISS-011 | Custom prompt save and quick-select | Refine + Settings | Backlog | Depends on ISS-010 ✅ and ISS-081 design. No AC written. |
 | ISS-018 | Audio file input for transcription | Transcribe / Feature | Backlog | Large pipeline feature; no detailed spec. |
@@ -126,39 +125,11 @@ Allow appending a new recording to an existing transcript instead of always crea
 
 ---
 
-### ISS-052 · [Feature] Analytics Exclusion Controls
-
-**View**: EditView + Settings
-**Severity**: UX — prevents data pollution in analytics
-**Depends On**: ISS-018 (imported transcripts default setting)
-
-Not every transcript should count toward personal voice analytics. Transcribing a movie, a podcast, or someone else's speech pollutes WPM averages, vocabulary metrics, and session statistics.
-
-**Two controls**:
-
-1. **Per-transcript checkbox** (EditView): "Include in analytics" toggle on each transcript. Defaults to `true` for mic-sourced transcripts. User can manually exclude any transcript.
-
-2. **Imported transcripts default** (Settings): "Include imported transcripts in analytics" toggle. Defaults to `false`. When a file-sourced transcript is created (ISS-018), its analytics inclusion flag is set based on this setting. User can still override per-transcript in EditView.
-
-**Backend implications**:
-- New column on transcript: `include_in_analytics BOOLEAN DEFAULT 1`.
-- Analytics queries (UserView, stats strip, heatmap) must filter on this column.
-- Import pipeline (ISS-018) reads the setting to set the default value.
-
-**Acceptance Criteria**:
-- Per-transcript "include in analytics" checkbox in EditView.
-- Settings toggle for imported transcript default.
-- Analytics queries respect the flag.
-- Mic-sourced transcripts default to included.
-- Imported transcripts default to the setting value.
-- Existing transcripts default to included (migration).
-
----
-
 ## Deferred (revisit when touching adjacent code)
 
 | Item | Location | Why Deferred |
 |------|----------|--------------|
+| ISS-052 imported-default Settings toggle | `src/core/settings.py` + Settings UI | Depends on ISS-018 (audio file input) for the import pipeline to exist. |
 | `transcript_to_dict()` location | `src/api/transcripts.py` | Affects WebSocket broadcast paths. Don't touch in isolation. |
 | Inline validation duplication | `refine_transcript`, `retitle_transcript` | Extract to helper or push into Intent `__post_init__`. Low priority. |
 | `system.py` download_model thread | `src/api/system.py` | Touches EventBus. Evaluate when system.py is next touched. |
@@ -202,6 +173,7 @@ Not every transcript should count toward personal voice analytics. Transcribing 
 | ISS-079 | Action bar component centralization | v5.8.1 | 2026-03-09 | 2c1f6a8 |
 | ISS-080 | UI Polish and Interaction Fixes | v5.8.2 | 2026-03-10 | 04c110d |
 | ISS-078 | Bulk refine skip-already-refined | v5.8.3 | 2026-03-10 | — |
+| ISS-052 | Analytics exclusion controls (per-transcript) | v5.8.4 | 2026-03-10 | — |
 | ISS-010 | PromptBuilder extraction (prerequisite) | v5.4.x | — | — |
 | ISS-026 | Confirmation dialogs (prerequisite) | v5.4.x | — | db097df |
 

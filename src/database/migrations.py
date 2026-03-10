@@ -233,6 +233,21 @@ def _v5_system_tags(conn: sqlite3.Connection) -> None:
     logger.info("v5 migration: is_system column ensured + Refined system tag seeded")
 
 
+def _v6_analytics_inclusion(conn: sqlite3.Connection) -> None:
+    """v6 — Add include_in_analytics flag to transcripts.
+
+    Defaults to 1 (included) for all existing transcripts. Users can
+    set this per-transcript in EditView to exclude junk/test recordings
+    from WPM averages and other personal analytics.
+    """
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(transcripts)").fetchall()}
+    if "include_in_analytics" not in cols:
+        conn.execute(
+            "ALTER TABLE transcripts ADD COLUMN include_in_analytics INTEGER NOT NULL DEFAULT 1"
+        )
+    logger.info("v6 migration: include_in_analytics column ensured on transcripts")
+
+
 #: Ordered list of (human-readable description, migration function) pairs.
 #: Append here to add future migrations; do not edit existing entries.
 MIGRATIONS: list[tuple[str, object]] = [
@@ -241,6 +256,7 @@ MIGRATIONS: list[tuple[str, object]] = [
     ("v3 tags — flat tag system replacing hierarchical projects", _v3_projects_to_tags),
     ("v4 drop projects + variants — simplified transcript model", _v4_drop_projects_and_variants),
     ("v5 system tags — is_system column + Refined tag seeded", _v5_system_tags),
+    ("v6 analytics inclusion flag — include_in_analytics column on transcripts", _v6_analytics_inclusion),
 ]
 
 

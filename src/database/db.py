@@ -48,6 +48,7 @@ class Transcript:
     duration_ms: int = 0
     speech_duration_ms: int = 0
     created_at: str = ""
+    include_in_analytics: bool = True
     # Populated by joins, not stored in transcripts table
     tags: list[Tag] = field(default_factory=list)
 
@@ -69,7 +70,8 @@ CREATE TABLE IF NOT EXISTS transcripts (
     display_name TEXT,
     duration_ms INTEGER DEFAULT 0,
     speech_duration_ms INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now'))
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now')),
+    include_in_analytics INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS idx_transcripts_timestamp ON transcripts(timestamp);
@@ -588,7 +590,17 @@ class TranscriptDB:
             duration_ms=row["duration_ms"],
             speech_duration_ms=row["speech_duration_ms"],
             created_at=row["created_at"],
+            include_in_analytics=bool(row["include_in_analytics"]),
         )
+
+    def set_analytics_inclusion(self, transcript_id: int, include: bool) -> None:
+        """Set the include_in_analytics flag for a transcript."""
+        with self._write_lock:
+            self._conn.execute(
+                "UPDATE transcripts SET include_in_analytics = ? WHERE id = ?",
+                (1 if include else 0, transcript_id),
+            )
+            self._conn.commit()
 
     def export_backup(self, dest: Path) -> None:
         """Export a full database backup to dest path."""

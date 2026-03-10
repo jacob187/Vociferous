@@ -83,7 +83,7 @@ __pypackages__/
 # Docs: Generated or Non-Source Material
 # =========================
 
-docs/agent_resources/
+/.agent_resources/
 
 # =========================
 # Tests: Generated Artifacts
