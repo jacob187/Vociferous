@@ -277,6 +277,7 @@
             {#if transcript}
                 {#if editingTitle}
                     <div class="flex items-center gap-2 min-w-0">
+                        <!-- svelte-ignore a11y_autofocus -->
                         <input
                             type="text"
                             class="flex-1 min-w-0 h-8 text-[18px] font-semibold text-[var(--text-primary)] bg-[var(--surface-secondary)] border border-[var(--shell-border)] rounded-[var(--radius-md)] px-2 outline-none focus:border-[var(--accent)]"

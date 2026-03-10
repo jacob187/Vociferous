@@ -54,8 +54,10 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
             class="fixed inset-0 z-[210] bg-black/50"
+            role="presentation"
             onclick={() => toast.activeConfirm && toast.resolveConfirm(toast.activeConfirm.id, false)}
-        />
+            onkeydown={(e) => e.key === "Escape" && toast.activeConfirm && toast.resolveConfirm(toast.activeConfirm.id, false)}
+        ></div>
     {/if}
 
     <!-- Strip body (sits above backdrop) -->
