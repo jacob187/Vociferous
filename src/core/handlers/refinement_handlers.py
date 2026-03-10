@@ -221,6 +221,18 @@ class RefinementHandlers:
             )
             return
 
+        # Filter out already-refined transcripts when requested
+        if intent.skip_refined:
+            already_refined = db.get_ids_with_system_tag("Refined", transcript_ids)
+            if already_refined:
+                transcript_ids = tuple(tid for tid in transcript_ids if tid not in already_refined)
+                if not transcript_ids:
+                    self._emit(
+                        "bulk_refinement_complete",
+                        {"completed": 0, "total": 0, "failed": 0, "cancelled": False},
+                    )
+                    return
+
         total = len(transcript_ids)
         self._bulk_active = True
         self._bulk_cancel.clear()

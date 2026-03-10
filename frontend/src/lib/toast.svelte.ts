@@ -26,6 +26,11 @@ export interface ConfirmOptions {
     confirmLabel?: string;
     cancelLabel?: string;
     danger?: boolean;
+    /** Optional checkbox rendered between message and buttons. */
+    checkboxLabel?: string;
+    checkboxDefault?: boolean;
+    /** Optional secondary action button rendered between Cancel and Confirm. */
+    alternativeLabel?: string;
 }
 
 export interface ConfirmItem extends ConfirmOptions {
@@ -38,6 +43,12 @@ const DEFAULT_DURATION_MS = 4000;
 
 /** Reactive array of active toasts. Read by ToastContainer. */
 let items = $state<ToastItem[]>([]);
+
+/** Last checkbox value from a confirm dialog with a checkbox. Set by ToastContainer before resolving. */
+let _lastCheckboxValue = $state(false);
+
+/** True if the most recent confirm was resolved via the alternative (secondary) button. */
+let _lastConfirmWasAlternative = $state(false);
 
 /** FIFO queue of pending confirmations. First element is active. */
 let confirmQueue = $state<ConfirmItem[]>([]);
@@ -76,6 +87,18 @@ export const toast = {
     },
     get activeConfirm(): ConfirmItem | null {
         return confirmQueue.length > 0 ? confirmQueue[0] : null;
+    },
+    get lastCheckboxValue(): boolean {
+        return _lastCheckboxValue;
+    },
+    setLastCheckboxValue(value: boolean): void {
+        _lastCheckboxValue = value;
+    },
+    get lastConfirmWasAlternative(): boolean {
+        return _lastConfirmWasAlternative;
+    },
+    setLastConfirmWasAlternative(value: boolean): void {
+        _lastConfirmWasAlternative = value;
     },
     push,
     dismiss,

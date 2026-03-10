@@ -2,6 +2,20 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.8.3 — Bulk Refine Skip-Already-Refined (ISS-078)
+
+**Date:** 2026-03-10
+**Status:** Patch / Feature
+
+### Added
+- **ISS-078** — Bulk refinement now skips transcripts that already carry the "Refined" system tag by default.
+  - Confirmation dialogs for bulk refine include a "Skip already-refined transcripts" checkbox (default: enabled).
+  - Backend filters out already-refined IDs before starting the refinement loop; the progress bar total reflects only the transcripts that will actually be processed.
+  - If all selected transcripts are already refined and skip is enabled, the operation completes immediately with no work done.
+  - `ConfirmOptions` gains optional `checkboxLabel` / `checkboxDefault` fields; `toast.lastCheckboxValue` exposes the result after resolution. All existing confirm callers are unaffected.
+
+---
+
 ## v5.8.2 — UI Polish and Interaction Fixes (ISS-080)
 
 **Date:** 2026-03-10

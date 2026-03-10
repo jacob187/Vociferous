@@ -105,10 +105,11 @@ export function bulkRefineTranscripts(
     ids: number[],
     level: number,
     instructions = "",
+    skipRefined = true,
 ): Promise<{ status: string; total: number }> {
     return request("/transcripts/batch-refine", {
         method: "POST",
-        body: JSON.stringify({ ids, level, instructions }),
+        body: JSON.stringify({ ids, level, instructions, skip_refined: skipRefined }),
     });
 }
 

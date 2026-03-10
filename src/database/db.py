@@ -545,6 +545,20 @@ class TranscriptDB:
             )
             self._conn.commit()
 
+    def get_ids_with_system_tag(self, tag_name: str, ids: tuple[int, ...]) -> set[int]:
+        """Return the subset of transcript IDs that already carry the named system tag."""
+        if not ids:
+            return set()
+        placeholders = ",".join("?" * len(ids))
+        rows = self._conn.execute(
+            f"""SELECT tt.transcript_id FROM transcript_tags tt
+                JOIN tags t ON t.id = tt.tag_id
+                WHERE t.name = ? AND t.is_system = 1
+                  AND tt.transcript_id IN ({placeholders})""",
+            (tag_name, *ids),
+        ).fetchall()
+        return {row["transcript_id"] for row in rows}
+
     def _get_tags_for_transcript(self, transcript_id: int) -> list[Tag]:
         """Fetch all tags for a transcript. Caller must hold _write_lock."""
         rows = self._conn.execute(

@@ -24,15 +24,28 @@
         info: "border-[var(--accent)] text-[var(--accent)]",
     };
 
+    let checkboxChecked = $state(false);
+
+    $effect(() => {
+        const c = toast.activeConfirm;
+        if (c) checkboxChecked = c.checkboxDefault ?? false;
+    });
+
+    function resolveWith(id: number, value: boolean, alternative = false) {
+        toast.setLastCheckboxValue(checkboxChecked);
+        toast.setLastConfirmWasAlternative(alternative);
+        toast.resolveConfirm(id, value);
+    }
+
     function handleConfirmKeydown(e: KeyboardEvent) {
         const c = toast.activeConfirm;
         if (!c) return;
         if (e.key === "Escape") {
             e.preventDefault();
-            toast.resolveConfirm(c.id, false);
+            resolveWith(c.id, false);
         } else if (e.key === "Enter") {
             e.preventDefault();
-            toast.resolveConfirm(c.id, true);
+            resolveWith(c.id, true);
         }
     }
 
@@ -55,8 +68,8 @@
         <div
             class="fixed inset-0 z-[210] bg-black/50"
             role="presentation"
-            onclick={() => toast.activeConfirm && toast.resolveConfirm(toast.activeConfirm.id, false)}
-            onkeydown={(e) => e.key === "Escape" && toast.activeConfirm && toast.resolveConfirm(toast.activeConfirm.id, false)}
+            onclick={() => toast.activeConfirm && resolveWith(toast.activeConfirm.id, false)}
+            onkeydown={(e) => e.key === "Escape" && toast.activeConfirm && resolveWith(toast.activeConfirm.id, false)}
         ></div>
     {/if}
 
@@ -89,18 +102,37 @@
                         {c.message}
                     </p>
                 </div>
+                {#if c.checkboxLabel}
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            class="accent-[var(--accent)] cursor-pointer"
+                            bind:checked={checkboxChecked}
+                        />
+                        <span class="text-[var(--text-secondary)] text-[var(--text-sm)]">{c.checkboxLabel}</span>
+                    </label>
+                {/if}
                 <div class="flex justify-end gap-2">
                     <StyledButton
                         size="sm"
                         variant="secondary"
-                        onclick={() => toast.resolveConfirm(c.id, false)}
+                        onclick={() => resolveWith(c.id, false)}
                     >
                         {c.cancelLabel ?? "Cancel"}
                     </StyledButton>
+                    {#if c.alternativeLabel}
+                        <StyledButton
+                            size="sm"
+                            variant="secondary"
+                            onclick={() => resolveWith(c.id, true, true)}
+                        >
+                            {c.alternativeLabel}
+                        </StyledButton>
+                    {/if}
                     <StyledButton
                         size="sm"
                         variant={c.danger ? "destructive" : "primary"}
-                        onclick={() => toast.resolveConfirm(c.id, true)}
+                        onclick={() => resolveWith(c.id, true)}
                     >
                         {c.confirmLabel ?? "Confirm"}
                     </StyledButton>

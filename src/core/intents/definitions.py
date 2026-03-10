@@ -109,6 +109,7 @@ class BulkRefineTranscriptsIntent(InteractionIntent):
     transcript_ids: tuple[int, ...] = field(default_factory=tuple)
     level: int = 2
     instructions: str = ""
+    skip_refined: bool = True
     source: IntentSource = IntentSource.API
 
 

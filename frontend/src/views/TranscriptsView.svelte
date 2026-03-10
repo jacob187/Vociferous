@@ -94,6 +94,7 @@
     let bulkRefineCompleted = $state(0);
     let bulkRefineFailed = $state(0);
     let bulkRefineTotal = $state(0);
+    let bulkSkipRefined = $state(true);
     let spotCheckRemaining: number[] | null = $state(null);
     const SPOT_CHECK_SIZE = 10;
     const DEFAULT_REFINEMENT_LEVEL = 2;
@@ -288,30 +289,26 @@
 
         const total = ids.length;
         const spotCheckCount = Math.min(SPOT_CHECK_SIZE, total);
+        const offerSpotCheck = total > spotCheckCount;
 
-        if (total > spotCheckCount) {
-            // Offer spot-check gate
-            const choice = await toast.confirm({
-                title: `Refine ${total} Transcripts`,
-                message: `Bulk refinement will auto-commit refined text for each transcript.\n\nRecommended: spot-check the first ${spotCheckCount} to verify quality before processing all ${total}.`,
-                confirmLabel: `Spot-Check First ${spotCheckCount}`,
-                cancelLabel: "Cancel",
-            });
+        const confirmed = await toast.confirm({
+            title: `Refine ${total} Transcripts`,
+            message: `This will refine and auto-commit ${total} transcripts. Refined text replaces the current version. Individual transcripts can be reverted from Edit view.`,
+            confirmLabel: `Refine All ${total}`,
+            cancelLabel: "Cancel",
+            alternativeLabel: offerSpotCheck ? `Spot-Check First ${spotCheckCount}` : undefined,
+            checkboxLabel: "Skip already-refined transcripts",
+            checkboxDefault: true,
+        });
 
-            if (!choice) return;
+        if (!confirmed) return;
+        bulkSkipRefined = toast.lastCheckboxValue;
 
-            // Spot-check: process first batch, stash remainder
+        if (offerSpotCheck && toast.lastConfirmWasAlternative) {
+            // Spot-check path: process first batch, stash remainder
             spotCheckRemaining = ids.slice(spotCheckCount);
             await startBulkRefine(ids.slice(0, spotCheckCount));
         } else {
-            // Small enough to just do it, but still confirm
-            const confirmed = await toast.confirm({
-                title: `Refine ${total} Transcripts`,
-                message: `This will refine and auto-commit ${total} transcripts. Refined text replaces the current version. Individual transcripts can be reverted from Edit view.`,
-                confirmLabel: `Refine All ${total}`,
-                cancelLabel: "Cancel",
-            });
-            if (!confirmed) return;
             spotCheckRemaining = null;
             await startBulkRefine(ids);
         }
@@ -323,7 +320,7 @@
         bulkRefineFailed = 0;
         bulkRefineTotal = ids.length;
         try {
-            await bulkRefineTranscripts(ids, DEFAULT_REFINEMENT_LEVEL);
+            await bulkRefineTranscripts(ids, DEFAULT_REFINEMENT_LEVEL, "", bulkSkipRefined);
         } catch (e: any) {
             toast.error(`Bulk refine failed: ${e.message}`);
             bulkRefineActive = false;
@@ -582,6 +579,9 @@
             }),
             ws.on("refinement_complete", () => loadTranscripts()),
             ws.on("transcript_updated", () => loadTranscripts()),
+            ws.on("bulk_refinement_started", (data) => {
+                bulkRefineTotal = data.total;
+            }),
             ws.on("bulk_refinement_progress", (data) => {
                 bulkRefineCompleted = data.completed;
                 bulkRefineFailed = data.failed;

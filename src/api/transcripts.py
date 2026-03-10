@@ -167,10 +167,15 @@ async def batch_refine_transcripts(data: dict) -> Response:
     from src.core.intents.definitions import BulkRefineTranscriptsIntent
 
     coordinator = get_coordinator()
+    skip_refined = data.get("skip_refined", True)
+    if not isinstance(skip_refined, bool):
+        skip_refined = True
+
     intent = BulkRefineTranscriptsIntent(
         transcript_ids=tuple(ids),
         level=level,
         instructions=data.get("instructions", ""),
+        skip_refined=skip_refined,
     )
     coordinator.command_bus.dispatch(intent)
     return Response(content={"status": "queued", "total": len(ids)})
