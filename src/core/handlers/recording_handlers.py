@@ -484,7 +484,9 @@ class RecordingSession:
                 if title_gen is not None and transcript is not None:
                     title_gen.schedule(transcript.id, text)
 
-            if settings.output.auto_copy_to_clipboard:
+            # When auto-refine is active, defer clipboard until refinement
+            # completes — otherwise we'd paste raw text that's about to be rewritten.
+            if settings.output.auto_copy_to_clipboard and not settings.output.auto_refine:
                 _copy_to_system_clipboard(text)
 
             # Cache audio WAV for crash recovery / future re-transcription

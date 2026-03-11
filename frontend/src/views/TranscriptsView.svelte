@@ -58,12 +58,12 @@
     let error = $state("");
 
     // Pagination & Sort
-    let pageSize = $state(50);
+    let pageSize = $state(25);
     let currentPage = $state(1);
     let sortBy = $state("created_at");
     let sortDir: "asc" | "desc" = $state("desc");
 
-    const PAGE_SIZES = [25, 50, 100] as const;
+    const PAGE_SIZES = [10, 25, 50] as const;
     const SORT_OPTIONS = [
         { value: "created_at", label: "Date" },
         { value: "duration_ms", label: "Duration" },

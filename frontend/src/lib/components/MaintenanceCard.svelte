@@ -222,11 +222,11 @@
                 <ToggleSwitch checked={preferSaveDialog} onChange={() => (preferSaveDialog = !preferSaveDialog)} />
             </div>
         </div>
-        <div class="flex gap-[var(--space-2)] flex-wrap">
-            <StyledButton variant="secondary" onclick={handleExportTranscripts}>Export</StyledButton>
+        <div class="flex justify-between gap-[var(--space-2)] flex-wrap">
             <StyledButton variant="destructive" onclick={handleClearTranscripts} disabled={clearingTranscripts}>
                 {clearingTranscripts ? "Clearing…" : "Clear All"}</StyledButton
             >
+            <StyledButton variant="primary" onclick={handleExportTranscripts}>Export</StyledButton>
         </div>
     </div>
 

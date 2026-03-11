@@ -212,8 +212,7 @@ class InsightManager:
                 return
 
             total_words = stats.get("total_words", 0)
-            speech_seconds = stats.get("recorded_seconds", 0) - stats.get("total_silence_seconds", 0)
-            avg_pace = round(total_words / (speech_seconds / 60)) if speech_seconds > 0 else 0
+            avg_pace = stats.get("avg_wpm", 0)
 
             # Build the refinement comparison section if data exists
             refined_count = stats.get("refined_count", 0)

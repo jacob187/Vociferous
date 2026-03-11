@@ -4,11 +4,9 @@
     import { toast } from "../lib/toast.svelte";
     import { ws } from "../lib/ws";
     import { formatCount } from "../lib/formatters";
-    import { computeTextMetrics, fleschKincaidGrade, countFillers, estimateSyllables } from "../lib/textAnalysis";
+    import { computeTextMetrics, fleschKincaidGrade, countFillers, countFillersByWord } from "../lib/textAnalysis";
     import StatCard from "../lib/components/StatCard.svelte";
     import ActivityHeatmap from "../lib/components/ActivityHeatmap.svelte";
-    import DistributionChart from "../lib/components/DistributionChart.svelte";
-    import RadarChart, { type RadarAxis } from "../lib/components/RadarChart.svelte";
     import {
         Timer,
         MessageSquareText,
@@ -29,6 +27,8 @@
         GraduationCap,
         Eraser,
         FileCheck2,
+        Flame,
+        Mic,
     } from "lucide-svelte";
 
     /* ── Constants ── */
@@ -37,10 +37,10 @@
     const TRANSCRIPT_EXPORT_LIMIT = 10000;
 
     /* ── Tabs ── */
-    type UserTab = "overview" | "analytics";
+    type UserTab = "dashboard" | "deep-dive";
     const TABS: { id: UserTab; label: string }[] = [
-        { id: "overview", label: "Overview" },
-        { id: "analytics", label: "Advanced Analytics" },
+        { id: "dashboard", label: "Dashboard" },
+        { id: "deep-dive", label: "Deep Dive" },
     ];
 
     /* ── State ── */
@@ -49,7 +49,7 @@
     let userName = $state("");
     let typingWpm = $state(DEFAULT_TYPING_WPM);
     let showExplanations = $state(false);
-    let activeTab = $state<UserTab>("overview");
+    let activeTab = $state<UserTab>("dashboard");
     let healthInfo: { version: string; transcripts: number } | null = $state(null);
     let slmInsight = $state("");
     let refreshingInsight = $state(false);
@@ -74,18 +74,21 @@
     let timeSavedSeconds = $derived(Math.max(0, typingSeconds - recordedSeconds));
     let avgSeconds = $derived(count > 0 ? recordedSeconds / count : 0);
 
-    let lexicalComplexity = $derived.by(() => {
-        const allWords: string[] = [];
+    /* ── Speech time & WPM (using VAD speech_duration_ms) ── */
+    let totalSpeechSeconds = $derived.by(() => {
+        let total = 0;
         for (const e of entries) {
-            const words = safeText(e).toLowerCase().split(/\s+/);
-            for (const w of words) {
-                const c = w.replace(/^[.,!?;:'"()\[\]{}]+|[.,!?;:'"()\[\]{}]+$/g, "");
-                if (c) allWords.push(c);
+            if (e.speech_duration_ms > 0) {
+                total += e.speech_duration_ms / 1000;
+            } else if (e.duration_ms > 0) {
+                const words = safeText(e).split(/\s+/).filter(Boolean).length;
+                total += Math.min((words / SPEAKING_SPEED_WPM) * 60, e.duration_ms / 1000);
             }
         }
-        if (allWords.length === 0) return 0;
-        return new Set(allWords).size / allWords.length;
+        return total;
     });
+
+    let avgWpm = $derived(totalSpeechSeconds > 0 ? Math.round((totalWords / totalSpeechSeconds) * 60) : 0);
 
     let totalSilence = $derived.by(() => {
         let total = 0;
@@ -121,64 +124,74 @@
         return total;
     });
 
-    /* ── Radar Chart Axes (6 normalized metrics) ── */
-    let radarAxes = $derived.by(() => {
-        const axes: RadarAxis[] = [];
+    /* ── Filler breakdown (top 5 per-word counts) ── */
+    let fillerBreakdown = $derived.by(() => {
+        const agg: Record<string, number> = {};
+        for (const e of entries) {
+            for (const [word, wc] of Object.entries(countFillersByWord(safeText(e)))) {
+                agg[word] = (agg[word] || 0) + wc;
+            }
+        }
+        return Object.entries(agg)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+    });
 
-        // 1. Speed (WPM) — 200 WPM = 1.0
-        const speechSeconds = recordedSeconds > 0 ? recordedSeconds : (totalWords / SPEAKING_SPEED_WPM) * 60;
-        const wpm = speechSeconds > 0 ? (totalWords / speechSeconds) * 60 : 0;
-        const speedNorm = Math.min(1, Math.max(0, wpm / 200));
-        axes.push({
-            label: "Speed",
-            value: `${Math.round(wpm)} WPM`,
-            normalized: speedNorm,
-        });
+    let fillerBreakdownMax = $derived(fillerBreakdown.length > 0 ? fillerBreakdown[0][1] : 0);
 
-        // 2. Session Depth (Avg duration in minutes) — 5 min = 1.0
-        const avgMinutes = avgSeconds / 60;
-        const depthNorm = Math.min(1, Math.max(0, avgMinutes / 5));
-        axes.push({
-            label: "Session Depth",
-            value: `${Math.round(avgSeconds)}s`,
-            normalized: depthNorm,
-        });
+    /* ── Vocabulary diversity ── */
+    let vocabRatio = $derived.by(() => {
+        const allWords: string[] = [];
+        for (const e of entries) {
+            for (const w of safeText(e).toLowerCase().split(/\s+/)) {
+                const c = w.replace(/^[.,!?;:'"()\[\]{}]+|[.,!?;:'"()\[\]{}]+$/g, "");
+                if (c) allWords.push(c);
+            }
+        }
+        if (allWords.length === 0) return 0;
+        return new Set(allWords).size / allWords.length;
+    });
 
-        // 3. Clean Speech (inverted filler ratio) — 15% fillers = 0.0, 0% = 1.0
-        const fillerRatio = totalWords > 0 ? (fillerCount / totalWords) * 100 : 0;
-        const cleanNorm = Math.min(1, Math.max(0, 1 - fillerRatio / 15));
-        axes.push({
-            label: "Clean Speech",
-            value: `${fillerRatio.toFixed(1)}% fillers`,
-            normalized: cleanNorm,
-        });
+    /* ── Streaks (consecutive active days) ── */
+    let streaks = $derived.by(() => {
+        const dates = new Set<number>();
+        for (const e of entries) {
+            try {
+                const d = new Date(e.created_at);
+                if (!isNaN(d.getTime())) {
+                    // Days since epoch (UTC)
+                    dates.add(Math.floor(d.getTime() / 86400000));
+                }
+            } catch {
+                /* skip */
+            }
+        }
 
-        // 4. Activity (log of transcription count) — 1000 transcripts = 1.0
-        const activityNorm = Math.min(1, Math.max(0, Math.log10(count + 1) / 3));
-        axes.push({
-            label: "Activity",
-            value: `${count} recordings`,
-            normalized: activityNorm,
-        });
+        let current = 0;
+        let longest = 0;
 
-        // 5. Vocabulary (FK Grade) — Grade 12 = 1.0
-        const vocabNorm = Math.min(1, Math.max(0, verbatimAvgFkGrade / 12));
-        axes.push({
-            label: "Vocabulary",
-            value: `Grade ${verbatimAvgFkGrade.toFixed(1)}`,
-            normalized: vocabNorm,
-        });
+        if (dates.size > 0) {
+            const today = Math.floor(Date.now() / 86400000);
+            let d = today;
+            while (dates.has(d)) {
+                current++;
+                d--;
+            }
 
-        // 6. Time Saved (log of minutes saved) — 1 hour saved = 1.0
-        const minutesSaved = timeSavedSeconds / 60;
-        const timeSavedNorm = Math.min(1, Math.max(0, Math.log10(minutesSaved + 1) / Math.log10(60)));
-        axes.push({
-            label: "Time Saved",
-            value: `${Math.round(minutesSaved)} min`,
-            normalized: timeSavedNorm,
-        });
+            const sorted = [...dates].sort((a, b) => a - b);
+            let run = 1;
+            for (let i = 1; i < sorted.length; i++) {
+                if (sorted[i] === sorted[i - 1] + 1) {
+                    run++;
+                } else {
+                    longest = Math.max(longest, run);
+                    run = 1;
+                }
+            }
+            longest = Math.max(longest, run);
+        }
 
-        return axes;
+        return { current, longest };
     });
 
     /* ── Verbatim vs Refined Metrics ── */
@@ -236,34 +249,6 @@
     });
 
     let fkGradeDelta = $derived(hasRefinements ? Math.round((refinedAvgFkGrade - verbatimFkForRefined) * 10) / 10 : 0);
-
-    /* ── Polysyllabic word ratio (vocabulary sophistication) ── */
-    function polyRatio(texts: string[]): number {
-        let poly = 0,
-            total = 0;
-        for (const t of texts) {
-            for (const w of t.split(/\s+/).filter(Boolean)) {
-                total++;
-                if (estimateSyllables(w) >= 3) poly++;
-            }
-        }
-        return total > 0 ? Math.round((poly / total) * 1000) / 10 : 0;
-    }
-
-    let verbatimPolyRatio = $derived(polyRatio(entries.map((e) => e.raw_text || "")));
-    let verbatimPolyForRefined = $derived(polyRatio(refinedEntries.map((e) => e.raw_text || "")));
-    let refinedPolyRatio = $derived(polyRatio(refinedEntries.map((e) => e.normalized_text || "")));
-
-    /* ── Distribution data for bell curves ── */
-    let perTranscriptWordCounts = $derived(entries.map((e) => safeText(e).split(/\s+/).filter(Boolean).length));
-
-    let perTranscriptFkVerbatim = $derived(
-        entries.map((e) => fleschKincaidGrade(e.raw_text || "")).filter((g) => g > 0),
-    );
-
-    let perTranscriptFkRefined = $derived(
-        refinedEntries.map((e) => fleschKincaidGrade(e.normalized_text || "")).filter((g) => g > 0),
-    );
 
     let insight = $derived.by(() => {
         if (slmInsight) return slmInsight;
@@ -342,53 +327,41 @@
             text: "Sum of word counts across all transcriptions. Each entry's words are counted individually.",
         },
         {
-            title: "Time Recording",
-            text: `Total recording duration in seconds. If duration is unavailable, estimated as: words ÷ ${SPEAKING_SPEED_WPM} WPM × 60 = seconds`,
+            title: "Avg Speed",
+            text: "Words per minute of actual speech time, computed from VAD (voice activity detection) segments. Excludes pauses and silence. If VAD data is unavailable, estimated from word count at 150 WPM.",
         },
         {
             title: "Time Saved",
-            text: `Productivity gain vs. manual typing. Calculated as: (words ÷ ${typingWpm} WPM × 60) − recording_time = time_saved. Based on average typing speed of ${typingWpm} WPM.`,
+            text: `Productivity gain vs. manual typing. Calculated as: (words ÷ ${typingWpm} WPM × 60) − recording_time = time_saved. Based on typing speed of ${typingWpm} WPM.`,
         },
-        { title: "Average Length", text: "Mean duration per transcription: total_time ÷ transcription_count" },
+        {
+            title: "Streaks",
+            text: "Consecutive days with at least one transcription. Current streak counts backward from today; longest streak is the all-time record.",
+        },
+        { title: "Average Length", text: "Mean duration per transcription: total_time ÷ transcription_count." },
         {
             title: "Total Silence",
-            text: `Total accumulated silence (pauses) across all recordings. Calculated as: recording_duration − VAD_speech_duration for each entry.`,
+            text: "Accumulated silence across all recordings. Calculated as: recording_duration − VAD_speech_duration for each entry.",
         },
         {
             title: "Vocabulary",
-            text: "Lexical complexity calculated as the ratio of unique words to total words across all transcriptions. Higher percentages indicate more diverse vocabulary usage.",
-        },
-        {
-            title: "Average Pauses",
-            text: `Average silence per recording. Calculated as: (recording_duration − VAD_speech_duration) ÷ recording_count.`,
+            text: "Ratio of unique words to total words across all transcriptions. Higher = more diverse vocabulary.",
         },
         {
             title: "Filler Words",
-            text: "Total count of common filler words and phrases detected across all transcriptions. Includes patterns like 'um', 'uh', 'like', 'you know', 'basically', 'literally', 'actually', etc.",
+            text: "Approximate count of common filler words and phrases detected across all transcriptions. Single-word fillers (um, uh, like, etc.) are matched token-by-token; multi-word fillers (you know, I mean, etc.) are matched by substring, which may overcount in some contexts.",
         },
         {
             title: "Transcripts Refined",
-            text: "Number of transcripts that have been processed by the SLM refinement pipeline. A transcript counts as refined when its normalized text differs from the raw ASR output.",
+            text: "Number of transcripts processed by the SLM refinement pipeline. A transcript counts as refined when its normalized text differs from the raw ASR output.",
         },
         {
             title: "Fillers Removed",
-            text: "Difference in filler word count between verbatim (raw ASR) and refined (post-SLM) text across all refined transcripts. Measures how many filler words the refinement pipeline eliminated.",
+            text: "Difference in filler word count between verbatim (raw ASR) and refined (post-SLM) text across refined transcripts.",
         },
         {
-            title: "Reading Level",
-            text: "Flesch-Kincaid Grade Level comparing the same transcripts before and after refinement. A lower grade after refinement means cleaner, shorter sentences — not dumbed-down content. The formula penalises long sentences above all else.",
-        },
-        {
-            title: "FK Grade (Sentence Complexity)",
-            text: "Flesch-Kincaid Grade Level measures sentence structure complexity — how long and syllabically heavy your sentences are. It does NOT measure sophistication or quality. Lower = more readable. Hemingway scores ~4; a newspaper article ~8; the Harvard Law Review ~18. Raw speech scores high because Whisper produces long unpunctuated runs; refinement breaks these into proper sentences.",
-        },
-        {
-            title: "Complex Words (Vocabulary)",
-            text: "Percentage of words with 3 or more syllables. Measures vocabulary sophistication independently of sentence structure — FK grade can't distinguish a short sophisticated sentence from a short simple one. Higher = more precise, technical, or formal vocabulary. Unlike FK grade, there's no 'better' direction: technical writing is naturally polysyllabic; conversational prose isn't.",
-        },
-        {
-            title: "Distribution Charts",
-            text: "Bell curves fitted to per-transcript values using Gaussian probability density. The curve shape reflects how consistent your transcripts are — tight curves mean uniform output, wide curves mean high variance. Overlapping verbatim/refined curves show how refinement shifts the distribution.",
+            title: "FK Grade",
+            text: "Flesch-Kincaid Grade Level measures sentence structure complexity. Lower = more readable. Hemingway ~4; newspaper ~8; Harvard Law Review ~18. Raw speech scores high because Whisper produces long unpunctuated runs; refinement breaks these into proper sentences.",
         },
     ]);
 </script>
@@ -442,6 +415,11 @@
                     </button>
                 </div>
 
+                <!-- ═══ Activity Heatmap (shared, above tabs) ═══ -->
+                {#if count >= 2}
+                    <ActivityHeatmap {entries} />
+                {/if}
+
                 <!-- ═══ Tab Bar ═══ -->
                 <div
                     class="sticky top-0 z-10 flex gap-[var(--space-2)] border-b border-[var(--shell-border)] bg-[var(--surface-primary)] -mx-[var(--space-5)] px-[var(--space-5)] overflow-x-auto"
@@ -459,30 +437,13 @@
                     {/each}
                 </div>
 
-                <!-- ═══ Overview Tab ═══ -->
-                {#if activeTab === "overview"}
-                    <!-- ═══ Activity Heatmap ═══ -->
-                    {#if count >= 2}
-                        <ActivityHeatmap {entries} />
-                    {/if}
-
-                    <!-- ═══ Radar Chart ═══ -->
-                    <div class="flex flex-col items-center gap-[var(--space-3)]">
-                        <RadarChart axes={radarAxes} />
-                    </div>
-
-                    <!-- ═══ Advanced Analytics Tab ═══ -->
-                {:else if activeTab === "analytics"}
-                    <!-- ═══ Activity Heatmap ═══ -->
-                    {#if count >= 2}
-                        <ActivityHeatmap {entries} />
-                    {/if}
-
-                    <!-- ═══ 2. Productivity Impact (lifetime) ═══ -->
+                <!-- ═══ Dashboard Tab ═══ -->
+                {#if activeTab === "dashboard"}
+                    <!-- ═══ Your Voice ═══ -->
                     <div class="flex flex-col gap-[var(--space-3)]">
                         <span
                             class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
-                            >Productivity Impact</span
+                            >Your Voice</span
                         >
                         <div class="grid grid-cols-2 gap-[var(--space-4)]">
                             <StatCard
@@ -500,9 +461,27 @@
                                 variant="featured"
                             />
                         </div>
+                        <div class="grid grid-cols-2 gap-[var(--space-3)]">
+                            <StatCard
+                                icon={Mic}
+                                value={avgWpm > 0 ? `${avgWpm} WPM` : "—"}
+                                label="Avg Speed"
+                                sublabel="Speech time only"
+                            />
+                            <StatCard
+                                icon={Flame}
+                                value={streaks.current > 0
+                                    ? `${streaks.current} day${streaks.current !== 1 ? "s" : ""}`
+                                    : "—"}
+                                label="Current Streak"
+                                sublabel={streaks.longest > 0
+                                    ? `Best: ${streaks.longest} day${streaks.longest !== 1 ? "s" : ""}`
+                                    : "Start your streak!"}
+                            />
+                        </div>
                     </div>
 
-                    <!-- ═══ 2b. Refinement Impact (only shown if refinements exist) ═══ -->
+                    <!-- ═══ Refinement Impact (only shown if refinements exist) ═══ -->
                     {#if hasRefinements}
                         <div class="flex flex-col gap-[var(--space-3)]">
                             <span
@@ -532,11 +511,58 @@
                         </div>
                     {/if}
 
-                    <!-- ═══ 3. Usage & Activity (lifetime) ═══ -->
+                    <div class="h-px bg-[var(--shell-border)]"></div>
+
+                    <!-- ═══ About ═══ -->
+                    <footer
+                        class="rounded-[var(--radius-lg)] border border-[var(--shell-border)] bg-[var(--surface-secondary)] p-[var(--space-5)] flex flex-col items-center gap-[var(--space-3)]"
+                    >
+                        <h2 class="text-2xl font-[var(--weight-emphasis)] text-[var(--accent)] m-0">Vociferous</h2>
+                        <p class="text-[var(--text-sm)] text-[var(--text-secondary)] m-0">Local AI Dictation Suite</p>
+
+                        <p
+                            class="text-[var(--text-sm)] text-[var(--text-tertiary)] text-center leading-[var(--leading-relaxed)] max-w-[520px] m-0"
+                        >
+                            From voice to polished text — speech recognition, intelligent refinement, and document
+                            export in one privacy-first pipeline. Runs entirely on your machine with no cloud, no data
+                            collection, and no internet required.
+                        </p>
+
+                        {#if healthInfo}
+                            <p class="text-[var(--text-xs)] text-[var(--text-tertiary)] font-mono m-0">
+                                v{healthInfo.version}
+                            </p>
+                        {/if}
+
+                        <div class="flex gap-[var(--space-3)]">
+                            <a
+                                class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-md)] text-[var(--text-secondary)] text-[var(--text-sm)] no-underline transition-[color,border-color] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
+                                href="https://www.linkedin.com/in/abrown7521/"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <Linkedin size={15} /> LinkedIn
+                            </a>
+                            <a
+                                class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-md)] text-[var(--text-secondary)] text-[var(--text-sm)] no-underline transition-[color,border-color] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
+                                href="https://github.com/WanderingAstronomer/Vociferous"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <Github size={15} /> GitHub
+                            </a>
+                        </div>
+
+                        <p class="text-[var(--text-xs)] text-[var(--accent)] m-0">Created by Andrew Brown</p>
+                    </footer>
+
+                    <!-- ═══ Deep Dive Tab ═══ -->
+                {:else if activeTab === "deep-dive"}
+                    <!-- ═══ Productivity ═══ -->
                     <div class="flex flex-col gap-[var(--space-3)]">
                         <span
                             class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
-                            >Usage & Activity</span
+                            >Productivity</span
                         >
                         <div class="grid grid-cols-4 gap-[var(--space-3)]">
                             <StatCard
@@ -566,7 +592,7 @@
                         </div>
                     </div>
 
-                    <!-- ═══ 4. Speech Quality (lifetime) ═══ -->
+                    <!-- ═══ Speech Quality ═══ -->
                     <div class="flex flex-col gap-[var(--space-3)]">
                         <span
                             class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
@@ -575,7 +601,7 @@
                         <div class="grid grid-cols-3 gap-[var(--space-3)]">
                             <StatCard
                                 icon={BookOpen}
-                                value={lexicalComplexity > 0 ? formatPercent(lexicalComplexity) : "—"}
+                                value={vocabRatio > 0 ? formatPercent(vocabRatio) : "—"}
                                 label="Vocabulary"
                                 sublabel="Unique words ratio"
                             />
@@ -583,18 +609,55 @@
                                 icon={Volume2}
                                 value={avgSilence > 0 ? formatDuration(avgSilence) : "—"}
                                 label="Avg. Pauses"
-                                sublabel="Silence between speech"
+                                sublabel="VAD-estimated silence"
                             />
                             <StatCard
                                 icon={MessageCircle}
                                 value={fillerCount > 0 ? formatCount(fillerCount) : "—"}
                                 label="Filler Words"
-                                sublabel="um, uh, like, you know"
+                                sublabel="≈ um, uh, like, you know"
                             />
                         </div>
+
+                        <!-- Filler Breakdown -->
+                        {#if fillerBreakdown.length > 0}
+                            <div
+                                class="rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-secondary)] p-[var(--space-4)]"
+                            >
+                                <p
+                                    class="text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] font-[var(--weight-emphasis)] m-0 mb-[var(--space-3)]"
+                                >
+                                    Top Fillers
+                                </p>
+                                <div class="flex flex-col gap-[var(--space-2)]">
+                                    {#each fillerBreakdown as [word, wcount]}
+                                        <div class="flex items-center gap-[var(--space-3)]">
+                                            <span
+                                                class="text-[var(--text-sm)] text-[var(--text-secondary)] w-20 text-right shrink-0 font-mono"
+                                                >{word}</span
+                                            >
+                                            <div
+                                                class="flex-1 h-5 rounded-[var(--radius-sm)] bg-[var(--surface-primary)] overflow-hidden"
+                                            >
+                                                <div
+                                                    class="h-full rounded-[var(--radius-sm)] bg-[var(--accent)] transition-all duration-[var(--transition-fast)]"
+                                                    style="width: {fillerBreakdownMax > 0
+                                                        ? (wcount / fillerBreakdownMax) * 100
+                                                        : 0}%"
+                                                ></div>
+                                            </div>
+                                            <span
+                                                class="text-[var(--text-xs)] text-[var(--text-tertiary)] w-10 shrink-0 tabular-nums"
+                                                >{formatCount(wcount)}</span
+                                            >
+                                        </div>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/if}
                     </div>
 
-                    <!-- ═══ 4b. Readability (lifetime) ═══ -->
+                    <!-- ═══ Readability ═══ -->
                     <div class="flex flex-col gap-[var(--space-3)]">
                         <span
                             class="font-[var(--weight-emphasis)] text-[var(--text-xs)] text-[var(--text-tertiary)] uppercase tracking-[1px] text-center"
@@ -604,66 +667,23 @@
                             <StatCard
                                 icon={GraduationCap}
                                 value="Grade {hasRefinements ? verbatimFkForRefined : verbatimAvgFkGrade}"
-                                label="FK Grade (Sentence Complexity)"
-                                sublabel={hasRefinements ? `Verbatim · lower = more readable` : "Lower = more readable"}
-                            />
-                            <StatCard
-                                icon={BookOpen}
-                                value="{hasRefinements ? verbatimPolyForRefined : verbatimPolyRatio}%"
-                                label="Complex Words (Vocabulary)"
-                                sublabel={hasRefinements ? `Verbatim · 3+ syllable words` : "3+ syllable words"}
+                                label="FK Grade"
+                                sublabel={hasRefinements ? "Verbatim · lower = more readable" : "Lower = more readable"}
                             />
                             {#if hasRefinements}
                                 <StatCard
                                     icon={Sparkles}
                                     value="Grade {refinedAvgFkGrade}"
-                                    label="FK Grade (Sentence Complexity)"
+                                    label="FK Grade"
                                     sublabel="Refined · {fkGradeDelta > 0 ? '+' : ''}{fkGradeDelta} from verbatim"
-                                />
-                                <StatCard
-                                    icon={Sparkles}
-                                    value="{refinedPolyRatio}%"
-                                    label="Complex Words (Vocabulary)"
-                                    sublabel="Refined · {Math.round((refinedPolyRatio - verbatimPolyForRefined) * 10) /
-                                        10 >
-                                    0
-                                        ? '+'
-                                        : ''}{Math.round((refinedPolyRatio - verbatimPolyForRefined) * 10) /
-                                        10}% from verbatim"
                                 />
                             {/if}
                         </div>
                     </div>
 
-                    <!-- ═══ 5. Distribution Charts ═══ -->
-                    <DistributionChart
-                        title="Word Count Distribution"
-                        series={[
-                            { label: "Words per transcript", values: perTranscriptWordCounts, color: "var(--accent)" },
-                        ]}
-                        xLabel="Words"
-                    />
-
-                    {#if hasRefinements}
-                        <DistributionChart
-                            title="Reading Level Distribution"
-                            series={[
-                                { label: "Verbatim", values: perTranscriptFkVerbatim, color: "var(--text-tertiary)" },
-                                { label: "Refined", values: perTranscriptFkRefined, color: "var(--accent)" },
-                            ]}
-                            xLabel="Flesch-Kincaid Grade"
-                        />
-                    {:else if perTranscriptFkVerbatim.length >= 2}
-                        <DistributionChart
-                            title="Reading Level Distribution"
-                            series={[{ label: "Verbatim", values: perTranscriptFkVerbatim, color: "var(--accent)" }]}
-                            xLabel="Flesch-Kincaid Grade"
-                        />
-                    {/if}
-
                     <div class="h-px bg-[var(--shell-border)]"></div>
 
-                    <!-- ═══ 6. Calculation Details (collapsible) ═══ -->
+                    <!-- ═══ Calculation Details (collapsible) ═══ -->
                     <section class="flex flex-col items-center gap-[var(--space-4)]">
                         <button
                             class="flex items-center gap-[var(--space-2)] bg-none border-none text-[var(--text-secondary)] text-[var(--text-sm)] cursor-pointer py-[var(--space-2)] px-[var(--space-4)] rounded-[var(--radius-md)] transition-[color,background] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:bg-[var(--hover-overlay)]"
@@ -697,53 +717,6 @@
                             </div>
                         {/if}
                     </section>
-                {/if}
-
-                <!-- ═══ Overview: About Footer ═══ -->
-                {#if activeTab === "overview"}
-                    <div class="h-px bg-[var(--shell-border)]"></div>
-
-                    <!-- ═══ About ═══ -->
-                    <footer
-                        class="rounded-[var(--radius-lg)] border border-[var(--shell-border)] bg-[var(--surface-secondary)] p-[var(--space-5)] flex flex-col items-center gap-[var(--space-3)]"
-                    >
-                        <h2 class="text-2xl font-[var(--weight-emphasis)] text-[var(--accent)] m-0">Vociferous</h2>
-                        <p class="text-[var(--text-sm)] text-[var(--text-secondary)] m-0">Local AI Speech to Text</p>
-
-                        <p
-                            class="text-[var(--text-sm)] text-[var(--text-tertiary)] text-center leading-[var(--leading-relaxed)] max-w-[520px] m-0"
-                        >
-                            Powered by CTranslate2 language models. Fully local, privacy-first speech-to-text that runs
-                            entirely on your machine. No cloud, no data collection, no internet.
-                        </p>
-
-                        {#if healthInfo}
-                            <p class="text-[var(--text-xs)] text-[var(--text-tertiary)] font-mono m-0">
-                                v{healthInfo.version}
-                            </p>
-                        {/if}
-
-                        <div class="flex gap-[var(--space-3)]">
-                            <a
-                                class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-md)] text-[var(--text-secondary)] text-[var(--text-sm)] no-underline transition-[color,border-color] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
-                                href="https://www.linkedin.com/in/abrown7521/"
-                                target="_blank"
-                                rel="noopener"
-                            >
-                                <Linkedin size={15} /> LinkedIn
-                            </a>
-                            <a
-                                class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-md)] text-[var(--text-secondary)] text-[var(--text-sm)] no-underline transition-[color,border-color] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
-                                href="https://github.com/WanderingAstronomer/Vociferous"
-                                target="_blank"
-                                rel="noopener"
-                            >
-                                <Github size={15} /> GitHub
-                            </a>
-                        </div>
-
-                        <p class="text-[var(--text-xs)] text-[var(--accent)] m-0">Created by Andrew Brown</p>
-                    </footer>
                 {/if}
             {/if}
         </div>

@@ -132,9 +132,12 @@
                     </div>
                 {/if}
 
-                {#if nav.current === "transcripts"}
+                <!-- TranscriptsView stays mounted to preserve pagination/filter/selection state -->
+                <div class="h-full" style:display={nav.current === "transcripts" ? "block" : "none"}>
                     <TranscriptsView />
-                {:else if nav.current === "settings"}
+                </div>
+
+                {#if nav.current === "settings"}
                     <SettingsView />
                 {:else if nav.current === "user"}
                     <UserView />

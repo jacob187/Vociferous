@@ -1,5 +1,38 @@
 # Vociferous Changelog
 
+## v5.10.8 — UserView Overhaul, Analytics Audit, SettingsView Polish, Clipboard Fix
+
+**Date:** 2026-03-11
+**Status:** Feature / Bugfix / Polish
+**Issues:** ISS-085, ISS-088, ISS-089, ISS-090, ISS-091, ISS-092
+
+### Changed
+- **UserView restructured into Dashboard + Deep Dive tabs** (ISS-092) — Killed the radar chart and distribution bell curves. Dashboard shows two summary cards ("Your Voice" + "Refinement Impact") with streaks, top filler word, and WPM. Deep Dive has four honest sections: Productivity, Speech Quality (filler bar chart), Readability (before/after FK delta), and Trends (speed + session length line charts). Every metric either works or is gone.
+- **Usage stats overhaul** (ISS-085) — WPM now uses VAD-based `speech_duration_ms` as denominator. Silence ratio only computed on transcripts with VAD data, with "based on X of Y" caveat. Dead metrics killed (`avg_word_length`, `long_word_ratio`). Added: `total_speech_seconds`, `avg_wpm`, per-word filler breakdown (`filler_counts`), current/longest streak computation, trend time-series data.
+- **Activity heatmap moved above tabs** (ISS-089) — Renders once between the AI insight paragraph and the tab bar instead of being duplicated inside each tab.
+- **About card rewritten** (ISS-090) — Body text now reflects the full dictation-to-document pipeline, not just "speech to text".
+- **TranscriptsView rendering switched to `style:display`** (ISS-088) — No longer destroyed on navigation. Default page size changed to 25, options to 10/25/50.
+
+### Added
+- **`countFillersByWord()`** in `textAnalysis.ts` — Frontend filler breakdown for the Deep Dive horizontal bar chart.
+- **Calculation detail labels** — Caveat annotations on silence ratio, filler density, and WPM explaining data coverage and approximation boundaries.
+- **SettingsView polish batch** (ISS-091) — "Hover for info" hint above tabs, tooltip audit across all 5 tabs, custom +/- stepper buttons on audio cache input (hides native spinners), maintenance button layout repositioned (Clear All left, Export right with primary variant).
+
+### Fixed
+- **Clipboard copies raw text when auto-refine is enabled** — `recording_handlers.py` was unconditionally copying to clipboard on transcription complete, before refinement had a chance to run. Now skips clipboard when `auto_refine` is on. `refinement_handlers.py` copies the refined text to clipboard after refinement completes (when both `auto_refine` and `auto_copy_to_clipboard` are enabled).
+
+### Removed
+- **RadarChart.svelte** — Dead. Mixed-unit normalized axes were dishonest.
+- **DistributionChart.svelte** — Dead. Bell curves looked impressive but told users nothing actionable.
+- **Polysyllabic word ratio, lexical complexity, average word length, long word ratio** — Removed from display and/or computation. Nobody cares.
+
+### Technical Notes
+- `usage_stats.py`: `compute_usage_stats()` signature unchanged but return dict gains `total_speech_seconds`, `avg_wpm`, `filler_counts`, `current_streak`, `longest_streak`, trend arrays. Dead keys removed.
+- `UserView.svelte`: ~475 lines changed. Complete tab restructure. New chart components inline (filler bar chart, trend line charts via canvas).
+- `test_usage_stats.py`: Test shapes updated for new return keys. Added coverage for VAD silence filtering, WPM computation, filler breakdown, streak calculation.
+
+---
+
 ## v5.10.7 — Architecture Audit Cleanup
 
 **Date:** 2026-03-11

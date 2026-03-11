@@ -105,6 +105,30 @@ export function countFillers(text: string): number {
     return count;
 }
 
+/** Per-filler breakdown: returns { word_or_phrase: count } for fillers that appear. */
+export function countFillersByWord(text: string): Record<string, number> {
+    if (!text) return {};
+    const lower = text.toLowerCase();
+    const breakdown: Record<string, number> = {};
+
+    for (const phrase of FILLER_MULTI) {
+        let idx = 0;
+        while ((idx = lower.indexOf(phrase, idx)) !== -1) {
+            breakdown[phrase] = (breakdown[phrase] || 0) + 1;
+            idx += phrase.length;
+        }
+    }
+
+    for (const w of lower.split(/\s+/)) {
+        const c = w.replace(/^[.,!?;:'"()\[\]{}]+|[.,!?;:'"()\[\]{}]+$/g, "");
+        if (FILLER_SINGLE.has(c)) {
+            breakdown[c] = (breakdown[c] || 0) + 1;
+        }
+    }
+
+    return breakdown;
+}
+
 // ---------------------------------------------------------------------------
 // Composite text metrics
 // ---------------------------------------------------------------------------

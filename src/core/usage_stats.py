@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from src.core.text_analysis import compute_text_metrics, std_dev
+from src.core.text_analysis import compute_text_metrics
 
 if TYPE_CHECKING:
     from src.database.db import TranscriptDB
@@ -68,6 +68,30 @@ def _count_fillers(text: str) -> int:
     return count
 
 
+def _count_fillers_by_word(text: str) -> dict[str, int]:
+    """Return per-filler breakdown: {filler_word_or_phrase: count}.
+
+    Only includes fillers that actually appear at least once.
+    """
+    if not text:
+        return {}
+    lower = text.lower()
+    breakdown: dict[str, int] = {}
+
+    for phrase in _FILLER_MULTI:
+        idx = 0
+        while (idx := lower.find(phrase, idx)) != -1:
+            breakdown[phrase] = breakdown.get(phrase, 0) + 1
+            idx += len(phrase)
+
+    for w in lower.split():
+        cleaned = w.strip(".,!?;:'\"()[]{}").lower()
+        if cleaned and cleaned in _FILLER_SINGLE:
+            breakdown[cleaned] = breakdown.get(cleaned, 0) + 1
+
+    return breakdown
+
+
 def _collect_cleaned_words(text: str) -> list[str]:
     """Extract cleaned lowercase words from text for vocabulary analysis."""
     words: list[str] = []
@@ -101,6 +125,7 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
     total_words = 0
     all_words: list[str] = []
     recorded_seconds = 0.0
+    total_speech_seconds = 0.0
     total_silence = 0.0
     filler_count = 0
 
@@ -113,23 +138,17 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
     verbatim_all_words: list[str] = []
     refined_all_words: list[str] = []
 
-    # Per-transcript distribution data
-    per_transcript_word_counts: list[float] = []
-    per_transcript_fk_verbatim: list[float] = []
-    per_transcript_fk_refined: list[float] = []
+    # Filler breakdown (per-word counts)
+    filler_breakdown: dict[str, int] = {}
 
     # Verbatim text metrics accumulators
     verbatim_fk_sum = 0.0
     verbatim_avg_sentence_len_sum = 0.0
-    verbatim_avg_word_len_sum = 0.0
-    verbatim_long_word_ratio_sum = 0.0
     verbatim_metrics_count = 0
 
     # Refined text metrics accumulators
     refined_fk_sum = 0.0
     refined_avg_sentence_len_sum = 0.0
-    refined_avg_word_len_sum = 0.0
-    refined_long_word_ratio_sum = 0.0
 
     for t in transcripts:
         raw = t.raw_text or ""
@@ -139,11 +158,14 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
 
         words = text.split()
         total_words += len(words)
-        per_transcript_word_counts.append(float(len(words)))
 
         # Overall filler count (best-available text)
         filler_count += _count_fillers(text)
         all_words.extend(_collect_cleaned_words(text))
+
+        # Filler breakdown (aggregate per-word counts across all transcripts)
+        for word, wcount in _count_fillers_by_word(text).items():
+            filler_breakdown[word] = filler_breakdown.get(word, 0) + wcount
 
         # Verbatim stats (always computed from raw_text)
         raw_words = raw.split()
@@ -155,10 +177,7 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
             v_metrics = compute_text_metrics(raw)
             verbatim_fk_sum += v_metrics["fk_grade"]
             verbatim_avg_sentence_len_sum += v_metrics["avg_sentence_length"]
-            verbatim_avg_word_len_sum += v_metrics["avg_word_length"]
-            verbatim_long_word_ratio_sum += v_metrics["long_word_ratio"]
             verbatim_metrics_count += 1
-            per_transcript_fk_verbatim.append(v_metrics["fk_grade"])
 
         # Refined stats (only for actually-refined transcripts)
         if is_refined:
@@ -171,25 +190,33 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
             r_metrics = compute_text_metrics(norm)
             refined_fk_sum += r_metrics["fk_grade"]
             refined_avg_sentence_len_sum += r_metrics["avg_sentence_length"]
-            refined_avg_word_len_sum += r_metrics["avg_word_length"]
-            refined_long_word_ratio_sum += r_metrics["long_word_ratio"]
-            per_transcript_fk_refined.append(r_metrics["fk_grade"])
 
-        # Duration / silence
+        # Duration / silence — use VAD speech_duration_ms when available
         dur = (t.duration_ms or 0) / 1000
         if dur > 0:
             recorded_seconds += dur
-            expected = (len(words) / _SPEAKING_WPM) * 60
-            total_silence += max(0.0, dur - expected)
+            speech = (t.speech_duration_ms or 0) / 1000
+            if speech > 0:
+                total_speech_seconds += speech
+                total_silence += max(0.0, dur - speech)
+            else:
+                # No VAD data — fall back to word-count estimate
+                expected = (len(words) / _SPEAKING_WPM) * 60
+                total_speech_seconds += min(expected, dur)
+                total_silence += max(0.0, dur - expected)
 
     # Fallback estimate when no duration metadata is present
     if recorded_seconds == 0 and total_words > 0:
         recorded_seconds = (total_words / _SPEAKING_WPM) * 60
+        total_speech_seconds = recorded_seconds  # no silence estimate possible
 
     typing_seconds = (total_words / typing_wpm) * 60
     time_saved = max(0.0, typing_seconds - recorded_seconds)
     avg_seconds = recorded_seconds / count if count > 0 else 0
     vocab_ratio = len(set(all_words)) / len(all_words) if all_words else 0
+
+    # WPM using actual speech time (VAD) when available
+    avg_wpm = round(total_words / (total_speech_seconds / 60)) if total_speech_seconds > 0 else 0
 
     # Verbatim averages
     v_count = verbatim_metrics_count or 1
@@ -200,6 +227,36 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
     r_count = refined_count or 1
     refined_vocab_ratio = len(set(refined_all_words)) / len(refined_all_words) if refined_all_words else 0
     refined_filler_density = refined_filler_count / refined_total_words if refined_total_words else 0
+
+    # ── Streak computation (consecutive active days) ──
+    transcript_dates: set[int] = set()
+    for t in transcripts:
+        try:
+            dt = datetime.fromisoformat(t.created_at.replace("Z", "+00:00"))
+            transcript_dates.add(dt.toordinal())
+        except (ValueError, AttributeError):
+            continue
+
+    current_streak = 0
+    longest_streak = 0
+    if transcript_dates:
+        today_ordinal = datetime.now(timezone.utc).toordinal()
+        # Walk backward from today counting consecutive days
+        d = today_ordinal
+        while d in transcript_dates:
+            current_streak += 1
+            d -= 1
+
+        # Find longest ever streak across all dates
+        sorted_dates = sorted(transcript_dates)
+        run = 1
+        for i in range(1, len(sorted_dates)):
+            if sorted_dates[i] == sorted_dates[i - 1] + 1:
+                run += 1
+            else:
+                longest_streak = max(longest_streak, run)
+                run = 1
+        longest_streak = max(longest_streak, run)
 
     # ── Session-level stats ──
     now = datetime.now(timezone.utc)
@@ -220,16 +277,22 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
         if ordinal >= week_start:
             active_days.add(ordinal)
 
+    # Top fillers — sorted by count descending, capped at 5
+    top_fillers = dict(sorted(filler_breakdown.items(), key=lambda x: x[1], reverse=True)[:5])
+
     return {
         # ── Overall (backward-compatible) ──
         "count": count,
         "total_words": total_words,
         "recorded_seconds": recorded_seconds,
+        "total_speech_seconds": total_speech_seconds,
+        "avg_wpm": avg_wpm,
         "time_saved_seconds": time_saved,
         "avg_seconds": avg_seconds,
         "vocab_ratio": vocab_ratio,
         "total_silence_seconds": total_silence,
         "filler_count": filler_count,
+        "filler_breakdown": top_fillers,
         # ── Verbatim pipeline ──
         "verbatim_total_words": verbatim_total_words,
         "verbatim_filler_count": verbatim_filler_count,
@@ -237,8 +300,6 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
         "verbatim_vocab_ratio": round(verbatim_vocab_ratio, 3),
         "verbatim_avg_fk_grade": round(verbatim_fk_sum / v_count, 1),
         "verbatim_avg_sentence_length": round(verbatim_avg_sentence_len_sum / v_count, 1),
-        "verbatim_avg_word_length": round(verbatim_avg_word_len_sum / v_count, 1),
-        "verbatim_long_word_ratio": round(verbatim_long_word_ratio_sum / v_count, 3),
         # ── Refinement pipeline ──
         "refined_count": refined_count,
         "refined_total_words": refined_total_words,
@@ -247,14 +308,9 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
         "refined_vocab_ratio": round(refined_vocab_ratio, 3),
         "refined_avg_fk_grade": round(refined_fk_sum / r_count, 1),
         "refined_avg_sentence_length": round(refined_avg_sentence_len_sum / r_count, 1),
-        "refined_avg_word_length": round(refined_avg_word_len_sum / r_count, 1),
-        "refined_long_word_ratio": round(refined_long_word_ratio_sum / r_count, 3),
-        # ── Distribution data (for bell curves) ──
-        "word_count_std_dev": std_dev(per_transcript_word_counts),
-        "word_count_mean": round(sum(per_transcript_word_counts) / count, 1),
-        "distribution_words": per_transcript_word_counts,
-        "distribution_fk_verbatim": per_transcript_fk_verbatim,
-        "distribution_fk_refined": per_transcript_fk_refined,
+        # ── Streaks ──
+        "current_streak": current_streak,
+        "longest_streak": longest_streak,
         # ── Session-level ──
         "today_count": today_count,
         "today_words": today_words,

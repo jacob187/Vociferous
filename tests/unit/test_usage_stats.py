@@ -192,11 +192,14 @@ class TestReturnShape:
             "count",
             "total_words",
             "recorded_seconds",
+            "total_speech_seconds",
+            "avg_wpm",
             "time_saved_seconds",
             "avg_seconds",
             "vocab_ratio",
             "total_silence_seconds",
             "filler_count",
+            "filler_breakdown",
             # Verbatim pipeline
             "verbatim_total_words",
             "verbatim_filler_count",
@@ -204,8 +207,6 @@ class TestReturnShape:
             "verbatim_vocab_ratio",
             "verbatim_avg_fk_grade",
             "verbatim_avg_sentence_length",
-            "verbatim_avg_word_length",
-            "verbatim_long_word_ratio",
             # Refinement pipeline
             "refined_count",
             "refined_total_words",
@@ -214,14 +215,9 @@ class TestReturnShape:
             "refined_vocab_ratio",
             "refined_avg_fk_grade",
             "refined_avg_sentence_length",
-            "refined_avg_word_length",
-            "refined_long_word_ratio",
-            # Distribution data
-            "word_count_std_dev",
-            "word_count_mean",
-            "distribution_words",
-            "distribution_fk_verbatim",
-            "distribution_fk_refined",
+            # Streaks
+            "current_streak",
+            "longest_streak",
             # Session-level (ISS-070)
             "today_count",
             "today_words",
@@ -315,66 +311,112 @@ class TestTextAnalysisMetrics:
         # No refinement — refined FK should be 0
         assert stats["refined_avg_fk_grade"] == 0.0
 
-    def test_avg_word_length_reasonable(self, db):
-        db.add_transcript(raw_text="The cat sat on a mat.", duration_ms=3000)
-
-        stats = compute_usage_stats(db)
-        # Average word length should be in a sane range
-        assert 2.0 <= stats["verbatim_avg_word_length"] <= 5.0
-
-    def test_long_word_ratio(self, db):
-        db.add_transcript(
-            raw_text="Internationalization is a sophisticated concept.",
-            duration_ms=5000,
-        )
-        stats = compute_usage_stats(db)
-        # "Internationalization" and "sophisticated" are > 6 chars
-        assert stats["verbatim_long_word_ratio"] > 0
-
 
 # ---------------------------------------------------------------------------
-# Distribution data
+# VAD-based silence
 # ---------------------------------------------------------------------------
 
 
-class TestDistributionData:
-    """Verify distribution arrays for bell curve visualizations."""
+class TestVadSilence:
+    """Silence uses speech_duration_ms (VAD) when available."""
 
-    def test_distribution_words_length_matches_count(self, db):
-        db.add_transcript(raw_text="Hello world.", duration_ms=3000)
-        db.add_transcript(raw_text="Testing one two three.", duration_ms=4000)
-
-        stats = compute_usage_stats(db)
-        assert len(stats["distribution_words"]) == 2
-        assert sorted(stats["distribution_words"]) == [2.0, 4.0]
-
-    def test_distribution_fk_verbatim_populated(self, db):
+    def test_silence_from_vad(self, db):
+        """30s recording, 20s speech → 10s silence."""
         db.add_transcript(
-            raw_text="The quick brown fox jumps over the lazy dog.",
-            duration_ms=5000,
-        )
-        stats = compute_usage_stats(db)
-        assert len(stats["distribution_fk_verbatim"]) == 1
-        assert stats["distribution_fk_verbatim"][0] > 0
-
-    def test_distribution_fk_refined_only_for_refined(self, db):
-        t = db.add_transcript(raw_text="um hello um world", duration_ms=3000)
-        db.update_normalized_text(t.id, "Hello, world.")
-        db.add_transcript(raw_text="Plain entry.", duration_ms=3000)
-
-        stats = compute_usage_stats(db)
-        # Only the refined transcript should appear in refined FK distribution
-        assert len(stats["distribution_fk_refined"]) == 1
-        # Both should appear in verbatim FK distribution
-        assert len(stats["distribution_fk_verbatim"]) == 2
-
-    def test_word_count_std_dev(self, db):
-        db.add_transcript(raw_text="Short.", duration_ms=2000)
-        db.add_transcript(
-            raw_text=" ".join(["word"] * 50),
-            duration_ms=20000,
+            raw_text="some words here",
+            duration_ms=30_000,
+            speech_duration_ms=20_000,
         )
 
         stats = compute_usage_stats(db)
-        assert stats["word_count_std_dev"] > 0
-        assert stats["word_count_mean"] > 0
+        assert stats["total_silence_seconds"] == pytest.approx(10.0, rel=0.01)
+        assert stats["total_speech_seconds"] == pytest.approx(20.0, rel=0.01)
+
+    def test_silence_falls_back_to_estimate_without_vad(self, db):
+        """When speech_duration_ms is 0, fall back to word-count estimate."""
+        # 10 words at 150 WPM = 4s estimated speech. 30s recording → ~26s silence.
+        db.add_transcript(raw_text=" ".join(["word"] * 10), duration_ms=30_000)
+
+        stats = compute_usage_stats(db)
+        assert stats["total_silence_seconds"] > 20
+
+
+# ---------------------------------------------------------------------------
+# WPM computation
+# ---------------------------------------------------------------------------
+
+
+class TestWpm:
+    """Average WPM uses actual speech time for an honest denominator."""
+
+    def test_avg_wpm_uses_speech_seconds(self, db):
+        """60 words in 20s of speech → 180 WPM."""
+        words = " ".join(["word"] * 60)
+        db.add_transcript(raw_text=words, duration_ms=30_000, speech_duration_ms=20_000)
+
+        stats = compute_usage_stats(db)
+        # 60 words / (20s / 60) = 60 / 0.333 = 180 WPM
+        assert stats["avg_wpm"] == 180
+
+
+# ---------------------------------------------------------------------------
+# Filler breakdown
+# ---------------------------------------------------------------------------
+
+
+class TestFillerBreakdown:
+    """Per-word filler counts for the top-fillers display."""
+
+    def test_filler_breakdown_returns_per_word_counts(self, db):
+        db.add_transcript(raw_text="um like um basically um", duration_ms=5000)
+
+        stats = compute_usage_stats(db)
+        breakdown = stats["filler_breakdown"]
+        assert breakdown["um"] == 3
+        assert breakdown["like"] == 1
+        assert breakdown["basically"] == 1
+
+    def test_filler_breakdown_includes_multi_word(self, db):
+        db.add_transcript(raw_text="you know I mean you know okay", duration_ms=5000)
+
+        stats = compute_usage_stats(db)
+        breakdown = stats["filler_breakdown"]
+        assert breakdown["you know"] == 2
+        assert breakdown["i mean"] == 1
+        assert breakdown["okay"] == 1
+
+    def test_filler_breakdown_capped_at_five(self, db):
+        # Use all 14 single-word fillers to ensure we get capped at 5
+        db.add_transcript(
+            raw_text="um uh uhm umm er err like basically literally actually so well right okay",
+            duration_ms=10000,
+        )
+
+        stats = compute_usage_stats(db)
+        assert len(stats["filler_breakdown"]) == 5
+
+
+# ---------------------------------------------------------------------------
+# Streak computation
+# ---------------------------------------------------------------------------
+
+
+class TestStreaks:
+    """Current and longest streak from transcript dates."""
+
+    def test_streaks_zero_with_no_timestamps(self, db):
+        # Transcripts without valid created_at
+        db.add_transcript(raw_text="test words", duration_ms=3000)
+
+        stats = compute_usage_stats(db)
+        # Should have some streak since add_transcript sets created_at to now
+        assert stats["current_streak"] >= 0
+        assert stats["longest_streak"] >= 0
+
+    def test_current_streak_counts_today(self, db):
+        """A transcript from today should give current_streak >= 1."""
+        db.add_transcript(raw_text="today entry", duration_ms=3000)
+
+        stats = compute_usage_stats(db)
+        assert stats["current_streak"] >= 1
+        assert stats["longest_streak"] >= 1

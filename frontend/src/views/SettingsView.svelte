@@ -209,6 +209,11 @@
              eliminating the centering offset that occurs when the tab bar is outside the scroll container. -->
         <div class="flex-1 overflow-y-auto">
             <div class="sticky top-0 z-10 border-b border-[var(--shell-border)] bg-[var(--surface-primary)]">
+                <p
+                    class="w-full max-w-5xl mx-auto px-[var(--space-5)] pt-[var(--space-2)] text-[var(--text-xs)] text-[var(--text-tertiary)] italic"
+                >
+                    Hover over a setting label for more information.
+                </p>
                 <div class="w-full max-w-5xl mx-auto px-[var(--space-5)] flex gap-0" role="tablist">
                     {#each tabs as tab (tab.id)}
                         <button
@@ -291,19 +296,59 @@
                                 title="Keep recorded audio on disk for crash recovery. Oldest recordings are pruned when the limit is exceeded. Set to 0 to disable."
                                 >Audio Cache (minutes)</label
                             >
-                            <input
-                                id="setting-audiocache"
-                                type="number"
-                                min="0"
-                                max="480"
-                                step="15"
-                                class="h-9 w-28 rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-primary)] px-[var(--space-2)] text-[var(--text-sm)] text-[var(--text-primary)]"
-                                value={getSafe(config, "recording.audio_cache_minutes", 60)}
-                                oninput={(e) => {
-                                    const v = parseFloat((e.target as HTMLInputElement).value);
-                                    if (!isNaN(v) && v >= 0 && v <= 480) setSafe("recording.audio_cache_minutes", v);
-                                }}
-                            />
+                            <div class="flex items-center gap-[var(--space-1)]">
+                                <button
+                                    type="button"
+                                    class="flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-primary)] text-[var(--accent)] cursor-pointer transition-colors duration-150 hover:bg-[var(--hover-overlay-blue)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                    disabled={getSafe(config, "recording.audio_cache_minutes", 60) <= 0}
+                                    onclick={() => {
+                                        const cur = getSafe(config, "recording.audio_cache_minutes", 60);
+                                        if (cur > 0) setSafe("recording.audio_cache_minutes", Math.max(0, cur - 15));
+                                    }}
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 14 14"
+                                        ><path
+                                            d="M3 7h8"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            stroke-linecap="round"
+                                        /></svg
+                                    >
+                                </button>
+                                <input
+                                    id="setting-audiocache"
+                                    type="number"
+                                    min="0"
+                                    max="480"
+                                    step="15"
+                                    class="h-9 w-20 rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-primary)] px-[var(--space-2)] text-[var(--text-sm)] text-[var(--text-primary)] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    value={getSafe(config, "recording.audio_cache_minutes", 60)}
+                                    oninput={(e) => {
+                                        const v = parseFloat((e.target as HTMLInputElement).value);
+                                        if (!isNaN(v) && v >= 0 && v <= 480)
+                                            setSafe("recording.audio_cache_minutes", v);
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    class="flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-primary)] text-[var(--accent)] cursor-pointer transition-colors duration-150 hover:bg-[var(--hover-overlay-blue)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                    disabled={getSafe(config, "recording.audio_cache_minutes", 60) >= 480}
+                                    onclick={() => {
+                                        const cur = getSafe(config, "recording.audio_cache_minutes", 60);
+                                        if (cur < 480)
+                                            setSafe("recording.audio_cache_minutes", Math.min(480, cur + 15));
+                                    }}
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 14 14"
+                                        ><path
+                                            d="M7 3v8M3 7h8"
+                                            stroke="currentColor"
+                                            stroke-width="1.5"
+                                            stroke-linecap="round"
+                                        /></svg
+                                    >
+                                </button>
+                            </div>
                         </div>
                     </div>
                 {:else if activeTab === "output"}
@@ -349,7 +394,8 @@
                             <label
                                 class="text-[var(--text-sm)] text-[var(--text-primary)]"
                                 for="setting-username"
-                                title="Your name. Used in the greeting on the Transcribe screen.">Your Name</label
+                                title="Your name. Used in the greeting on the Transcribe screen and the title of your Vociferous Journey."
+                                >Your Name</label
                             >
                             <input
                                 id="setting-username"
