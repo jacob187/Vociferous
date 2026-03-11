@@ -231,8 +231,8 @@ class TestClearTranscripts:
 
     def test_clear_deletes_all(self, wired):
         coord, events = wired
-        coord.db.add_transcript(raw_text="one", duration_ms=100)
-        coord.db.add_transcript(raw_text="two", duration_ms=200)
+        t1 = coord.db.add_transcript(raw_text="one", duration_ms=100)
+        t2 = coord.db.add_transcript(raw_text="two", duration_ms=200)
 
         from src.core.intents.definitions import ClearTranscriptsIntent
 
@@ -240,11 +240,11 @@ class TestClearTranscripts:
 
         cleared = events.of_type("transcripts_cleared")
         assert len(cleared) == 1
-        assert cleared[0]["count"] == 2
+        assert cleared[0]["count"] == 2  # only non-protected deleted
 
-        # Verify rows are gone
-        assert coord.db.get_transcript(1) is None
-        assert coord.db.get_transcript(2) is None
+        # Verify added rows are gone (protected seeded transcript at ID 1 survives)
+        assert coord.db.get_transcript(t1.id) is None
+        assert coord.db.get_transcript(t2.id) is None
 
     def test_clear_empty_db(self, wired):
         """Clearing with no transcripts emits count 0."""

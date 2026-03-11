@@ -111,7 +111,7 @@ class TestHealthEndpoint:
         body = resp.json()
         assert body["status"] == "ok"
         assert "version" in body
-        assert body["transcripts"] == 0
+        assert body["transcripts"] == 1  # v9 seeds 1 protected prompt transcript
 
     def test_health_reflects_transcript_count(self, api):
         client, coord, _ = api
@@ -119,7 +119,7 @@ class TestHealthEndpoint:
         coord.db.add_transcript(raw_text="two", duration_ms=200)
 
         resp = client.get("/api/health")
-        assert resp.json()["transcripts"] == 2
+        assert resp.json()["transcripts"] == 3  # 2 added + 1 seeded
 
 
 # ── Transcript CRUD ──────────────────────────────────────────────────────
@@ -127,12 +127,13 @@ class TestHealthEndpoint:
 
 class TestTranscriptRoutes:
     def test_list_empty(self, api):
+        """Fresh DB has only the seeded system prompt transcript."""
         client, _, _ = api
         resp = client.get("/api/transcripts")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["items"] == []
-        assert data["total"] == 0
+        assert data["total"] == 1  # v9 seeds 1 protected prompt transcript
+        assert len(data["items"]) == 1
 
     def test_list_returns_transcripts(self, api):
         client, coord, _ = api
@@ -141,8 +142,8 @@ class TestTranscriptRoutes:
 
         resp = client.get("/api/transcripts")
         data = resp.json()
-        assert len(data["items"]) == 2
-        assert data["total"] == 2
+        assert len(data["items"]) == 3  # 2 added + 1 seeded
+        assert data["total"] == 3
         assert all("id" in t and "raw_text" in t for t in data["items"])
 
     def test_list_with_limit(self, api):
@@ -153,7 +154,7 @@ class TestTranscriptRoutes:
         resp = client.get("/api/transcripts", params={"limit": 3})
         data = resp.json()
         assert len(data["items"]) == 3
-        assert data["total"] == 5
+        assert data["total"] == 6  # 5 added + 1 seeded
 
     def test_get_transcript_by_id(self, api):
         client, coord, _ = api
@@ -189,7 +190,7 @@ class TestTranscriptRoutes:
         assert deleted[0]["id"] == t.id
 
     def test_clear_all_transcripts(self, api):
-        """DELETE /api/transcripts returns deleted count and clears all records."""
+        """DELETE /api/transcripts returns deleted count and clears non-protected records."""
         client, coord, events = api
         coord.db.add_transcript(raw_text="first", duration_ms=100)
         coord.db.add_transcript(raw_text="second", duration_ms=200)
@@ -198,8 +199,8 @@ class TestTranscriptRoutes:
         assert resp.status_code == 200
         data = resp.json()
         assert "deleted" in data
-        assert data["deleted"] == 2
-        assert coord.db.transcript_count() == 0
+        assert data["deleted"] == 2  # only non-protected transcripts deleted
+        assert coord.db.transcript_count() == 1  # protected prompt transcript survives
 
     def test_search_transcripts(self, api):
         client, coord, _ = api

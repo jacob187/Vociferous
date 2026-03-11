@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
-    import { getTranscripts, getTranscript, refineTranscript, commitRefinement, type Transcript } from "../lib/api";
+    import { getTranscripts, getTranscript, getTags, refineTranscript, commitRefinement, type Transcript, type Tag } from "../lib/api";
     import { toast } from "../lib/toast.svelte";
     import { ws } from "../lib/ws";
     import { nav } from "../lib/navigation.svelte";
@@ -43,7 +43,36 @@
     let refineTimer: ReturnType<typeof setInterval> | null = $state(null);
     let refineError = $state("");
 
+    /* ── Prompt System ── */
+    let savedPrompts: Transcript[] = $state([]);
+    let promptTagId: number | null = $state(null);
+
     /* ── Data ── */
+    async function loadPrompts() {
+        try {
+            const tags = await getTags();
+            const promptTag = tags.find((t: Tag) => t.name === "Prompt" && t.is_system);
+            if (!promptTag) return;
+            promptTagId = promptTag.id;
+            const result = await getTranscripts({ limit: 100, tag_ids: [promptTag.id] });
+            savedPrompts = result.items;
+        } catch (e) {
+            console.error("Failed to load saved prompts:", e);
+        }
+    }
+
+    function handlePromptSelect(e: Event) {
+        const val = (e.target as HTMLSelectElement).value;
+        if (!val) return;
+        const id = Number(val);
+        const prompt = savedPrompts.find((p) => p.id === id);
+        if (prompt) {
+            customInstructions = prompt.text || prompt.normalized_text || prompt.raw_text || "";
+        }
+        // Reset select to placeholder so user can re-select the same prompt
+        (e.target as HTMLSelectElement).value = "";
+    }
+
     async function loadTranscripts() {
         try {
             transcripts = (await getTranscripts({ limit: 100 })).items;
@@ -163,6 +192,7 @@
 
     onMount(() => {
         loadTranscripts();
+        loadPrompts();
 
         unsubRefinement = ws.on("refinement_complete", (data) => {
             if (data.transcript_id === selectedId) {
@@ -304,11 +334,7 @@
             <div class="flex-1 overflow-y-auto p-[var(--space-4)]">
                 {#if originalText}
                     <WorkspacePanel>
-                        <p
-                            class="text-[var(--text-sm)] leading-[1.7] text-[var(--text-primary)] m-0 whitespace-pre-wrap"
-                        >
-                            {originalText}
-                        </p>
+                        <MarkdownBody text={originalText} className="text-[var(--text-sm)] text-[var(--text-primary)]" />
                     </WorkspacePanel>
                 {:else}
                     <EmptyState icon={FileText} message="Select a transcript to begin" />
@@ -398,6 +424,20 @@
             <p class="m-0 text-[var(--text-xs)] text-[var(--text-tertiary)] text-center">
                 Default behavior fixes grammar and punctuation with minimal wording changes.
             </p>
+            {#if savedPrompts.length > 0}
+                <div class="flex items-center gap-[var(--space-2)]">
+                    <span class="text-[var(--text-xs)] text-[var(--text-tertiary)] shrink-0">Saved Prompts</span>
+                    <select
+                        class="flex-1 py-1.5 px-2 border border-[var(--shell-border)] rounded-[var(--radius-sm)] bg-[var(--surface-primary)] text-[var(--text-primary)] text-[var(--text-xs)] outline-none cursor-pointer transition-[border-color] duration-[var(--transition-fast)] focus:border-[var(--accent)]"
+                        onchange={handlePromptSelect}
+                    >
+                        <option value="">Load a saved prompt…</option>
+                        {#each savedPrompts as p (p.id)}
+                            <option value={p.id}>{p.display_name || `Prompt #${p.id}`}</option>
+                        {/each}
+                    </select>
+                </div>
+            {/if}
             <textarea
                 class="flex-1 resize-none py-[var(--space-2)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-sm)] bg-[var(--surface-primary)] text-[var(--text-primary)] text-[var(--text-sm)] font-[inherit] outline-none transition-[border-color] duration-[var(--transition-fast)] focus:border-[var(--accent)] disabled:opacity-50"
                 placeholder="Add specific instructions (e.g., 'Make it bullet points', 'Fix technical jargon')…"

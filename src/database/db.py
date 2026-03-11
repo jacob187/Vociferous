@@ -50,6 +50,7 @@ class Transcript:
     created_at: str = ""
     include_in_analytics: bool = True
     has_audio_cached: bool = False
+    is_protected: bool = False
     # Populated by joins, not stored in transcripts table
     tags: list[Tag] = field(default_factory=list)
 
@@ -73,7 +74,8 @@ CREATE TABLE IF NOT EXISTS transcripts (
     speech_duration_ms INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now')),
     include_in_analytics INTEGER NOT NULL DEFAULT 1,
-    has_audio_cached INTEGER NOT NULL DEFAULT 0
+    has_audio_cached INTEGER NOT NULL DEFAULT 0,
+    is_protected INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_transcripts_timestamp ON transcripts(timestamp);
@@ -341,34 +343,35 @@ class TranscriptDB:
         return row[0] if row else 0
 
     def delete_transcript(self, transcript_id: int) -> bool:
-        """Delete a transcript (tag junction rows CASCADE)."""
+        """Delete a transcript (tag junction rows CASCADE). Refuses to delete protected transcripts."""
         with self._write_lock:
-            cur = self._conn.execute("DELETE FROM transcripts WHERE id = ?", (transcript_id,))
+            cur = self._conn.execute(
+                "DELETE FROM transcripts WHERE id = ? AND is_protected = 0",
+                (transcript_id,),
+            )
             self._conn.commit()
             return cur.rowcount > 0
 
     def batch_delete_transcripts(self, transcript_ids: list[int]) -> int:
-        """Delete multiple transcripts in a single transaction. Returns count deleted."""
+        """Delete multiple transcripts in a single transaction. Skips protected rows. Returns count deleted."""
         if not transcript_ids:
             return 0
         placeholders = ",".join("?" * len(transcript_ids))
         with self._write_lock:
             cur = self._conn.execute(
-                f"DELETE FROM transcripts WHERE id IN ({placeholders})",
+                f"DELETE FROM transcripts WHERE id IN ({placeholders}) AND is_protected = 0",
                 transcript_ids,
             )
             self._conn.commit()
             return cur.rowcount
 
     def clear_all_transcripts(self) -> int:
-        """Delete all transcripts. Returns count deleted."""
+        """Delete all non-protected transcripts. Returns count deleted."""
         with self._write_lock:
-            cur = self._conn.execute("SELECT COUNT(*) FROM transcripts")
-            count = cur.fetchone()[0]
             # transcript_tags ON DELETE CASCADE handles junction table cleanup
-            self._conn.execute("DELETE FROM transcripts")
+            cur = self._conn.execute("DELETE FROM transcripts WHERE is_protected = 0")
             self._conn.commit()
-            return count
+            return cur.rowcount
 
     def update_normalized_text(self, transcript_id: int, text: str) -> None:
         """Update the normalized_text field (for edits)."""
@@ -594,6 +597,7 @@ class TranscriptDB:
             created_at=row["created_at"],
             include_in_analytics=bool(row["include_in_analytics"]),
             has_audio_cached=bool(row["has_audio_cached"]),
+            is_protected=bool(row["is_protected"]),
         )
 
     def append_to_transcript(

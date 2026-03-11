@@ -271,6 +271,52 @@ def _v8_audio_cache_flag(conn: sqlite3.Connection) -> None:
     logger.info("v8 migration: has_audio_cached column ensured on transcripts")
 
 
+def _v9_prompt_system(conn: sqlite3.Connection) -> None:
+    """v9 — Prompt tag, is_protected column, and default system prompt transcript.
+
+    Adds the "Prompt" system tag (is_system=1) for tagging reusable instruction
+    templates.  Adds an is_protected column to transcripts so the seeded default
+    system prompt cannot be deleted.  Seeds the default refinement system prompt
+    as a protected transcript tagged with the Prompt tag.
+    """
+    # 1. is_protected column on transcripts
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(transcripts)").fetchall()}
+    if "is_protected" not in cols:
+        conn.execute("ALTER TABLE transcripts ADD COLUMN is_protected INTEGER NOT NULL DEFAULT 0")
+
+    # 2. Seed "Prompt" system tag
+    existing_tag = conn.execute("SELECT id FROM tags WHERE name = 'Prompt' AND is_system = 1").fetchone()
+    if existing_tag:
+        prompt_tag_id = existing_tag[0]
+    else:
+        cur = conn.execute("INSERT INTO tags (name, color, is_system) VALUES ('Prompt', NULL, 1)")
+        prompt_tag_id = cur.lastrowid
+
+    # 3. Seed default system prompt transcript (idempotent via display_name check)
+    default_prompt_text = "You are a professional editor and proofreader."
+    existing_prompt = conn.execute(
+        "SELECT id FROM transcripts WHERE display_name = 'Default Refinement Prompt' AND is_protected = 1"
+    ).fetchone()
+    if not existing_prompt:
+        ts = "1970-01-01T00:00:00.000"  # sentinel timestamp for seeded data
+        cur = conn.execute(
+            """INSERT INTO transcripts
+               (timestamp, raw_text, normalized_text, display_name,
+                duration_ms, speech_duration_ms, created_at,
+                include_in_analytics, has_audio_cached, is_protected)
+               VALUES (?, ?, ?, ?, 0, 0, ?, 0, 0, 1)""",
+            (ts, default_prompt_text, default_prompt_text, "Default Refinement Prompt", ts),
+        )
+        prompt_transcript_id = cur.lastrowid
+        # Tag the seeded transcript with the Prompt tag
+        conn.execute(
+            "INSERT OR IGNORE INTO transcript_tags (transcript_id, tag_id) VALUES (?, ?)",
+            (prompt_transcript_id, prompt_tag_id),
+        )
+
+    logger.info("v9 migration: Prompt system tag + default system prompt transcript seeded")
+
+
 #: Ordered list of (human-readable description, migration function) pairs.
 #: Append here to add future migrations; do not edit existing entries.
 MIGRATIONS: list[tuple[str, object]] = [
@@ -282,6 +328,7 @@ MIGRATIONS: list[tuple[str, object]] = [
     ("v6 analytics inclusion flag — include_in_analytics column on transcripts", _v6_analytics_inclusion),
     ("v7 compound system tag — seed Compound tag for transcript continuation", _v7_compound_tag),
     ("v8 audio cache flag — has_audio_cached column on transcripts", _v8_audio_cache_flag),
+    ("v9 prompt system — Prompt tag + is_protected column + default system prompt transcript", _v9_prompt_system),
 ]
 
 

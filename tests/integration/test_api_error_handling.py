@@ -195,13 +195,15 @@ class TestTranscriptErrors:
     def test_list_transcripts_with_zero_limit(self, api):
         """Limit=0 should return empty or handle gracefully."""
         client, coord, _ = api
+        # v9 migration seeds 1 protected transcript; add_transcript adds 1 more
+        baseline = len(coord.db.recent(limit=100)[0])
         coord.db.add_transcript(raw_text="limited", duration_ms=100)
 
         resp = client.get("/api/transcripts", params={"limit": 0})
         assert resp.status_code == 200
         data = resp.json()
         assert data["items"] == []
-        assert data["total"] == 1
+        assert data["total"] == baseline + 1
 
     def test_list_transcripts_large_limit(self, api):
         """Very large limit should not crash."""

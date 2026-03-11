@@ -64,6 +64,8 @@ async def delete_transcript(transcript_id: int) -> Response:
     transcript = await asyncio.to_thread(coordinator.db.get_transcript, transcript_id)
     if transcript is None:
         return Response(content={"error": "Not found"}, status_code=404)
+    if transcript.is_protected:
+        return Response(content={"error": "Protected transcripts cannot be deleted"}, status_code=403)
 
     from src.core.intents.definitions import DeleteTranscriptIntent
 
@@ -104,7 +106,8 @@ async def clear_all_transcripts() -> Response:
     success = coordinator.command_bus.dispatch(intent)
     if not success:
         return Response(content={"error": "Clear failed"}, status_code=500)
-    return Response(content={"deleted": count})
+    remaining = await asyncio.to_thread(coordinator.db.transcript_count)
+    return Response(content={"deleted": count - remaining})
 
 
 @get("/api/transcripts/search", sync_to_thread=True)
@@ -271,6 +274,7 @@ def transcript_to_dict(transcript) -> dict:
         "created_at": transcript.created_at,
         "include_in_analytics": transcript.include_in_analytics,
         "has_audio_cached": transcript.has_audio_cached,
+        "is_protected": transcript.is_protected,
         "tags": [
             {"id": tag.id, "name": tag.name, "color": tag.color, "is_system": tag.is_system} for tag in transcript.tags
         ],

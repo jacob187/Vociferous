@@ -47,6 +47,7 @@
     import EmptyState from "../lib/components/EmptyState.svelte";
     import TagBar from "../lib/components/TagBar.svelte";
     import ActionBar from "../lib/components/ActionBar.svelte";
+    import MarkdownBody from "../lib/components/MarkdownBody.svelte";
     import { formatDuration, wordCount, formatRelativeDate } from "../lib/formatters";
 
     /* ===== State ===== */
@@ -809,13 +810,15 @@
                             </div>
 
                             <!-- Text preview -->
-                            <p class="text-[15px] text-[var(--text-secondary)] leading-relaxed m-0 mb-2 line-clamp-2">
-                                {#if isSearching}
+                            {#if isSearching}
+                                <p class="text-[15px] text-[var(--text-secondary)] leading-relaxed m-0 mb-2 line-clamp-2">
                                     {@html highlight(truncate(getDisplayText(entry)), searchQuery)}
-                                {:else}
-                                    {truncate(getDisplayText(entry))}
-                                {/if}
-                            </p>
+                                </p>
+                            {:else}
+                                <div class="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-2 max-h-[3.25em] overflow-hidden">
+                                    <MarkdownBody text={getDisplayText(entry)} className="[&>*:first-child]:mt-0" />
+                                </div>
+                            {/if}
 
                             <!-- Bottom row: tags + metadata -->
                             <div class="flex items-center gap-2 flex-wrap pt-1.5 mt-0.5">
@@ -912,7 +915,12 @@
                 <div class="flex-1"></div>
 
                 {#if selection.count === 1}
-                    <StyledButton size="sm" variant="secondary" onclick={continueRecording} title="Continue recording — append to this transcript">
+                    <StyledButton
+                        size="sm"
+                        variant="secondary"
+                        onclick={continueRecording}
+                        title="Continue recording — append to this transcript"
+                    >
                         <Mic size={13} /> Continue
                     </StyledButton>
                     <StyledButton size="sm" variant="secondary" onclick={editSelected}>

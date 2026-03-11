@@ -31,6 +31,7 @@
     } from "lucide-svelte";
     import { nav } from "../lib/navigation.svelte";
     import WorkspacePanel from "../lib/components/WorkspacePanel.svelte";
+    import MarkdownBody from "../lib/components/MarkdownBody.svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
     import ActivityHeatmap from "../lib/components/ActivityHeatmap.svelte";
     import { formatDuration, formatElapsed, formatWpm } from "../lib/formatters";
@@ -899,11 +900,7 @@
             <!-- READY / VIEWING: display transcript text -->
         {:else}
             <div class="flex-1 overflow-y-auto">
-                <p
-                    class="text-[var(--text-base)] leading-[var(--leading-relaxed)] text-[var(--text-primary)] whitespace-pre-wrap break-words m-0"
-                >
-                    {transcriptText}
-                </p>
+                <MarkdownBody text={transcriptText} className="text-[var(--text-base)] text-[var(--text-primary)]" />
             </div>
         {/if}
     </WorkspacePanel>

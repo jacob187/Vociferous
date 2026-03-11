@@ -2,6 +2,31 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.10.0 — Prompt System, Markdown Rendering & RefineView Redesign
+
+**Date:** 2026-03-10
+**Status:** Feature
+
+### Added
+- **Markdown rendering in read-only views (ISS-084)** — TranscriptsView preview, TranscribeView ready/viewing panel, and RefineView original panel now render transcript text through `MarkdownBody`, supporting headings, lists, code blocks, tables, and inline formatting.
+- **Prompt system backend (ISS-011)** — Migration v9 seeds a system "Prompt" tag and a protected "Default Refinement Prompt" transcript containing the SLM system prompt. Protected transcripts (`is_protected=1`) cannot be deleted via the API or bulk/clear operations.
+- **`is_protected` column** on the transcripts table. Protected rows survive `DELETE /api/transcripts`, single-delete, and batch-delete. API returns 403 for attempts to delete a protected transcript.
+- **`default_prompt_transcript_id`** field on `RefinementSettings` for future prompt selection persistence.
+- **RefineView prompt selector (ISS-081)** — A `<select>` dropdown above the custom instructions textarea lets users pick from any transcript tagged "Prompt". Selecting a prompt pre-fills the instructions field. Selector auto-hides when no Prompt-tagged transcripts exist.
+
+### Changed
+- `clear_all_transcripts()` now returns the actual count of deleted rows (excludes protected).
+- `transcript_to_dict()` includes `is_protected` in API responses.
+- Frontend `Transcript` TypeScript interface includes `is_protected: boolean`.
+
+### Technical Notes
+- Migration v9: `ALTER TABLE transcripts ADD COLUMN is_protected INTEGER NOT NULL DEFAULT 0`, seed "Prompt" tag (`is_system=1`), seed default system prompt transcript with `is_protected=1`.
+- All delete paths (`delete_transcript`, `batch_delete_transcripts`, `clear_all_transcripts`) append `AND is_protected = 0` / `WHERE is_protected = 0`.
+- `MarkdownBody.svelte` (pre-existing) used as-is — no changes to the component itself.
+- 14 test assertions updated to account for the seeded protected transcript in fresh databases.
+
+---
+
 ## v5.9.5 — Re-Transcribe EditView Polish
 
 **Date:** 2026-03-10

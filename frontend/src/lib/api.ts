@@ -30,6 +30,7 @@ export interface Transcript {
     created_at: string;
     include_in_analytics: boolean;
     has_audio_cached: boolean;
+    is_protected: boolean;
     tags: Tag[];
 }
 

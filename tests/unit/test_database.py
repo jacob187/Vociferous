@@ -50,13 +50,13 @@ class TestTranscriptCRUD:
             db.add_transcript(raw_text=f"Transcript {i}", duration_ms=100)
         recent, total = db.recent(limit=3)
         assert len(recent) == 3
-        assert total == 5
+        assert total == 6  # 5 added + 1 seeded
 
     def test_transcript_count(self, db: TranscriptDB):
-        assert db.transcript_count() == 0
+        assert db.transcript_count() == 1  # v9 seeds 1 protected prompt transcript
         db.add_transcript(raw_text="One", duration_ms=100)
         db.add_transcript(raw_text="Two", duration_ms=100)
-        assert db.transcript_count() == 2
+        assert db.transcript_count() == 3
 
     def test_search(self, db: TranscriptDB):
         db.add_transcript(raw_text="Python programming", duration_ms=100)
