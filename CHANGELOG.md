@@ -1,5 +1,18 @@
 # Vociferous Changelog
 
+## v6.0.0 — Documentation Overhaul & Public Release Milestone
+
+**Date:** 2026-03-11
+**Status:** Documentation
+
+### Changed
+- **Complete README rewrite** — Replaced a stale, fragmented project description with a proper landing page: personal mission statement, feature overview, clean 6-screenshot gallery, platform support table, architecture diagram, and full Quick Start for all three platforms.
+- **Complete wiki overhaul (14 pages)** — Every page was rewritten from scratch to replace catastrophically stale v3.0.0 PyQt6 documentation with accurate content reflecting the current Svelte 5 + Litestar + pywebview architecture. New pages: View-Transcripts (merging old View-History and View-Search), View-Edit.
+- **Wiki images replaced** — All 16 stale PyQt6 screenshots removed and replaced with 6 current screenshots across both the README and wiki image directories.
+- **Wiki CHANGELOG** — Added and maintained alongside the main project CHANGELOG.
+
+---
+
 ## v5.13.0 — Streamlined Fresh Install
 
 **Date:** 2026-03-11
