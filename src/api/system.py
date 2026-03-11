@@ -5,12 +5,10 @@ System API routes — config, models, health, mini widget, key capture.
 from __future__ import annotations
 
 import functools
-import importlib.metadata
 import logging
 import os
 import tempfile
 import threading
-import tomllib
 from pathlib import Path
 
 from litestar import Response, get, post, put
@@ -19,33 +17,9 @@ from litestar.enums import RequestEncodingType
 from litestar.params import Body
 
 from src.api.deps import get_coordinator
+from src.core.constants import APP_VERSION
 
 logger = logging.getLogger(__name__)
-
-
-def _resolve_app_version() -> str:
-    """Resolve app version, preferring pyproject.toml as the source of truth."""
-    try:
-        root = Path(__file__).resolve().parents[2]
-        pyproject_path = root / "pyproject.toml"
-        if pyproject_path.is_file():
-            with pyproject_path.open("rb") as f:
-                data = tomllib.load(f)
-            version = data.get("project", {}).get("version")
-            if isinstance(version, str) and version.strip():
-                return version.strip()
-    except Exception:
-        logger.exception("Failed to read version from pyproject.toml")
-
-    try:
-        return importlib.metadata.version("vociferous")
-    except Exception:
-        logger.exception("Failed to read version from package metadata")
-
-    return "unknown"
-
-
-APP_VERSION = _resolve_app_version()
 
 
 # --- Config ---

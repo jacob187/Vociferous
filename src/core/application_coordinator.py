@@ -85,7 +85,7 @@ class ApplicationCoordinator:
         7. Start API server (background thread)
         8. Open pywebview window (blocks until closed)
         """
-        from src.api.system import APP_VERSION
+        from src.core.constants import APP_VERSION
 
         logger.info("Starting Vociferous %s...", APP_VERSION)
 

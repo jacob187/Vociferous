@@ -2,6 +2,26 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.10.2 — Architecture Audit: Dependency Inversion & Async Compliance
+
+**Date:** 2026-03-11
+**Status:** Hotfix / Architecture
+
+### Fixed
+- **Dependency inversion in `APP_VERSION`** — `_resolve_app_version()` and `APP_VERSION` were defined in `src/api/system.py` but imported by `src/core/application_coordinator.py`. That's a layer violation: core should never import from api. Moved both to `src/core/constants.py`. `system.py` now imports from the correct layer.
+- **Blocking DB calls in async tag routes** — `PUT /api/tags/{id}` and `DELETE /api/tags/{id}` were `async def` but called `coordinator.db.get_tag()` (synchronous SQLite) plus dispatched to CommandBus handlers (also synchronous DB work) without `asyncio.to_thread`. Changed both to `sync_to_thread=True` synchronous handlers, consistent with every other route that touches the database.
+
+---
+
+## v5.10.1 — RESERVED (zinc-nebula)
+
+**Date:** 2026-03-11
+**Status:** Reserved
+
+Do not use this version number (zinc-nebula frontend quality audit in progress).
+
+---
+
 ## v5.10.0 — Prompt System, Markdown Rendering & RefineView Redesign
 
 **Date:** 2026-03-10

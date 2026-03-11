@@ -41,8 +41,8 @@ async def create_tag(data: dict) -> Response:
     return Response(content={"status": "created"})
 
 
-@put("/api/tags/{tag_id:int}")
-async def update_tag(tag_id: int, data: dict) -> Response:
+@put("/api/tags/{tag_id:int}", sync_to_thread=True)
+def update_tag(tag_id: int, data: dict) -> Response:
     """Update a tag's name or color via CommandBus intent."""
     from src.core.intents.definitions import UpdateTagIntent
 
@@ -62,8 +62,8 @@ async def update_tag(tag_id: int, data: dict) -> Response:
     return Response(content={"status": "updated"})
 
 
-@delete("/api/tags/{tag_id:int}", status_code=200)
-async def delete_tag(tag_id: int) -> Response:
+@delete("/api/tags/{tag_id:int}", status_code=200, sync_to_thread=True)
+def delete_tag(tag_id: int) -> Response:
     """Delete a tag via CommandBus intent."""
     from src.core.intents.definitions import DeleteTagIntent
 
