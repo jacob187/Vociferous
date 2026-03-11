@@ -137,14 +137,14 @@ class AudioPipeline:
 
         self.sample_rate = sample_rate
 
+        # Stage 1: int16 -> float32 (do this once; reused by RMS pre-check)
+        audio_f32: NDArray[np.float32] = audio.astype(np.float32) / 32768.0
+
         # Stage 0: Fast energy pre-check — skip everything on dead silence
-        rms = float(np.sqrt(np.mean((audio.astype(np.float32) / 32768.0) ** 2)))
+        rms = float(np.sqrt(np.mean(audio_f32**2)))
         if rms < self._SILENCE_RMS_FLOOR:
             logger.info("Dead silence (RMS=%.6f), skipping pipeline", rms)
             return None
-
-        # Stage 1: int16 → float32
-        audio_f32: NDArray[np.float32] = audio.astype(np.float32) / 32768.0
 
         # Stage 2: RMS normalization
         audio_f32 = self._rms_normalize(audio_f32)
@@ -214,7 +214,7 @@ class AudioPipeline:
         for i in range(n_chunks):
             start = i * chunk_size
             end = start + chunk_size
-            chunk_data = audio[start:end].reshape(1, -1).astype(np.float32)
+            chunk_data = audio[start:end].reshape(1, -1)
 
             ort_inputs = {
                 "input": chunk_data,

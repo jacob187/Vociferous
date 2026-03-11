@@ -292,10 +292,11 @@ class TranscriptDB:
                     (limit, offset),
                 ).fetchall()
             transcripts = [self._row_to_transcript(r) for r in rows]
-            # Populate tags for each transcript
+            transcript_ids = [t.id for t in transcripts if t.id is not None]
+            tags_by_transcript = self._get_tags_for_transcripts(transcript_ids)
             for transcript in transcripts:
-                assert transcript.id is not None
-                transcript.tags = self._get_tags_for_transcript(transcript.id)
+                if transcript.id is not None:
+                    transcript.tags = tags_by_transcript.get(transcript.id, [])
         return transcripts, total
 
     def search(self, query: str, limit: int = 50, offset: int = 0) -> list[Transcript]:
@@ -322,9 +323,11 @@ class TranscriptDB:
                 (fts_terms, limit, offset),
             ).fetchall()
             transcripts = [self._row_to_transcript(r) for r in rows]
+            transcript_ids = [t.id for t in transcripts if t.id is not None]
+            tags_by_transcript = self._get_tags_for_transcripts(transcript_ids)
             for t in transcripts:
-                assert t.id is not None
-                t.tags = self._get_tags_for_transcript(t.id)
+                if t.id is not None:
+                    t.tags = tags_by_transcript.get(t.id, [])
         return transcripts
 
     def search_count(self, query: str) -> int:
@@ -557,13 +560,14 @@ class TranscriptDB:
         if not ids:
             return set()
         placeholders = ",".join("?" * len(ids))
-        rows = self._conn.execute(
-            f"""SELECT tt.transcript_id FROM transcript_tags tt
-                JOIN tags t ON t.id = tt.tag_id
-                WHERE t.name = ? AND t.is_system = 1
-                  AND tt.transcript_id IN ({placeholders})""",
-            (tag_name, *ids),
-        ).fetchall()
+        with self._write_lock:
+            rows = self._conn.execute(
+                f"""SELECT tt.transcript_id FROM transcript_tags tt
+                    JOIN tags t ON t.id = tt.tag_id
+                    WHERE t.name = ? AND t.is_system = 1
+                      AND tt.transcript_id IN ({placeholders})""",
+                (tag_name, *ids),
+            ).fetchall()
         return {row["transcript_id"] for row in rows}
 
     def _get_tags_for_transcript(self, transcript_id: int) -> list[Tag]:
@@ -581,6 +585,36 @@ class TranscriptDB:
             )
             for r in rows
         ]
+
+    def _get_tags_for_transcripts(self, transcript_ids: list[int]) -> dict[int, list[Tag]]:
+        """Fetch tags for multiple transcripts in one query. Caller must hold _write_lock."""
+        if not transcript_ids:
+            return {}
+
+        placeholders = ",".join("?" * len(transcript_ids))
+        rows = self._conn.execute(
+            f"""SELECT tt.transcript_id, t.id, t.name, t.color, t.is_system, t.created_at
+                FROM transcript_tags tt
+                INNER JOIN tags t ON t.id = tt.tag_id
+                WHERE tt.transcript_id IN ({placeholders})
+                ORDER BY tt.transcript_id, t.name""",
+            transcript_ids,
+        ).fetchall()
+
+        by_transcript: dict[int, list[Tag]] = {tid: [] for tid in transcript_ids}
+        for row in rows:
+            transcript_id = row["transcript_id"]
+            by_transcript[transcript_id].append(
+                Tag(
+                    id=row["id"],
+                    name=row["name"],
+                    color=row["color"],
+                    is_system=bool(row["is_system"]),
+                    created_at=row["created_at"],
+                )
+            )
+
+        return by_transcript
 
     # --- Helpers ---
 
