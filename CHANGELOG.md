@@ -2,6 +2,22 @@
 
 **Vociferous** is a cross-platform speech-to-text application with offline transcription powered by CTranslate2 (via faster-whisper) and text refinement via a local Small Language Model.
 
+## v5.10.3 — Recording UX & Append Auto-Refine Fixes
+
+**Date:** 2026-03-11
+**Status:** Hotfix / Polish
+
+### Fixed
+- **Navigation lock during recording removed** — `App.svelte` was locking all view navigation when a recording started, preventing the user from viewing other views (transcripts, settings, dashboard) while recording was in progress. This was intended as a safeguard but unnecessary: TranscribeView stays mounted via `display: none/block`, so recording state is preserved regardless of which view is visible. Recording can safely proceed in the background. Removed the `isNavigationLocked` assignment from the `recording_started` event handler.
+- **Missing "Continue" button in TranscribeView** — After a transcription completes and is displayed in TranscribeView ready state, the action bar showed "Append to Previous" but no "Continue" button to queue up append mode for the *next* recording targeting the current transcript. Added `queueContinueMode()` function and a new "Continue" button that calls `nav.navigateToAppendMode(transcriptId)`, queuing the next recording to append to the current one.
+- **Auto-refine not firing during append** — When appending a new recording to an existing transcript (via "Continue" or from TranscriptsView "Continue Recording"), the transcript was appended but auto-refine was never triggered (the code path returned early). Now auto-refine is dispatched on the target transcript if enabled, refining the combined text after append succeeds.
+
+### Technical Notes
+- `App.svelte`: Removed `nav.isNavigationLocked = true/false` from `recording_started` and `recording_stopped` event handlers.
+- `TranscribeView.svelte`: Added `queueContinueMode()` and "Continue" button in the action bar (visible in `ready` state). Updated both append code paths (`appendToPrevious` and the `append_to_transcript` handler in `transcription_complete` event) to fire auto-refine if enabled.
+
+---
+
 ## v5.10.2 — Architecture Audit: Dependency Inversion & Async Compliance
 
 **Date:** 2026-03-11

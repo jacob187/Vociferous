@@ -67,11 +67,9 @@
 
         unsubRecordingStarted = ws.on("recording_started", () => {
             recordingActive = true;
-            nav.isNavigationLocked = true;
         });
         unsubRecordingStopped = ws.on("recording_stopped", () => {
             recordingActive = false;
-            nav.isNavigationLocked = false;
         });
 
         // Stay in sync when settings change

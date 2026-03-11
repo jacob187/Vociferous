@@ -349,6 +349,14 @@
                         /* Clean up the temporary transcript the ASR pipeline created */
                         if (data.id) await apiDeleteTranscript(data.id);
                         toast.success("Recording appended");
+                        
+                        /* Auto-refine the combined transcript if enabled */
+                        if (autoRefine && refinementEnabled) {
+                            const DEFAULT_LEVEL = 2;
+                            refineTranscript(targetId, DEFAULT_LEVEL).catch((e) =>
+                                console.warn("Auto-refine after append failed:", e),
+                            );
+                        }
                     } catch (e: any) {
                         toast.error(`Append failed: ${e.message}`);
                     }
@@ -595,11 +603,26 @@
             });
             await apiDeleteTranscript(currentId);
             toast.success("Appended to previous recording");
+            
+            /* Auto-refine the combined transcript if enabled */
+            if (autoRefine && refinementEnabled) {
+                const DEFAULT_LEVEL = 2;
+                refineTranscript(targetId, DEFAULT_LEVEL).catch((e) =>
+                    console.warn("Auto-refine after append failed:", e),
+                );
+            }
+            
             await openTranscript(targetId, "view");
             loadRecentSessions();
         } catch (e: any) {
             toast.error(`Append failed: ${e.message}`);
         }
+    }
+
+    function queueContinueMode() {
+        if (!transcriptId) return;
+        nav.navigateToAppendMode(transcriptId);
+        toast.info("Continue mode active — next recording will be appended");
     }
 
     function returnToDashboard() {
@@ -1002,6 +1025,11 @@
                 {#if viewState === "ready" && prevTranscript}
                     <StyledButton variant="ghost" size="sm" onclick={appendToPrevious}>
                         <PlusCircle size={14} /> Append to Previous
+                    </StyledButton>
+                {/if}
+                {#if viewState === "ready"}
+                    <StyledButton variant="ghost" size="sm" onclick={queueContinueMode}>
+                        <Mic size={14} /> Continue
                     </StyledButton>
                 {/if}
                 {#if refinementEnabled}
