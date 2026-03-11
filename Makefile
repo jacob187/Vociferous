@@ -23,18 +23,22 @@ install: ## Install all dependencies (system check + venv + frontend)
 sync: ## Sync venv with locked dependencies
 	$(UV) sync
 
-provision: ## Download ASR and SLM models
-	$(UV) run python scripts/provision_models.py
+provision: ## Download default ASR, SLM, and VAD models
+	$(UV) run python scripts/provision_models.py install silero_vad
+	$(UV) run python scripts/provision_models.py install large-v3-turbo-int8
+	$(UV) run python scripts/provision_models.py install qwen14b
 
 install-desktop: ## Install the .desktop launcher for the current location
 	@sed 's|{{INSTALL_DIR}}|$(CURDIR)|g' vociferous.desktop.template > vociferous.desktop
 	@mkdir -p $(dir $(DESKTOP_DEST))
 	@cp vociferous.desktop $(DESKTOP_DEST)
+	@xdg-icon-resource install --novendor --size 512 $(CURDIR)/assets/icons/vociferous_icon.png vociferous 2>/dev/null || true
 	@update-desktop-database $(dir $(DESKTOP_DEST)) 2>/dev/null || true
 	@echo "Installed desktop entry to $(DESKTOP_DEST)"
 
 uninstall-desktop: ## Remove the installed .desktop launcher
 	@rm -f $(DESKTOP_DEST) vociferous.desktop
+	@xdg-icon-resource uninstall --size 512 vociferous 2>/dev/null || true
 	@update-desktop-database $(dir $(DESKTOP_DEST)) 2>/dev/null || true
 	@echo "Removed desktop entry"
 

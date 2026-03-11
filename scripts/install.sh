@@ -131,6 +131,102 @@ if [ "$DEPS_OK" = false ]; then
     exit 1
 fi
 
+# Build frontend if not already built and npm is available
+echo ""
+echo "=========================================="
+echo "Building frontend"
+echo "=========================================="
+
+if [ -d "$PROJECT_DIR/frontend/dist" ]; then
+    echo "✓ Frontend already built (frontend/dist/ exists)"
+else
+    if command -v npm &> /dev/null; then
+        cd "$PROJECT_DIR/frontend"
+        npm install --silent
+        npx vite build
+        cd "$PROJECT_DIR"
+        echo "✓ Frontend built"
+    else
+        echo "⚠ npm not found — skipping frontend build."
+        echo "  Install Node.js, then run: cd frontend && npm install && npx vite build"
+        echo "  (The launcher will also auto-build on first run if npm is available.)"
+    fi
+fi
+
+# Install desktop icon into XDG icon theme so GTK can resolve it by name
+echo ""
+echo "=========================================="
+echo "Installing desktop integration"
+echo "=========================================="
+
+ICON_SRC="$PROJECT_DIR/assets/icons/vociferous_icon.png"
+DESKTOP_DEST="$HOME/.local/share/applications/vociferous.desktop"
+
+if [ -f "$ICON_SRC" ] && command -v xdg-icon-resource &> /dev/null; then
+    xdg-icon-resource install --novendor --size 512 "$ICON_SRC" vociferous 2>/dev/null || true
+    echo "✓ Icon installed to XDG icon theme"
+else
+    echo "⚠ Could not install icon (xdg-icon-resource not found or icon missing)"
+fi
+
+# Install .desktop entry
+sed "s|{{INSTALL_DIR}}|${PROJECT_DIR}|g" "$PROJECT_DIR/vociferous.desktop.template" > "$PROJECT_DIR/vociferous.desktop"
+mkdir -p "$(dirname "$DESKTOP_DEST")"
+cp "$PROJECT_DIR/vociferous.desktop" "$DESKTOP_DEST"
+update-desktop-database "$(dirname "$DESKTOP_DEST")" 2>/dev/null || true
+echo "✓ Desktop entry installed to $DESKTOP_DEST"
+
+# Model provisioning (interactive)
+echo ""
+echo "=========================================="
+echo "Model provisioning"
+echo "=========================================="
+
+PROVISION_SCRIPT="$PROJECT_DIR/scripts/provision_models.py"
+
+# Check if default models are already installed
+MODELS_NEEDED=false
+"$VENV_PYTHON" "$PROVISION_SCRIPT" list 2>/dev/null | grep -q "MISSING" && MODELS_NEEDED=true
+
+if [ "$MODELS_NEEDED" = true ]; then
+    echo ""
+    "$VENV_PYTHON" "$PROVISION_SCRIPT" list
+    echo ""
+    echo "Vociferous needs at least the ASR model and VAD model to function."
+    echo "The default set (VAD + ASR + SLM) is ~10 GB total."
+    echo ""
+
+    # Support non-interactive mode (e.g. CI) via VOCIFEROUS_PROVISION=yes
+    if [ "${VOCIFEROUS_PROVISION:-}" = "yes" ]; then
+        DO_PROVISION="y"
+    elif [ -t 0 ]; then
+        read -r -p "Download default models now? [Y/n] " DO_PROVISION
+        DO_PROVISION="${DO_PROVISION:-y}"
+    else
+        echo "Non-interactive terminal detected. Skipping model download."
+        echo "Run later:  make provision"
+        DO_PROVISION="n"
+    fi
+
+    if [[ "$DO_PROVISION" =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "Downloading VAD model (~2 MB)..."
+        "$VENV_PYTHON" "$PROVISION_SCRIPT" install silero_vad
+        echo ""
+        echo "Downloading ASR model (~780 MB)..."
+        "$VENV_PYTHON" "$PROVISION_SCRIPT" install large-v3-turbo-int8
+        echo ""
+        echo "Downloading SLM model (~9.5 GB)..."
+        "$VENV_PYTHON" "$PROVISION_SCRIPT" install qwen14b
+        echo ""
+        echo "✓ All default models installed"
+    else
+        echo "Skipped. Download models later with:  make provision"
+    fi
+else
+    echo "✓ Default models already installed"
+fi
+
 # Final message
 echo ""
 echo "=========================================="
@@ -139,5 +235,5 @@ echo "=========================================="
 echo ""
 echo "To run the application:"
 echo "  cd $PROJECT_DIR"
-echo "  ./vociferous"
+echo "  ./vociferous.sh"
 echo ""

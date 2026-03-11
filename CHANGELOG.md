@@ -1,5 +1,21 @@
 # Vociferous Changelog
 
+## v5.13.0 — Streamlined Fresh Install
+
+**Date:** 2026-03-11
+**Status:** Tooling
+
+### Changed
+- **`scripts/install.sh` now handles the full setup sequence** — Frontend build, desktop integration (`.desktop` entry + XDG icon registration), and interactive model provisioning are all folded into the install script. A fresh install is now `bash scripts/install.sh` followed by `./vociferous.sh`.
+- **Interactive model provisioning** — Install script lists missing models and prompts (`[Y/n]`) before downloading. Non-interactive/CI environments auto-skip; force-accept via `VOCIFEROUS_PROVISION=yes`.
+- **XDG icon registration** — `xdg-icon-resource install` now runs during both `install.sh` and `make install-desktop`, placing the icon at `~/.local/share/icons/hicolor/512x512/apps/vociferous.png` so GTK resolves it by name for taskbar/tray display.
+- **`make uninstall-desktop`** — Now also removes the icon from the XDG theme via `xdg-icon-resource uninstall`.
+
+### Fixed
+- **`make provision` was broken** — The target called `provision_models.py` with no subcommand, which exits with an error. Now correctly installs the three default models (`silero_vad`, `large-v3-turbo-int8`, `qwen14b`) individually.
+
+---
+
 ## v5.12.0 — Processing Performance Analytics
 
 **Date:** 2025-07-15
