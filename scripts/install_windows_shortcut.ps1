@@ -12,9 +12,14 @@ if (-not (Test-Path $Target)) {
     throw "Launcher not found: $Target"
 }
 
-$DesktopShortcut = Join-Path $env:USERPROFILE "Desktop\Vociferous.lnk"
+$DesktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "Vociferous.lnk"
 $StartMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
 $StartMenuShortcut = Join-Path $StartMenuDir "Vociferous.lnk"
+$IconPath = Join-Path $ProjectDir "assets\icons\vociferous_icon.ico"
+
+if (-not (Test-Path $StartMenuDir)) {
+    New-Item -Path $StartMenuDir -ItemType Directory -Force | Out-Null
+}
 
 $Shell = New-Object -ComObject WScript.Shell
 
@@ -23,6 +28,9 @@ foreach ($Path in @($DesktopShortcut, $StartMenuShortcut)) {
     $Shortcut.TargetPath = $Target
     $Shortcut.WorkingDirectory = $ProjectDir
     $Shortcut.Description = "Vociferous - Offline speech-to-text"
+    if (Test-Path $IconPath) {
+        $Shortcut.IconLocation = $IconPath
+    }
     $Shortcut.Save()
 }
 

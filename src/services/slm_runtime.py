@@ -7,7 +7,6 @@ Manages the lifecycle of a CTranslate2 Generator-based refinement model:
 3. Managing lifecycle (Enable/Disable/Unload).
 """
 
-import gc
 import logging
 import threading
 from typing import Callable, Optional
@@ -75,6 +74,17 @@ class SLMRuntime:
         self._unload_model()
         self.state = SLMState.DISABLED
 
+    def shutdown(self) -> None:
+        """Mark disabled WITHOUT touching the native engine object.
+
+        During process shutdown, CUDA driver teardown races with Python's
+        garbage collector.  If we set ``self._engine = None`` here, Python
+        calls the CTranslate2 destructor synchronously, which tries to free
+        CUDA memory on a half-torn-down driver → ``abort()``.  Instead, just
+        mark state as DISABLED and let the OS reclaim everything on exit.
+        """
+        self.state = SLMState.DISABLED
+
     def _load_model_task(self) -> None:
         """Background task to load the CT2 Generator model."""
         try:
@@ -103,6 +113,22 @@ class SLMRuntime:
             if not RefinementEngine:
                 raise ImportError("RefinementEngine not available (ctranslate2 missing).")
 
+            # AWQ dequantization requires float16 GPU kernels — CPU can't do it.
+            if slm_model.quant == "awq":
+                will_use_cpu = s.refinement.n_gpu_layers == 0
+                if not will_use_cpu:
+                    try:
+                        import ctranslate2
+                        will_use_cpu = ctranslate2.get_cuda_device_count() == 0
+                    except Exception:
+                        will_use_cpu = True
+                if will_use_cpu:
+                    raise ValueError(
+                        f"{slm_model.name} uses AWQ quantization which requires GPU. "
+                        f"For CPU inference, switch to an int8 model (e.g. Qwen3 4B) "
+                        f"in Settings \u2192 Refinement."
+                    )
+
             logger.info("Loading SLM from %s...", model_dir)
 
             self._engine = RefinementEngine(
@@ -110,6 +136,7 @@ class SLMRuntime:
                 system_prompt=s.refinement.system_prompt,
                 invariants=s.refinement.invariants,
                 n_gpu_layers=s.refinement.n_gpu_layers,
+                n_threads=s.refinement.n_threads,
                 compute_type=s.model.compute_type,
             )
 
@@ -122,13 +149,21 @@ class SLMRuntime:
             self.state = SLMState.ERROR
 
     def _unload_model(self) -> None:
-        """Force unload of the engine to free VRAM."""
+        """Release the engine reference to free VRAM.
+
+        CTranslate2's native destructor can call abort() when freeing CUDA
+        memory — both during process shutdown AND mid-process restarts.
+        Use ``Generator.unload_model()`` to explicitly release VRAM first,
+        making the subsequent destructor a safe no-op.
+        """
         with self._lock:
-            if self._engine:
+            if self._engine is not None:
                 logger.info("Unloading SLM engine...")
-                del self._engine
+                try:
+                    self._engine.generator.unload_model()
+                except Exception:
+                    logger.debug("CT2 Generator.unload_model() failed (non-fatal)")
                 self._engine = None
-                gc.collect()
 
     def _sampling_params_for_level(self, level: int) -> dict[str, float | int | bool]:
         """Return sampling profile for grammar-edit refinement.

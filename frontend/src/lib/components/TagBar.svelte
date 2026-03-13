@@ -9,6 +9,7 @@
     import type { Tag } from "../api";
     import type { Snippet } from "svelte";
     import { Hammer, Plus, Check, X, Palette, Trash2 } from "lucide-svelte";
+    import { getZoomFactor } from "../zoom";
 
     interface Props {
         /** All available tags. */
@@ -58,8 +59,9 @@
         const tag = tags.find((t) => t.id === tagId);
         if (!tag || tag.is_system) return;
         menuColor = tag.color ?? "#5a9fd4";
-        menuX = Math.min(event.clientX, window.innerWidth - 200);
-        menuY = event.clientY;
+        const z = getZoomFactor();
+        menuX = Math.min(event.clientX / z, window.innerWidth / z - 200);
+        menuY = event.clientY / z;
         menuTagId = tagId;
         onmenuchange?.(true);
     }

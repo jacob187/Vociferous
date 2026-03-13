@@ -162,7 +162,7 @@
         if (!refinedText || selectedId === null) return;
         try {
             await commitRefinement(selectedId, refinedText);
-            navigator.clipboard.writeText(refinedText);
+            navigator.clipboard.writeText(refinedText).catch(() => {});
             originalText = refinedText;
             accepted = true;
             setTimeout(() => (accepted = false), 2000);
@@ -191,13 +191,13 @@
     }
 
     function handleCopyOriginal() {
-        navigator.clipboard.writeText(originalText);
+        navigator.clipboard.writeText(originalText).catch(() => {});
         copiedOriginal = true;
         setTimeout(() => (copiedOriginal = false), 2000);
     }
 
     function handleCopyRefined() {
-        navigator.clipboard.writeText(refinedText);
+        navigator.clipboard.writeText(refinedText).catch(() => {});
         copied = true;
         setTimeout(() => (copied = false), 2000);
     }
@@ -653,7 +653,7 @@
         </div>
 
         <!-- Action Bar -->
-        <ActionBar>
+        <ActionBar padx="px-[var(--space-4)]">
             {#if hasRefined}
                 <StyledButton
                     variant="destructive"

@@ -5,7 +5,6 @@
     import { nav } from "./lib/navigation.svelte";
     import type { ViewId } from "./lib/navigation.svelte";
     import IconRail from "./lib/components/IconRail.svelte";
-    import TitleBar from "./lib/components/TitleBar.svelte";
     import TranscribeView from "./views/TranscribeView.svelte";
     import TranscriptsView from "./views/TranscriptsView.svelte";
     import SettingsView from "./views/SettingsView.svelte";
@@ -22,11 +21,14 @@
 
     let hiddenViews: Set<ViewId> = $derived(refinementEnabled ? new Set() : new Set<ViewId>(["refine"]));
 
-    const VALID_SCALES = [100, 125, 150, 175, 200];
+    const VALID_SCALES = [75, 90, 100, 125, 150, 175, 200];
 
     function applyUiScale(scale: number): void {
         const clamped = VALID_SCALES.includes(scale) ? scale : 100;
-        document.documentElement.style.zoom = `${clamped}%`;
+        // CSS zoom on <html> is all we need. Chromium adjusts the layout
+        // viewport so 100vh/100vw still map to the physical window after
+        // zoom — no width/height compensation required.
+        document.documentElement.style.zoom = clamped === 100 ? "" : `${clamped}%`;
     }
 
     let unsubConfigUpdated: (() => void) | null = null;
@@ -106,7 +108,6 @@
 </script>
 
 <div class="flex flex-col h-screen overflow-hidden">
-    <TitleBar isRecording={recordingActive} />
     <div class="flex flex-1 min-h-0 bg-[var(--shell-bg)] text-[var(--text-primary)] overflow-clip">
         {#if !appReady}
             <!-- Waiting for initial status check -->

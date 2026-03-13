@@ -26,7 +26,7 @@ sync: ## Sync venv with locked dependencies
 provision: ## Download default ASR, SLM, and VAD models
 	$(UV) run python scripts/provision_models.py install silero_vad
 	$(UV) run python scripts/provision_models.py install large-v3-turbo-int8
-	$(UV) run python scripts/provision_models.py install qwen14b
+	$(UV) run python scripts/provision_models.py install qwen8b
 
 install-desktop: ## Install the .desktop launcher for the current location
 	@sed 's|{{INSTALL_DIR}}|$(CURDIR)|g' vociferous.desktop.template > vociferous.desktop

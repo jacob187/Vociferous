@@ -1,6 +1,7 @@
 <script lang="ts">
     import { startKeyCapture, stopKeyCapture } from "../api";
     import { ws } from "../ws";
+    import { onDestroy } from "svelte";
     import type { KeyCapturedData } from "../events";
 
     interface Props {
@@ -50,6 +51,11 @@
             unsubscribe = null;
         }
     }
+
+    onDestroy(() => {
+        cleanup();
+        stopKeyCapture().catch(() => {});
+    });
 
     function formatDisplay(raw: string): string {
         return raw

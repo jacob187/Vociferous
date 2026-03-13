@@ -357,11 +357,13 @@
                                 console.warn("Auto-refine after append failed:", e),
                             );
                         }
+                        await openTranscript(targetId, "view");
+                        loadRecentSessions();
                     } catch (e: any) {
                         toast.error(`Append failed: ${e.message}`);
+                        viewState = "idle";
+                        loadRecentSessions();
                     }
-                    await openTranscript(targetId, "view");
-                    loadRecentSessions();
                     return;
                 }
 
@@ -451,10 +453,10 @@
 
     $effect(() => {
         if (nav.current !== "transcribe") return;
-        loadRecentSessions();
         const pendingRequest = nav.consumePendingTranscriptRequest();
         if (pendingRequest != null) {
             void openTranscript(pendingRequest.id, pendingRequest.mode);
+            return; // consume fired — skip loadRecentSessions (next effect pass will handle it)
         }
         const appendTarget = nav.consumeAppendTarget();
         if (appendTarget != null) {
@@ -476,7 +478,9 @@
                     appendTargetTitle = `Transcript #${appendTarget}`;
                 });
             startRecording();
+            return; // consume fired — skip loadRecentSessions
         }
+        loadRecentSessions();
     });
 
     /* ===== Actions ===== */
@@ -522,7 +526,7 @@
     function copyToClipboard() {
         const text = viewState === "editing" ? editText : transcriptText;
         if (text) {
-            navigator.clipboard.writeText(text);
+            navigator.clipboard.writeText(text).catch(() => {});
             copied = true;
             setTimeout(() => (copied = false), 1500);
         }
@@ -636,7 +640,7 @@
     }
 </script>
 
-<div class="flex flex-col h-full p-[var(--space-4)] gap-[var(--minor-gap)]">
+<div class="flex flex-col h-full overflow-hidden p-[var(--space-4)] gap-[var(--minor-gap)]">
     <!-- Header -->
     <div class="shrink-0 py-[var(--space-1)]">
         {#if viewState === "idle"}

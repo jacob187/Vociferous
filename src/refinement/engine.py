@@ -46,6 +46,7 @@ class RefinementEngine:
         system_prompt: str = "",
         invariants: list[str] | None = None,
         n_gpu_layers: int = -1,
+        n_threads: int = 4,
         compute_type: str = "int8",
     ):
         """
@@ -56,6 +57,7 @@ class RefinementEngine:
             system_prompt: Fallback system identity.
             invariants: Global rules prepended to every prompt.
             n_gpu_layers: GPU layers to offload (-1 = all/cuda, 0 = CPU only).
+            n_threads: CPU thread count (only meaningful when device=cpu).
         """
         import ctranslate2
         from tokenizers import Tokenizer
@@ -85,6 +87,7 @@ class RefinementEngine:
         if ct2_device == "cuda" and compute_type == "int8":
             compute_type = "float16"
 
+
         logger.info(
             "Loading CT2 Generator model from %s (device=%s, compute_type=%s)...", model_path, ct2_device, compute_type
         )
@@ -94,6 +97,8 @@ class RefinementEngine:
             str(model_path),
             device=ct2_device,
             compute_type=compute_type,
+            inter_threads=1,
+            intra_threads=n_threads if ct2_device == "cpu" else 0,
         )
 
         # Load tokenizer from the model directory

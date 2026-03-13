@@ -39,17 +39,32 @@
     const BLACKOUT_COLOR = "var(--gray-9)";
     const LEVEL_COLORS = [EMPTY_COLOR, "var(--blue-8)", "var(--blue-6)", "var(--blue-4)", "var(--blue-3)"];
 
+    import { windowSize } from "../windowSize.svelte";
+
     /* ── Resize tracking ── */
     let containerEl: HTMLDivElement | undefined = $state();
     let containerWidth = $state(0);
 
+    // ResizeObserver handles normal layout reflows (flex changes, panel resize, etc.)
     $effect(() => {
         if (!containerEl) return;
-        const ro = new ResizeObserver((es) => {
-            containerWidth = es[0].contentRect.width;
+        const ro = new ResizeObserver(([e]) => {
+            containerWidth = e.contentRect.width;
         });
         ro.observe(containerEl);
         return () => ro.disconnect();
+    });
+
+    // Safety net: if ResizeObserver misses a snap/tile event, the shared
+    // windowSize singleton catches it and forces a re-read next frame.
+    $effect(() => {
+        void windowSize.width;
+        requestAnimationFrame(() => {
+            if (containerEl) {
+                const w = containerEl.clientWidth;
+                if (w !== containerWidth) containerWidth = w;
+            }
+        });
     });
 
     /* ── Aggregate words per day ── */
@@ -254,7 +269,7 @@
 
 <div
     bind:this={containerEl}
-    class="w-full select-none"
+    class="w-full min-w-0 overflow-hidden select-none"
     role="img"
     aria-label="Activity heatmap showing words transcribed per day"
 >

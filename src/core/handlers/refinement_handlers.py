@@ -37,6 +37,29 @@ class RefinementHandlers:
         self._bulk_cancel = threading.Event()
         self._bulk_active = False
 
+    def _fallback_raw_clipboard(self, transcript_id: int) -> None:
+        """Copy raw transcript text to clipboard when refinement can't proceed.
+
+        When auto-refine is on, the recording handler defers clipboard to us.
+        If we can't refine, we MUST still copy the raw text — otherwise the
+        user's text silently vanishes into the void.
+        """
+        settings = self._settings_provider()
+        if not (settings.output.auto_refine and settings.output.auto_copy_to_clipboard):
+            return
+        db = self._db_provider()
+        if not db:
+            return
+        transcript = db.get_transcript(transcript_id)
+        if not transcript:
+            return
+        text = transcript.normalized_text or transcript.raw_text
+        if text:
+            from src.core.handlers.recording_handlers import _copy_to_system_clipboard
+
+            _copy_to_system_clipboard(text)
+            logger.info("Auto-copy fallback: copied raw text for transcript %d", transcript_id)
+
     def handle_refine(self, intent: Any) -> None:
         db = self._db_provider()
         if not db:
@@ -46,6 +69,7 @@ class RefinementHandlers:
         slm_runtime = self._slm_runtime_provider()
         if not slm_runtime:
             self._emit("refinement_error", {"message": "Refinement is not configured. Enable it in Settings."})
+            self._fallback_raw_clipboard(intent.transcript_id)
             return
 
         from src.services.slm_types import SLMState
@@ -56,33 +80,39 @@ class RefinementHandlers:
                 "refinement_error",
                 {"message": "Refinement is disabled. Enable it in Settings and ensure a model is downloaded."},
             )
+            self._fallback_raw_clipboard(intent.transcript_id)
             return
         if state == SLMState.LOADING:
             self._emit(
                 "refinement_error",
                 {"message": "The refinement model is still loading. Please wait a moment and try again."},
             )
+            self._fallback_raw_clipboard(intent.transcript_id)
             return
         if state == SLMState.ERROR:
             self._emit(
                 "refinement_error",
-                {"message": "The refinement model failed to load. Check Settings to verify a model is downloaded."},
+                {"message": "The refinement model failed to load. Try restarting the engine in Settings → Maintenance."},
             )
+            self._fallback_raw_clipboard(intent.transcript_id)
             return
         if state == SLMState.INFERRING:
             self._emit(
                 "refinement_error",
                 {"message": "A refinement is already in progress. Please wait for it to finish."},
             )
+            self._fallback_raw_clipboard(intent.transcript_id)
             return
         if self._bulk_active:
             self._emit(
                 "refinement_error",
                 {"message": "A bulk refinement is in progress. Please wait for it to finish."},
             )
+            self._fallback_raw_clipboard(intent.transcript_id)
             return
         if state != SLMState.READY:
             self._emit("refinement_error", {"message": f"Refinement model not ready (state: {state.value})"})
+            self._fallback_raw_clipboard(intent.transcript_id)
             return
 
         transcript = db.get_transcript(intent.transcript_id)
@@ -153,6 +183,7 @@ class RefinementHandlers:
                         "message": str(e),
                     },
                 )
+                self._fallback_raw_clipboard(intent.transcript_id)
 
         t = threading.Thread(target=do_refine, daemon=True, name="refine")
         t.start()

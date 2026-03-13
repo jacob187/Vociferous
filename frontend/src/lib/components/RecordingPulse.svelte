@@ -8,7 +8,7 @@
 
     let { audioLevel = 0, size = undefined }: Props = $props();
 
-    /* ── Mic sizing: fixed when size prop is set, responsive otherwise ── */
+    /* ── Mic sizing: fixed when size prop is set, fills container otherwise ── */
     let containerEl: HTMLDivElement | undefined = $state();
     let micSizePx = $state(96);
 
@@ -20,7 +20,7 @@
         if (!containerEl) return;
         const ro = new ResizeObserver(([e]) => {
             const side = Math.min(e.contentRect.width, e.contentRect.height);
-            micSizePx = Math.max(64, Math.min(140, side * 0.2));
+            micSizePx = Math.max(64, side);
         });
         ro.observe(containerEl);
         return () => ro.disconnect();

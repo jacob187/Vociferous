@@ -1,22 +1,22 @@
 <script lang="ts">
     /**
-     * MaintenanceCard — Data management and engine restart.
+     * MaintenanceCard — GPU status, engine info + restart, data management.
      *
-     * Self-contained: owns export formatting, clear-all confirmation modal,
-     * and engine restart action.
+     * Flat layout matching other Settings tabs. No bordered cards.
      */
 
     import { getTranscripts, clearAllTranscripts, exportFile, restartEngine } from "../api";
     import { buildExportPayload, type ExportFormat } from "../exportUtils";
-    import { RotateCcw } from "lucide-svelte";
+    import { CheckCircle, AlertCircle } from "lucide-svelte";
     import ToggleSwitch from "./ToggleSwitch.svelte";
     import CustomSelect from "./CustomSelect.svelte";
     import StyledButton from "./StyledButton.svelte";
+
     interface Props {
         config: Record<string, any>;
         models: { asr: Record<string, any>; slm: Record<string, any> };
         health: {
-            gpu?: { cuda_available?: boolean };
+            gpu?: { cuda_available?: boolean; detail?: string };
         };
         getSafe: (obj: any, path: string, fallback?: any) => any;
         showMessage: (msg: string, type: "success" | "error") => void;
@@ -33,6 +33,32 @@
 
     let clearingTranscripts = $state(false);
     let showClearTranscriptsConfirm = $state(false);
+
+    /* ===== Derived ===== */
+
+    let asrDeviceLabel = $derived(
+        ({ auto: "Automatic", gpu: "GPU", cpu: "CPU" } as Record<string, string>)[
+            getSafe(config, "model.device", "auto")
+        ] ?? "Auto",
+    );
+
+    let slmEnabled = $derived(getSafe(config, "refinement.enabled", false));
+
+    let slmDeviceLabel = $derived(
+        !slmEnabled ? "—" : getSafe(config, "refinement.n_gpu_layers", -1) === 0 ? "CPU" : "GPU",
+    );
+
+    let asrModelName = $derived(
+        (models.asr[getSafe(config, "model.model", "")] as any)?.name ??
+            (getSafe(config, "model.model", "") || "—"),
+    );
+
+    let slmModelName = $derived(
+        !slmEnabled
+            ? "Disabled"
+            : ((models.slm[getSafe(config, "refinement.model_id", "")] as any)?.name ??
+              (getSafe(config, "refinement.model_id", "") || "—")),
+    );
 
     /* ===== Actions ===== */
 
@@ -97,74 +123,104 @@
     }
 </script>
 
-<div class="grid grid-cols-2 gap-[var(--space-4)]">
-    <!-- Transcriptions: export + clear -->
-    <div
-        class="flex flex-col gap-[var(--space-2)] border border-[var(--shell-border)] rounded-[var(--radius-md)] p-[var(--space-3)]"
-    >
-        <span class="text-[var(--text-sm)] text-[var(--text-primary)] font-[var(--weight-emphasis)]"
-            >Transcriptions</span
+<div class="flex flex-col gap-[var(--space-3)]">
+    <!-- GPU Status -->
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <div
+            class="text-[var(--text-sm)] text-[var(--text-primary)]"
+            data-tip="GPU acceleration status. Requires CTranslate2 compiled with CUDA support."
         >
-        <div class="flex flex-col gap-[var(--space-2)]">
-            <div class="flex items-center justify-between gap-[var(--space-3)]">
-                <span class="text-[var(--text-xs)] text-[var(--text-secondary)]">Format</span>
-                <div class="w-full max-w-[180px]">
-                    <CustomSelect
-                        id="history-export-format"
-                        options={[
-                            { value: "json", label: "JSON" },
-                            { value: "csv", label: "CSV" },
-                            { value: "txt", label: "Plain Text" },
-                            { value: "md", label: "Markdown" },
-                        ]}
-                        value={exportFormat}
-                        onchange={(v: string) => {
-                            if (v === "json" || v === "csv" || v === "txt" || v === "md") {
-                                exportFormat = v;
-                            }
-                        }}
-                    />
-                </div>
-            </div>
-            <div class="flex items-center justify-between gap-[var(--space-3)]">
-                <span
-                    class="text-[var(--text-xs)] text-[var(--text-secondary)]"
-                    title="Uses native save dialog when supported; otherwise downloads to your default location."
-                    >Choose Location</span
-                >
-                <ToggleSwitch checked={preferSaveDialog} onChange={() => (preferSaveDialog = !preferSaveDialog)} />
-            </div>
+            GPU Status
         </div>
-        <div class="flex justify-between gap-[var(--space-2)] flex-wrap">
-            <StyledButton variant="destructive" onclick={handleClearTranscripts} disabled={clearingTranscripts}>
-                {clearingTranscripts ? "Clearing…" : "Clear All"}</StyledButton
-            >
-            <StyledButton variant="primary" onclick={handleExportTranscripts}>Export</StyledButton>
+        <div
+            class="gpu-status-badge"
+            class:gpu-available={health.gpu?.cuda_available}
+            class:gpu-unavailable={!health.gpu?.cuda_available}
+        >
+            {#if health.gpu?.cuda_available}
+                <CheckCircle size={14} />
+                <span>{health.gpu.detail || "CUDA available"}</span>
+            {:else}
+                <AlertCircle size={14} />
+                <span>{health.gpu?.detail || "No GPU detected"}</span>
+            {/if}
         </div>
     </div>
 
-    <!-- Engine: status + restart -->
-    <div
-        class="flex flex-col gap-[var(--space-2)] border border-[var(--shell-border)] rounded-[var(--radius-md)] p-[var(--space-3)]"
-    >
-        <span class="text-[var(--text-sm)] text-[var(--text-primary)] font-[var(--weight-emphasis)]">Engine</span>
-        <div class="flex flex-col gap-1">
-            <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">
-                ASR: {(models.asr[getSafe(config, "model.model", "")] as any)?.name ??
-                    (getSafe(config, "model.model", "") || "—")}
-            </span>
-            <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">
-                SLM: {getSafe(config, "refinement.enabled", false)
-                    ? ((models.slm[getSafe(config, "refinement.model_id", "")] as any)?.name ??
-                      (getSafe(config, "refinement.model_id", "") || "—"))
-                    : "Disabled"}
-            </span>
-            <span class="text-[var(--text-xs)] text-[var(--text-tertiary)]">
-                Compute: {health.gpu?.cuda_available ? "GPU (CUDA)" : "CPU"}
-            </span>
-        </div>
-        <div class="flex gap-[var(--space-2)] flex-wrap">
+    <!-- ASR info -->
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <span class="text-[var(--text-sm)] text-[var(--text-primary)]">ASR Model</span>
+        <span class="text-[var(--text-sm)] text-[var(--text-secondary)]">{asrModelName}</span>
+    </div>
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <span class="text-[var(--text-sm)] text-[var(--text-primary)]">ASR Device</span>
+        <span class="text-[var(--text-sm)] text-[var(--text-secondary)]">{asrDeviceLabel}</span>
+    </div>
+
+    <!-- SLM info -->
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <span class="text-[var(--text-sm)] text-[var(--text-primary)]">Refinement Model</span>
+        <span class="text-[var(--text-sm)] text-[var(--text-secondary)]">{slmModelName}</span>
+    </div>
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <span class="text-[var(--text-sm)] text-[var(--text-primary)]">Refinement Device</span>
+        <span class="text-[var(--text-sm)] text-[var(--text-secondary)]">{slmDeviceLabel}</span>
+    </div>
+
+    <!-- Restart -->
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <span
+            class="text-[var(--text-sm)] text-[var(--text-primary)]"
+            data-tip="Reloads ASR and SLM models with the current configuration. Required after changing model or device settings."
+        >
+            Engine
+        </span>
+        <div>
             <StyledButton variant="secondary" onclick={handleRestartEngine}>Restart Engine</StyledButton>
+        </div>
+    </div>
+
+    <!-- Separator -->
+    <div class="border-t border-[var(--shell-border)] my-[var(--space-1)]"></div>
+
+    <!-- Transcriptions -->
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <label class="text-[var(--text-sm)] text-[var(--text-primary)]" for="history-export-format">Export Format</label
+        >
+        <div class="w-full max-w-[460px]">
+            <CustomSelect
+                id="history-export-format"
+                options={[
+                    { value: "json", label: "JSON" },
+                    { value: "csv", label: "CSV" },
+                    { value: "txt", label: "Plain Text" },
+                    { value: "md", label: "Markdown" },
+                ]}
+                value={exportFormat}
+                onchange={(v: string) => {
+                    if (v === "json" || v === "csv" || v === "txt" || v === "md") {
+                        exportFormat = v;
+                    }
+                }}
+            />
+        </div>
+    </div>
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <label
+            class="text-[var(--text-sm)] text-[var(--text-primary)]"
+            for="setting-save-dialog"
+            data-tip="Uses native save dialog when supported; otherwise downloads to your default location."
+            >Choose Location</label
+        >
+        <ToggleSwitch checked={preferSaveDialog} onChange={() => (preferSaveDialog = !preferSaveDialog)} />
+    </div>
+    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
+        <span class="text-[var(--text-sm)] text-[var(--text-primary)]">Transcriptions</span>
+        <div class="flex gap-[var(--space-2)]">
+            <StyledButton variant="primary" onclick={handleExportTranscripts}>Export</StyledButton>
+            <StyledButton variant="destructive" onclick={handleClearTranscripts} disabled={clearingTranscripts}>
+                {clearingTranscripts ? "Clearing…" : "Clear All"}
+            </StyledButton>
         </div>
     </div>
 </div>
@@ -206,3 +262,24 @@
         </div>
     </div>
 {/if}
+
+<style>
+    .gpu-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: var(--text-xs);
+        font-weight: 500;
+        width: fit-content;
+    }
+    .gpu-status-badge.gpu-available {
+        color: var(--color-success, #22c55e);
+        background: color-mix(in srgb, var(--color-success, #22c55e) 12%, transparent);
+    }
+    .gpu-status-badge.gpu-unavailable {
+        color: var(--text-tertiary);
+        background: color-mix(in srgb, var(--text-tertiary) 10%, transparent);
+    }
+</style>

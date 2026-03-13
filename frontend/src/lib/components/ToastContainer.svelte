@@ -52,6 +52,11 @@
 
     // Determine if the strip should be visible
     const isActive = () => toast.items.length > 0 || toast.activeConfirm !== null;
+
+    let confirmEl: HTMLDivElement | undefined = $state();
+    $effect(() => {
+        if (toast.activeConfirm && confirmEl) confirmEl.focus();
+    });
 </script>
 
 <svelte:window onkeydown={handleConfirmKeydown} />
@@ -77,8 +82,8 @@
         {#if toast.activeConfirm}
             {@const c = toast.activeConfirm}
             <!-- Confirmation card in strip -->
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
+                bind:this={confirmEl}
                 class="flex flex-col gap-2.5 p-4 border-t-0"
                 role="alertdialog"
                 tabindex="-1"

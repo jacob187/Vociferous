@@ -185,14 +185,21 @@
 
 html,
 body {
+    height: 100%;
+    margin: 0;
     font-family: var(--font-family);
     font-size: var(--text-base);
     font-weight: var(--weight-normal);
     line-height: var(--leading-normal);
     color: var(--text-primary);
     background: var(--shell-bg);
+    overflow: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+    height: 100%;
 }
 
 /* ==========================================================================

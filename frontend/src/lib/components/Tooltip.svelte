@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
+    import { getZoomFactor } from "../zoom";
 
     interface Props {
         text: string;
@@ -26,8 +27,9 @@
     }
 
     function position(e: MouseEvent) {
-        x = e.clientX;
-        y = e.clientY - 8;
+        const z = getZoomFactor();
+        x = e.clientX / z;
+        y = e.clientY / z - 8;
     }
 </script>
 

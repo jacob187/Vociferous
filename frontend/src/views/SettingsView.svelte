@@ -10,12 +10,13 @@
     import { toast } from "../lib/toast.svelte";
     import { ws } from "../lib/ws";
     import { onMount, onDestroy } from "svelte";
-    import { Save, Undo2, Loader2, Cpu, Mic, Sliders, Eye, RotateCcw, Check } from "lucide-svelte";
+    import { Save, Undo2, Loader2, Cpu, Mic, Sliders, Eye, RotateCcw, Check, BarChart3, Sparkles } from "lucide-svelte";
     import CustomSelect from "../lib/components/CustomSelect.svelte";
     import KeyBindCapture from "../lib/components/KeyBindCapture.svelte";
     import MaintenanceCard from "../lib/components/MaintenanceCard.svelte";
     import OutputCard from "../lib/components/OutputCard.svelte";
     import AsrModelCard from "../lib/components/AsrModelCard.svelte";
+    import RefinementCard from "../lib/components/RefinementCard.svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
     import EmptyState from "../lib/components/EmptyState.svelte";
     import ToggleSwitch from "../lib/components/ToggleSwitch.svelte";
@@ -23,14 +24,16 @@
 
     /* ===== Tabs ===== */
 
-    type SettingsTab = "asr" | "recording" | "output" | "appearance" | "maintenance";
+    type SettingsTab = "analytics" | "appearance" | "maintenance" | "output" | "recording" | "refinement" | "asr";
 
     const tabs: { id: SettingsTab; label: string; icon: typeof Cpu }[] = [
-        { id: "asr", label: "Speech Recognition", icon: Cpu },
-        { id: "recording", label: "Recording", icon: Mic },
-        { id: "output", label: "Output", icon: Sliders },
+        { id: "analytics", label: "Analytics", icon: BarChart3 },
         { id: "appearance", label: "Appearance", icon: Eye },
         { id: "maintenance", label: "Maintenance", icon: RotateCcw },
+        { id: "output", label: "Output", icon: Sliders },
+        { id: "recording", label: "Recording", icon: Mic },
+        { id: "refinement", label: "Refinement", icon: Sparkles },
+        { id: "asr", label: "Transcription", icon: Cpu },
     ];
 
     let activeTab = $state<SettingsTab>("asr");
@@ -184,6 +187,15 @@
         config = { ...config };
     }
 
+    /* ===== Tip bar (replaces native title= tooltips) ===== */
+
+    let hoveredTip = $state("");
+
+    function handleTipOver(e: Event) {
+        const el = (e.target as HTMLElement).closest("[data-tip]");
+        hoveredTip = el?.getAttribute("data-tip") || "";
+    }
+
     async function handleDownload(type: "asr" | "slm", modelId: string) {
         downloadingModel = modelId;
         downloadMessage = "Starting download...";
@@ -207,13 +219,9 @@
         <!-- Unified scroll area — tab bar is sticky inside so both it and content share the same
              width reference for mx-auto. When a scrollbar appears it affects both equally,
              eliminating the centering offset that occurs when the tab bar is outside the scroll container. -->
-        <div class="flex-1 overflow-y-auto">
+        <!-- svelte-ignore a11y_mouse_events_have_key_events -->
+        <div class="flex-1 overflow-y-auto" onmouseover={handleTipOver} onmouseleave={() => (hoveredTip = "")} onfocusin={handleTipOver} onfocusout={() => (hoveredTip = "")}>
             <div class="sticky top-0 z-10 border-b border-[var(--shell-border)] bg-[var(--surface-primary)]">
-                <p
-                    class="w-full max-w-5xl mx-auto px-[var(--space-5)] pt-[var(--space-2)] text-[var(--text-xs)] text-[var(--text-tertiary)] italic"
-                >
-                    Hover over a setting label for more information.
-                </p>
                 <div class="w-full max-w-5xl mx-auto px-[var(--space-5)] flex gap-0" role="tablist">
                     {#each tabs as tab (tab.id)}
                         <button
@@ -234,21 +242,52 @@
 
             <!-- Tab panel content -->
             <div
-                class="w-full max-w-5xl min-w-[var(--content-min-width)] mx-auto py-[var(--space-5)] px-[var(--space-5)] pb-[var(--space-7)]"
+                class="w-full max-w-5xl mx-auto py-[var(--space-5)] px-[var(--space-5)] pb-[var(--space-7)]"
                 role="tabpanel"
             >
-                {#if activeTab === "asr"}
-                    <AsrModelCard
-                        {config}
-                        {models}
-                        {health}
-                        {downloadingModel}
-                        {downloadMessage}
-                        {downloadErrorAsr}
-                        {getSafe}
-                        {setSafe}
-                        {handleDownload}
-                    />
+                {#if activeTab === "analytics"}
+                    <div class="flex flex-col gap-[var(--space-3)]">
+                        <div
+                            class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]"
+                        >
+                            <label
+                                class="text-[var(--text-sm)] text-[var(--text-primary)]"
+                                for="setting-typing-wpm"
+                                data-tip="Your manual typing speed. Used to calculate Time Saved on the dashboard. Default: 40 WPM."
+                                >Typing Speed (WPM)</label
+                            >
+                            <input
+                                id="setting-typing-wpm"
+                                type="number"
+                                min="10"
+                                max="200"
+                                class="h-9 w-24 rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-primary)] px-[var(--space-2)] text-[var(--text-sm)] text-[var(--text-primary)] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                value={getSafe(config, "user.typing_wpm", 40)}
+                                onchange={(e: Event) => {
+                                    const v = parseInt((e.target as HTMLInputElement).value);
+                                    if (!isNaN(v) && v >= 10 && v <= 200) setSafe("user.typing_wpm", v);
+                                }}
+                            />
+                        </div>
+                        <div
+                            class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]"
+                        >
+                            <label
+                                class="text-[var(--text-sm)] text-[var(--text-primary)]"
+                                for="setting-exclude-imported"
+                                data-tip="Automatically excludes imported audio file transcriptions from analytics calculations."
+                                >Exclude Imports from Analytics</label
+                            >
+                            <ToggleSwitch
+                                checked={getSafe(config, "output.exclude_imported_from_analytics", false)}
+                                onChange={() =>
+                                    setSafe(
+                                        "output.exclude_imported_from_analytics",
+                                        !getSafe(config, "output.exclude_imported_from_analytics", false),
+                                    )}
+                            />
+                        </div>
+                    </div>
                 {:else if activeTab === "recording"}
                     <div class="flex flex-col gap-[var(--space-3)]">
                         <div
@@ -257,7 +296,7 @@
                             <label
                                 class="text-[var(--text-sm)] text-[var(--text-primary)]"
                                 for="setting-hotkey"
-                                title="Click Set Key to capture a new global hotkey. Works system-wide, even when the app is in the background."
+                                data-tip="Click Set Key to capture a new global hotkey. Works system-wide, even when the app is in the background."
                                 >Activation Key</label
                             >
                             <KeyBindCapture
@@ -272,7 +311,7 @@
                             <label
                                 class="text-[var(--text-sm)] text-[var(--text-primary)]"
                                 for="setting-recmode"
-                                title="Toggle: press once to start, again to stop. Hold: hold key to record, release to stop."
+                                data-tip="Toggle: press once to start, again to stop. Hold: hold key to record, release to stop."
                                 >Recording Mode</label
                             >
                             <div class="w-full max-w-[460px]">
@@ -293,7 +332,7 @@
                             <label
                                 class="text-[var(--text-sm)] text-[var(--text-primary)]"
                                 for="setting-audiocache"
-                                title="Keep recorded audio on disk for crash recovery. Oldest recordings are pruned when the limit is exceeded. Set to 0 to disable."
+                                data-tip="Keep recorded audio on disk for crash recovery. Oldest recordings are pruned when the limit is exceeded. Set to 0 to disable."
                                 >Audio Cache (minutes)</label
                             >
                             <div class="flex items-center gap-[var(--space-1)]">
@@ -354,16 +393,7 @@
                         </div>
                     </div>
                 {:else if activeTab === "output"}
-                    <OutputCard
-                        {config}
-                        {models}
-                        {downloadingModel}
-                        {downloadMessage}
-                        {downloadErrorSlm}
-                        {getSafe}
-                        {setSafe}
-                        {handleDownload}
-                    />
+                    <OutputCard {config} {getSafe} {setSafe} />
                 {:else if activeTab === "appearance"}
                     <div class="flex flex-col gap-[var(--space-3)]">
                         <div
@@ -372,13 +402,15 @@
                             <label
                                 class="text-[var(--text-sm)] text-[var(--text-primary)]"
                                 for="setting-uiscale"
-                                title="Scale the entire interface. Useful for high-DPI displays or accessibility."
+                                data-tip="Scale the entire interface. Useful for high-DPI displays or accessibility."
                                 >UI Scale</label
                             >
                             <div class="w-full max-w-[460px]">
                                 <CustomSelect
                                     id="setting-uiscale"
                                     options={[
+                                        { value: "75", label: "75%" },
+                                        { value: "90", label: "90%" },
                                         { value: "100", label: "100%" },
                                         { value: "125", label: "125%" },
                                         { value: "150", label: "150%" },
@@ -396,7 +428,7 @@
                             <label
                                 class="text-[var(--text-sm)] text-[var(--text-primary)]"
                                 for="setting-username"
-                                title="Your name. Used in the greeting on the Transcribe screen and the title of your Vociferous Journey."
+                                data-tip="Your name. Used in the greeting on the Transcribe screen and the title of your Vociferous Journey."
                                 >Your Name</label
                             >
                             <input
@@ -409,51 +441,42 @@
                                 oninput={(e) => setSafe("user.name", (e.target as HTMLInputElement).value)}
                             />
                         </div>
-                        <div
-                            class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]"
-                        >
-                            <label
-                                class="text-[var(--text-sm)] text-[var(--text-primary)]"
-                                for="setting-typing-wpm"
-                                title="Your manual typing speed. Used to calculate Time Saved on the dashboard. Default: 40 WPM."
-                                >Typing Speed (WPM)</label
-                            >
-                            <input
-                                id="setting-typing-wpm"
-                                type="number"
-                                min="10"
-                                max="200"
-                                class="h-9 w-24 rounded-[var(--radius-md)] border border-[var(--shell-border)] bg-[var(--surface-primary)] px-[var(--space-2)] text-[var(--text-sm)] text-[var(--text-primary)] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                value={getSafe(config, "user.typing_wpm", 40)}
-                                onchange={(e: Event) => {
-                                    const v = parseInt((e.target as HTMLInputElement).value);
-                                    if (!isNaN(v) && v >= 10 && v <= 200) setSafe("user.typing_wpm", v);
-                                }}
-                            />
-                        </div>
-                        <div
-                            class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]"
-                        >
-                            <label
-                                class="text-[var(--text-sm)] text-[var(--text-primary)]"
-                                for="setting-markdown-editor"
-                                title="Render transcript text as formatted markdown in the Edit View by default. You can still toggle per-session."
-                                >Markdown in Editor</label
-                            >
-                            <ToggleSwitch
-                                checked={getSafe(config, "display.render_markdown_in_editor", false)}
-                                onChange={() =>
-                                    setSafe(
-                                        "display.render_markdown_in_editor",
-                                        !getSafe(config, "display.render_markdown_in_editor", false),
-                                    )}
-                            />
-                        </div>
                     </div>
                 {:else if activeTab === "maintenance"}
                     <MaintenanceCard {config} {models} {health} {getSafe} {showMessage} />
+                {:else if activeTab === "refinement"}
+                    <RefinementCard
+                        {config}
+                        {models}
+                        {downloadingModel}
+                        {downloadMessage}
+                        {downloadErrorSlm}
+                        {getSafe}
+                        {setSafe}
+                        {handleDownload}
+                    />
+                {:else if activeTab === "asr"}
+                    <AsrModelCard
+                        {config}
+                        {models}
+                        {downloadingModel}
+                        {downloadMessage}
+                        {downloadErrorAsr}
+                        {getSafe}
+                        {setSafe}
+                        {handleDownload}
+                    />
                 {/if}
             </div>
+        </div>
+
+        <!-- Tip bar — shows data-tip text when hovering a setting label -->
+        <div
+            class="shrink-0 h-7 flex items-center justify-center px-[var(--space-4)] text-[11px] text-[var(--text-tertiary)] italic overflow-hidden transition-opacity duration-150 {hoveredTip
+                ? 'opacity-100'
+                : 'opacity-0'}"
+        >
+            {hoveredTip}
         </div>
 
         <!-- Save bar -->

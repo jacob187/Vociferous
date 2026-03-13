@@ -48,6 +48,7 @@
     } from "lucide-svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
     import EmptyState from "../lib/components/EmptyState.svelte";
+    import { getZoomFactor } from "../lib/zoom";
     import TagBar from "../lib/components/TagBar.svelte";
     import ActionBar from "../lib/components/ActionBar.svelte";
     import MarkdownBody from "../lib/components/MarkdownBody.svelte";
@@ -368,7 +369,7 @@
 
     function copySelectedText() {
         if (!selectedEntry) return;
-        navigator.clipboard.writeText(getDisplayText(selectedEntry));
+        navigator.clipboard.writeText(getDisplayText(selectedEntry)).catch(() => {});
         copied = true;
         setTimeout(() => (copied = false), 1500);
     }
@@ -497,9 +498,10 @@
     function openTagAssign(event?: MouseEvent) {
         event?.stopPropagation();
         if (event?.currentTarget) {
+            const z = getZoomFactor();
             const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-            tagAssignX = Math.min(rect.left, window.innerWidth - 280);
-            tagAssignY = rect.top - 8;
+            tagAssignX = Math.min(rect.left / z, window.innerWidth / z - 280);
+            tagAssignY = rect.top / z - 8;
         }
         tagAssignOpen = true;
     }
@@ -1094,8 +1096,8 @@
     <div
         class="fixed min-w-[260px] bg-[var(--surface-primary)] border border-[var(--shell-border)] rounded-lg shadow-[0_12px_28px_rgba(0,0,0,0.45)] py-1 z-[200] -translate-y-full"
         style="left: {exportBtnEl
-            ? Math.min(exportBtnEl.getBoundingClientRect().left, window.innerWidth - 280)
-            : 0}px; top: {exportBtnEl ? exportBtnEl.getBoundingClientRect().top - 8 : 0}px"
+            ? Math.min(exportBtnEl.getBoundingClientRect().left / getZoomFactor(), window.innerWidth / getZoomFactor() - 280)
+            : 0}px; top: {exportBtnEl ? exportBtnEl.getBoundingClientRect().top / getZoomFactor() - 8 : 0}px"
         role="menu"
         tabindex="-1"
         onpointerdown={(e) => e.stopPropagation()}

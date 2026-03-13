@@ -165,13 +165,85 @@ make provision
 
 ### Windows
 
+#### 1. Install Prerequisites
+
+You need **Python 3.12+** and **Node.js 18+** on your PATH. If you don't have them,
+[winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/) is the easiest route:
+
 ```powershell
-# Run from PowerShell as Administrator
+winget install --id Python.Python.3.12 --accept-package-agreements
+winget install --id OpenJS.NodeJS.LTS --accept-package-agreements
+```
+
+> **Restart your terminal** after installing Python/Node so the new PATH entries take effect.
+> If `python` still opens the Microsoft Store, disable the "App execution aliases" for Python
+> in **Settings → Apps → Advanced app settings → App execution aliases**.
+
+#### 2. Set Execution Policy (One-Time)
+
+PowerShell's default policy blocks script execution. Allow locally-created scripts:
+
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+#### 3. Clone and Install
+
+```powershell
+git clone https://github.com/your-username/Vociferous.git
+cd Vociferous
 .\scripts\install_windows.ps1
+```
+
+The install script will:
+- Verify Python 3.12+ and Visual C++ Build Tools
+- Create a `.venv` virtual environment
+- Install all Python dependencies from `requirements.txt`
+- Build the Svelte frontend (`frontend/dist`)
+- Verify critical imports (ctranslate2, faster-whisper, pywebview, etc.)
+- Detect NVIDIA GPU availability
+- Verify Microsoft Edge WebView2 Runtime
+- **Download AI models** (ASR ~780 MB, SLM ~5.8 GB, VAD ~2 MB) — interactive prompt
+- **Create Desktop and Start Menu shortcuts** with the Vociferous icon — interactive prompt
+
+#### 4. Launch
+
+```powershell
 .\vociferous.bat
 ```
 
+Or directly:
+
+```powershell
+.venv\Scripts\python.exe -m src.main
+```
+
+If you skipped model provisioning during install, the app will auto-navigate to Settings on first
+launch where you can download models via the UI.
+
+#### GPU Acceleration (Optional)
+
+CPU inference works out of the box. For GPU acceleration with NVIDIA cards:
+
+1. Install the latest [NVIDIA Game Ready or Studio driver](https://www.nvidia.com/download/index.aspx)
+2. Install [CUDA Toolkit 12.x](https://developer.nvidia.com/cuda-downloads) — the driver alone is **not** enough
+3. Verify `cublas64_12.dll` is on PATH (typically `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.x\bin`)
+4. Verify with: `nvidia-smi` (should show your GPU) and `nvcc --version` (should show CUDA version)
+
+The installer detects GPU availability automatically. If you install CUDA after the initial setup,
+just restart the app — no reinstall needed.
+
+#### Uninstall
+
+Remove shortcuts: `.\scripts\uninstall_windows_shortcut.ps1`
+
+Remove everything else: delete the `Vociferous` directory and optionally
+`%LOCALAPPDATA%\vociferous` (settings, database, cached models).
+
 ### Desktop Shortcuts
+
+The Windows install script offers to create shortcuts automatically. For other platforms, or to
+create/remove them manually:
 
 | Platform | Install | Remove |
 |----------|---------|--------|
@@ -186,7 +258,7 @@ docker compose build
 
 # Provision models (first run only — persisted in named volume)
 docker compose run --rm --entrypoint python3 vociferous scripts/provision_models.py install large-v3-turbo-int8
-docker compose run --rm --entrypoint python3 vociferous scripts/provision_models.py install qwen14b
+docker compose run --rm --entrypoint python3 vociferous scripts/provision_models.py install qwen8b
 
 # CPU mode
 docker compose up
@@ -205,6 +277,10 @@ docker compose --profile gpu up
 
 If a 30-second clip takes 2 minutes even with an RTX card, you're on CPU-only wheels.
 
+**Windows**: Verify CUDA Toolkit is installed (`nvcc --version` in a terminal). The Game Ready
+driver alone doesn't provide `cublas64_12.dll`. Install [CUDA Toolkit 12.x](https://developer.nvidia.com/cuda-downloads).
+
+**Linux**:
 1. Ensure `nvcc` is in your `$PATH` before running `install.sh`
 2. Force rebuild if needed:
     ```bash
@@ -290,7 +366,7 @@ make provision    # Interactive model selection
 Default models:
 
 - **ASR**: `faster-whisper-large-v3-turbo-int8-ct2` (~780 MB)
-- **SLM**: `Qwen3-1.7B-ct2-int8` (~1.7 GB)
+- **SLM**: `Qwen3-8B-ct2-AWQ` (~5.8 GB)
 
 Models are cached in `~/.cache/vociferous/models/` (XDG-compliant).
 

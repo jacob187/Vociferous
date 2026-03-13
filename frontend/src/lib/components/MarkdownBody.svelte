@@ -1,15 +1,15 @@
 <!--
     MarkdownBody — renders a markdown string as styled HTML.
 
-    Uses `marked` for parsing + `{@html}` for injection. All content
-    originates from the local ASR/SLM pipeline, never from untrusted
-    user input, so we skip a full DOMPurify dependency.
+    Uses `marked` for parsing + `{@html}` for injection. Raw HTML tags
+    in the source are escaped to prevent self-XSS from user-editable
+    transcript text.
 
     Clipboard copies should always use the raw markdown string directly
     (handled by the caller), NOT the rendered HTML.
 -->
 <script lang="ts">
-    import { marked } from "marked";
+    import { Marked } from "marked";
 
     interface Props {
         text: string;
@@ -18,10 +18,11 @@
 
     let { text, className = "" }: Props = $props();
 
-    // marked config: no async, no mangle, GFM enabled (tables, strikethrough, etc.)
-    marked.use({ async: false, gfm: true, breaks: true });
+    // Escape raw HTML in markdown source to prevent injection
+    const renderer = { html: ({ text: t }: { text: string }) => t.replace(/</g, "&lt;").replace(/>/g, "&gt;") };
+    const md = new Marked({ async: false, gfm: true, breaks: true, renderer });
 
-    let rendered = $derived(marked.parse(text) as string);
+    let rendered = $derived(md.parse(text) as string);
 </script>
 
 <div class="markdown-body {className}">

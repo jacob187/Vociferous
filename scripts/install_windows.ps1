@@ -15,11 +15,19 @@ $ProjectDir = Split-Path -Parent $ScriptDir
 
 # --- Check Python ---
 $PythonCmd = $null
-foreach ($cmd in @("python3", "python", "py")) {
+$PythonArgs = @()
+foreach ($candidate in @(
+    @{ Cmd = "python3"; Args = @() },
+    @{ Cmd = "python"; Args = @() },
+    @{ Cmd = "py"; Args = @("-3.13") },
+    @{ Cmd = "py"; Args = @("-3.12") },
+    @{ Cmd = "py"; Args = @() }
+)) {
     try {
-        $ver = & $cmd --version 2>&1
+        $ver = & $candidate.Cmd @($candidate.Args + "--version") 2>&1
         if ($ver -match "Python (3\.1[2-9]|3\.[2-9]\d)") {
-            $PythonCmd = $cmd
+            $PythonCmd = $candidate.Cmd
+            $PythonArgs = $candidate.Args
             break
         }
     } catch {}
@@ -32,8 +40,9 @@ if (-not $PythonCmd) {
     exit 1
 }
 
-$PythonVersion = (& $PythonCmd --version 2>&1) -replace "Python ", ""
-Write-Host "[OK] Python $PythonVersion ($PythonCmd)" -ForegroundColor Green
+$PythonVersion = (& $PythonCmd @($PythonArgs + "--version") 2>&1) -replace "Python ", ""
+$PythonDisplay = if ($PythonArgs.Count -gt 0) { "$PythonCmd $($PythonArgs -join ' ')" } else { $PythonCmd }
+Write-Host "[OK] Python $PythonVersion ($PythonDisplay)" -ForegroundColor Green
 
 # --- Check for Visual C++ Build Tools (needed for some native deps) ---
 Write-Host ""
@@ -44,9 +53,13 @@ Write-Host "==========================================" -ForegroundColor Cyan
 $hasVCTools = $false
 $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 if (Test-Path $vsWhere) {
-    $installations = & $vsWhere -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json 2>$null | ConvertFrom-Json
-    if ($installations.Count -gt 0) {
-        $hasVCTools = $true
+    try {
+        $installations = & $vsWhere -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json 2>$null | ConvertFrom-Json
+        if ($installations) {
+            $hasVCTools = $true
+        }
+    } catch {
+        $hasVCTools = $false
     }
 }
 
@@ -59,7 +72,7 @@ if ($hasVCTools) {
     Write-Host "  Select 'Desktop development with C++' workload."
     Write-Host ""
     $confirm = Read-Host "Continue anyway? (y/N)"
-    if ($confirm -ne "y") { exit 1 }
+    if ($confirm -notmatch "^(?i:y|yes)$") { exit 1 }
 }
 
 # --- Create virtual environment ---
@@ -72,9 +85,14 @@ $VenvDir = Join-Path $ProjectDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $VenvPip = Join-Path $VenvDir "Scripts\pip.exe"
 
-if (-not (Test-Path $VenvDir)) {
+if ((Test-Path $VenvDir) -and (-not (Test-Path $VenvPython))) {
+    Write-Host "[WARN] Existing .venv is not usable on Windows. Recreating..." -ForegroundColor Yellow
+    Remove-Item -Path $VenvDir -Recurse -Force
+}
+
+if (-not (Test-Path $VenvPython)) {
     Write-Host "Creating virtual environment..."
-    & $PythonCmd -m venv $VenvDir
+    & $PythonCmd @($PythonArgs + "-m", "venv", $VenvDir)
     Write-Host "[OK] Virtual environment created" -ForegroundColor Green
 } else {
     Write-Host "[OK] Virtual environment already exists" -ForegroundColor Green
@@ -101,6 +119,42 @@ try {
     Write-Host "[OK] Dependencies installed" -ForegroundColor Green
 } finally {
     Pop-Location
+}
+
+# --- Build frontend if needed ---
+Write-Host ""
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "Building frontend"                        -ForegroundColor Cyan
+Write-Host "==========================================" -ForegroundColor Cyan
+
+$FrontendDir = Join-Path $ProjectDir "frontend"
+$FrontendDistDir = Join-Path $FrontendDir "dist"
+
+if (Test-Path $FrontendDistDir) {
+    Write-Host "[OK] Frontend already built (frontend/dist exists)" -ForegroundColor Green
+} else {
+    $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+    if ($npmCmd) {
+        Push-Location $FrontendDir
+        try {
+            & npm install --silent
+            if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+
+            & npx vite build
+            if ($LASTEXITCODE -ne 0) { throw "vite build failed" }
+
+            Write-Host "[OK] Frontend built" -ForegroundColor Green
+        } finally {
+            Pop-Location
+        }
+    } else {
+        Write-Host "[WARN] npm not found - skipping frontend build." -ForegroundColor Yellow
+        Write-Host "  Install Node.js 18+, then run:"
+        Write-Host "  cd frontend"
+        Write-Host "  npm install"
+        Write-Host "  npx vite build"
+        Write-Host "  (The launcher will auto-build on first run if npm is available.)"
+    }
 }
 
 # --- Verify critical dependencies ---
@@ -156,20 +210,95 @@ if ($nvidiaSmi) {
         Write-Host "[INFO] nvidia-smi found but query failed" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[INFO] No NVIDIA GPU detected — CPU inference will be used" -ForegroundColor Yellow
+    Write-Host "[INFO] No NVIDIA GPU detected -- CPU inference will be used" -ForegroundColor Yellow
     Write-Host "  If you have an NVIDIA GPU, install the latest drivers from:"
     Write-Host "  https://www.nvidia.com/download/index.aspx"
 }
 
 # --- WebView2 Check ---
 Write-Host ""
-$webview2Key = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BEE-13A6279D3EBB}"
-if (Test-Path $webview2Key) {
+$webview2Keys = @(
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BEE-13A6279D3EBB}",
+    "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BEE-13A6279D3EBB}",
+    "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BEE-13A6279D3EBB}"
+)
+
+$hasWebView2 = $false
+foreach ($webview2Key in $webview2Keys) {
+    if (Test-Path $webview2Key) {
+        $hasWebView2 = $true
+        break
+    }
+}
+
+if ($hasWebView2) {
     Write-Host "[OK] Microsoft Edge WebView2 Runtime installed" -ForegroundColor Green
 } else {
     Write-Host "[WARN] Microsoft Edge WebView2 Runtime not detected." -ForegroundColor Yellow
     Write-Host "  pywebview requires WebView2 on Windows."
     Write-Host "  Download: https://developer.microsoft.com/en-us/microsoft-edge/webview2/"
+}
+
+# --- Model Provisioning ---
+Write-Host ""
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "Model Provisioning"                        -ForegroundColor Cyan
+Write-Host "==========================================" -ForegroundColor Cyan
+
+$ProvisionScript = Join-Path $ProjectDir "scripts\provision_models.py"
+
+# Check if any models are missing
+$modelsMissing = $false
+try {
+    $listOutput = & $VenvPython $ProvisionScript list 2>&1
+    if ($listOutput -match "MISSING") {
+        $modelsMissing = $true
+    }
+} catch {
+    $modelsMissing = $true
+}
+
+if ($modelsMissing) {
+    Write-Host "Some models need to be downloaded." -ForegroundColor Yellow
+    Write-Host ""
+    & $VenvPython $ProvisionScript list
+    Write-Host ""
+
+    $doProvision = Read-Host "Download default models now? (Y/n)"
+    if ($doProvision -eq "" -or $doProvision -match "^(?i:y|yes)$") {
+        Write-Host ""
+        Write-Host "Downloading Silero VAD..." -ForegroundColor Cyan
+        & $VenvPython $ProvisionScript install silero_vad
+
+        Write-Host ""
+        Write-Host "Downloading ASR model (faster-whisper-large-v3-turbo-int8)..." -ForegroundColor Cyan
+        & $VenvPython $ProvisionScript install large-v3-turbo-int8
+
+        Write-Host ""
+        Write-Host "Downloading SLM model (Qwen3-8B-ct2-AWQ)..." -ForegroundColor Cyan
+        & $VenvPython $ProvisionScript install qwen8b
+
+        Write-Host "[OK] Models downloaded" -ForegroundColor Green
+    } else {
+        Write-Host "Skipped. You can download models later from Settings in the app," -ForegroundColor Yellow
+        Write-Host "or run:  .venv\Scripts\python.exe scripts\provision_models.py install <model_id>" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "[OK] All default models already present" -ForegroundColor Green
+}
+
+# --- Desktop Shortcut ---
+Write-Host ""
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "Desktop Shortcut"                          -ForegroundColor Cyan
+Write-Host "==========================================" -ForegroundColor Cyan
+
+$ShortcutScript = Join-Path $ScriptDir "install_windows_shortcut.ps1"
+$doShortcut = Read-Host "Create Desktop and Start Menu shortcuts? (Y/n)"
+if ($doShortcut -eq "" -or $doShortcut -match "^(?i:y|yes)$") {
+    & powershell -ExecutionPolicy Bypass -File $ShortcutScript
+} else {
+    Write-Host "Skipped. Run later:  .\scripts\install_windows_shortcut.ps1" -ForegroundColor Yellow
 }
 
 # --- Done ---

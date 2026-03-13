@@ -114,8 +114,9 @@ class RefinementSettings(BaseModel):
     """SLM refinement configuration."""
 
     enabled: bool = True
-    model_id: str = "qwen14b"
+    model_id: str = "qwen8b"
     n_gpu_layers: int = -1  # -1 = full GPU (CT2 device="cuda"), 0 = CPU only
+    n_threads: int = 4  # CPU thread count (only used when device=CPU)
     temperature: float = 0.3
     top_p: float = 0.9
     top_k: int = 20

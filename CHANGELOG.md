@@ -1,5 +1,45 @@
 # Vociferous Changelog
 
+## v6.1.0 — Windows Platform, Settings Overhaul, Refinement CPU Fix
+
+**Date:** 2026-03-12
+**Status:** Feature / Fix / Platform
+
+### Added
+- **Windows native installer** (`scripts/install_windows.ps1`) — Full setup sequence: smart Python finder (`py -3.12`/`py -3.13`), venv creation, dependency install, frontend build, model provisioning, and Desktop shortcut creation with icon.
+- **Windows Desktop shortcuts** — `install_windows_shortcut.ps1` / `uninstall_windows_shortcut.ps1` use `[Environment]::GetFolderPath("Desktop")` for OneDrive-redirected Desktop compatibility. Shortcuts use the app icon.
+- **App icon** — `assets/icons/vociferous_icon.ico` (multi-resolution ICO: 16/32/48/64/128/256px). Set via WinForms on the UI thread in `window_controller.py`.
+- **CUDA DLL discovery on Windows** (`src/main.py`) — `_register_nvidia_dll_dirs()` walks `site-packages` for `nvidia-*/bin` directories and registers them with `os.add_dll_directory()`, fixing CUDA load failures where nvidia-* packages are installed but their DLLs aren't on PATH.
+- **Settings — 7 tabs** (was 5) — Alphabetical: Analytics, Appearance, Maintenance, Output, Recording, Refinement, Transcription.
+  - New **Refinement tab** (`RefinementCard.svelte`) — Grammar enable toggle, Device dropdown (GPU/CPU), Refinement Threads (CPU mode only), Model picker + download, Auto-Refine, Auto-Retitle, Advanced Sampling collapsible (temperature, top_p, top_k, repetition_penalty).
+  - New **Analytics tab** — Typing Speed (WPM), Exclude Imports from Analytics.
+  - **Maintenance tab** flat layout — GPU status, ASR model + device, Refinement model + device, Restart Engine, Export/Clear.
+  - **Output tab** slimmed — Add Trailing Space, Auto-Copy to Clipboard, Markdown in Editor only.
+- **Refinement CPU threads** (`refinement.n_threads`) — New setting (default: 4) passed to `ctranslate2.Generator(intra_threads=...)`. Visible in UI only when device is CPU. Matches the existing ASR threads control.
+- **AWQ + CPU incompatibility guard** (`slm_runtime.py`) — Pre-load check: if model quant is `awq` and resolved device is CPU, raises a clear error before CTranslate2 is called. Frontend shows "— GPU only" labels on AWQ models when CPU device is selected, plus an inline warning.
+- **Tip bar in Settings** — Replaced all `title=` native browser tooltips (27 instances across 5 files) with `data-tip=` + event-delegation. A fixed-height tip bar at the bottom of the settings view shows hovered label descriptions inline. Removed the hint `<p>` line.
+
+### Changed
+- **pywebview frameless → native title bar** — Removed `frameless=True` and `easy_drag=True`. DWM dark title bar attribute applied on Windows via `window_controller.py`.
+- **CSS zoom on `#app`** — Zoom applied to `#app` div, not `<html>`, so `height: 100%` chains correctly and `100vh` is never used under zoom.
+- **`TitleBar.svelte` deleted** — Dead code after frameless migration; zero imports.
+- **"Speech Recognition" tab renamed "Transcription"** — Prevents tab label wrapping on narrow widths.
+- **Default SLM model** — `qwen14b` → `qwen8b` in settings default, Makefile, and install scripts.
+- **`nvidia-cublas-cu12`** added as Windows-only dependency in `pyproject.toml`.
+
+### Fixed
+- **Engine restart CUDA abort()** — `SLMRuntime.shutdown()` no longer touches the native engine object; `_unload_model()` calls `Generator.unload_model()` explicitly before dropping the reference, preventing the CUDA destructor race.
+- **AWQ models on GPU — int8 upgrade** — `engine.py` upgrades `compute_type` from `int8` → `float16` when CUDA device is selected, preventing silent GEMM hangs on non-Tensor-Core paths.
+- **Auto-refine clipboard fallback** — `_fallback_raw_clipboard()` fires on all SLM failure paths (disabled, ERROR state, exception), so the raw transcript is always copied even when refinement fails.
+- **Error message** now references "Settings → Maintenance" for engine restart guidance.
+- **CustomSelect dropdown positioning** — Fixed-position, zoom-corrected, closes on scroll.
+- **Activity Heatmap horizontal overflow** — `overflow-hidden` on container; `windowSize` reactive resize.
+- **10 frontend audit fixes** — `ws.ts` disposed flag; `RecordingControls` single DOM element; `RecordingPulse` fill sizing; `KeyBindCapture` cleanup; `MarkdownBody` HTML escaping (self-XSS); `TranscribeView` effect ordering; `UserView` stale-response guard; `TagBar`/`Tooltip`/`ToastContainer` zoom-corrected positioning; `ActionBar` `padx` prop; `navigator.clipboard` `.catch()` on all call sites.
+- **Operator precedence bug** in `MaintenanceCard` derived values (`??` + `||` now wrapped in parens).
+- **README** — Complete Windows setup guide, GPU driver requirements, CUDA troubleshooting, Windows-specific CUDA guidance.
+
+---
+
 ## v6.0.0 — Documentation Overhaul & Public Release Milestone
 
 **Date:** 2026-03-11

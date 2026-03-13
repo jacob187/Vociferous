@@ -1,28 +1,18 @@
 <script lang="ts">
     /**
-     * AsrModelCard — Whisper ASR model selection, GPU status, device, threads, language.
+     * AsrModelCard — Whisper ASR model selection, device, threads, language.
      *
-     * Extracted from SettingsView. Owns `showGpuDetails` toggle internally.
-     * All config mutations flow through parent-supplied `setSafe`.
+     * Extracted from SettingsView. All config mutations flow through
+     * parent-supplied `setSafe`.
      */
 
-    import { Loader2, Cpu, CheckCircle, AlertCircle } from "lucide-svelte";
+    import { Loader2, CheckCircle, AlertCircle } from "lucide-svelte";
     import CustomSelect from "./CustomSelect.svelte";
     import DownloadButton from "./DownloadButton.svelte";
 
     interface Props {
         config: Record<string, any>;
-        models: { asr: Record<string, any>; slm: Record<string, any> };
-        health: {
-            status: string;
-            version: string;
-            transcripts: number;
-            gpu?: {
-                cuda_available?: boolean;
-                detail?: string;
-                slm_gpu_layers?: number;
-            };
-        };
+        models: { asr: Record<string, any> };
         downloadingModel: string | null;
         downloadMessage: string;
         downloadErrorAsr: string;
@@ -34,7 +24,6 @@
     let {
         config,
         models,
-        health,
         downloadingModel,
         downloadMessage,
         downloadErrorAsr,
@@ -51,7 +40,7 @@
         <label
             class="text-[var(--text-sm)] text-[var(--text-primary)]"
             for="setting-model"
-            title="Larger models are slower but more accurate. Tiny/Base are fast; Small/Medium offer better quality."
+            data-tip="Larger models are slower but more accurate. Tiny/Base are fast; Small/Medium offer better quality."
             >Whisper Architecture</label
         >
         <div class="flex items-center gap-[var(--space-2)]">
@@ -98,38 +87,12 @@
         </div>
     {/if}
 
-    <!-- GPU Status -->
-    <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
-        <div
-            class="text-[var(--text-sm)] text-[var(--text-primary)]"
-            title="ASR GPU acceleration requires CTranslate2 with CUDA support."
-        >
-            GPU Status
-        </div>
-        <div class="flex flex-col gap-1 flex-1">
-            <div
-                class="gpu-status-badge"
-                class:gpu-available={health.gpu?.cuda_available}
-                class:gpu-unavailable={!health.gpu?.cuda_available}
-            >
-                {#if health.gpu?.cuda_available}
-                    <CheckCircle size={14} />
-                    <span>{health.gpu.detail || "CUDA available"}</span>
-                {:else}
-                    <AlertCircle size={14} />
-                    <span>{health.gpu?.detail || "No GPU detected"}</span>
-                {/if}
-            </div>
-
-        </div>
-    </div>
-
     <!-- ASR Device -->
     <div class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]">
         <label
             class="text-[var(--text-sm)] text-[var(--text-primary)]"
             for="setting-device"
-            title="Preference for ASR backend selection. Requires engine restart after saving.">ASR Device</label
+            data-tip="Preference for ASR backend selection. Requires engine restart after saving.">ASR Device</label
         >
         <div class="w-full max-w-[460px]">
             <CustomSelect
@@ -150,7 +113,7 @@
         <label
             class="text-[var(--text-sm)] text-[var(--text-primary)]"
             for="setting-threads"
-            title="CPU threads for Whisper inference. Higher values use more cores but may improve speed. Default: 4."
+            data-tip="CPU threads for Whisper inference. Higher values use more cores but may improve speed. Default: 4."
             >ASR Threads</label
         >
         <input
@@ -172,7 +135,7 @@
         <label
             class="text-[var(--text-sm)] text-[var(--text-primary)]"
             for="setting-language"
-            title="Auto-detect works but is slower and slightly less accurate than specifying a language explicitly."
+            data-tip="Auto-detect works but is slower and slightly less accurate than specifying a language explicitly."
             >Language</label
         >
         <div class="w-full max-w-[460px]">
@@ -243,24 +206,3 @@
         </div>
     </div>
 </div>
-
-<style>
-    .gpu-status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: var(--text-xs);
-        font-weight: 500;
-        width: fit-content;
-    }
-    .gpu-status-badge.gpu-available {
-        color: var(--color-success, #22c55e);
-        background: color-mix(in srgb, var(--color-success, #22c55e) 12%, transparent);
-    }
-    .gpu-status-badge.gpu-unavailable {
-        color: var(--text-tertiary);
-        background: color-mix(in srgb, var(--text-tertiary) 10%, transparent);
-    }
-</style>

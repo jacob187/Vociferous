@@ -3,7 +3,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$DesktopShortcut = Join-Path $env:USERPROFILE "Desktop\Vociferous.lnk"
+$DesktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "Vociferous.lnk"
 $StartMenuShortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Vociferous.lnk"
 
 foreach ($Path in @($DesktopShortcut, $StartMenuShortcut)) {

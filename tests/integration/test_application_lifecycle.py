@@ -237,12 +237,12 @@ class TestShutdownLifecycle:
         assert fresh_coordinator.recording_session is None
 
     def test_cleanup_with_mock_slm(self, coordinator):
-        """cleanup() calls disable() on the SLM runtime if present."""
+        """cleanup() calls shutdown() on the SLM runtime if present."""
         mock_slm = MagicMock()
         coordinator.slm_runtime = mock_slm
 
         coordinator.cleanup()
-        mock_slm.disable.assert_called_once()
+        mock_slm.shutdown.assert_called_once()
 
     def test_cleanup_with_mock_input_listener(self, coordinator):
         """cleanup() calls stop() on the input listener if present."""
@@ -268,14 +268,14 @@ class TestShutdownLifecycle:
         assert mock_server.should_exit is True
 
     def test_cleanup_resilient_to_slm_error(self, coordinator):
-        """cleanup() continues even if SLM disable() raises."""
+        """cleanup() continues even if SLM shutdown() raises."""
         mock_slm = MagicMock()
-        mock_slm.disable.side_effect = RuntimeError("SLM cleanup boom")
+        mock_slm.shutdown.side_effect = RuntimeError("SLM cleanup boom")
         coordinator.slm_runtime = mock_slm
 
         # Should not raise
         coordinator.cleanup()
-        mock_slm.disable.assert_called_once()
+        mock_slm.shutdown.assert_called_once()
 
     def test_cleanup_resilient_to_listener_error(self, coordinator):
         """cleanup() continues even if input listener stop() raises."""

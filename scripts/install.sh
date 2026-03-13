@@ -217,7 +217,7 @@ if [ "$MODELS_NEEDED" = true ]; then
         "$VENV_PYTHON" "$PROVISION_SCRIPT" install large-v3-turbo-int8
         echo ""
         echo "Downloading SLM model (~9.5 GB)..."
-        "$VENV_PYTHON" "$PROVISION_SCRIPT" install qwen14b
+        "$VENV_PYTHON" "$PROVISION_SCRIPT" install qwen8b
         echo ""
         echo "✓ All default models installed"
     else

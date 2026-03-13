@@ -19,6 +19,7 @@ class WSClient {
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private reconnectDelay = 1000;
     private maxReconnectDelay = 30000;
+    private disposed = false;
 
     connect(): void {
         const protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -96,15 +97,17 @@ class WSClient {
     }
 
     disconnect(): void {
+        this.disposed = true;
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
         }
         this.ws?.close();
         this.ws = null;
     }
 
     private scheduleReconnect(): void {
-        if (this.reconnectTimer) return;
+        if (this.disposed || this.reconnectTimer) return;
         this.reconnectTimer = setTimeout(() => {
             this.reconnectTimer = null;
             this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);

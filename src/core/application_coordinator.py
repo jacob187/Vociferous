@@ -218,12 +218,12 @@ class ApplicationCoordinator:
 
         if self.slm_runtime:
             try:
-                self.slm_runtime.disable()
+                self.slm_runtime.shutdown()
             except Exception:
                 logger.exception("SLM runtime cleanup failed")
 
         if self.recording_session is not None:
-            self.recording_session.unload_asr_model()
+            self.recording_session.shutdown_models()
 
         if self.db:
             try:
@@ -333,33 +333,52 @@ class ApplicationCoordinator:
         Called when the user clicks "Restart Engine" in settings, typically
         after changing model selection or GPU/CPU preference.
         """
+        if not hasattr(self, "_restart_lock"):
+            self._restart_lock = threading.Lock()
+
+        if not self._restart_lock.acquire(blocking=False):
+            logger.warning("Engine restart already in progress — ignoring duplicate request.")
+            return
 
         def _do_restart() -> None:
-            logger.info("Engine restart requested — tearing down models...")
-            self.event_bus.emit("engine_status", {"asr": "restarting", "slm": "restarting"})
+            try:
+                logger.info("Engine restart requested — tearing down models...")
+                self.event_bus.emit("engine_status", {"asr": "restarting", "slm": "restarting"})
 
-            # Tear down ASR
-            if self.recording_session is not None:
-                self.recording_session.unload_asr_model()
+                # Tear down ASR
+                if self.recording_session is not None:
+                    self.recording_session.unload_asr_model()
 
-            # Tear down SLM
-            if self.slm_runtime:
+                # Tear down SLM
+                if self.slm_runtime:
+                    try:
+                        self.slm_runtime.disable()
+                        self.slm_runtime = None
+                    except Exception:
+                        logger.exception("SLM teardown failed during restart")
+
+                # Reload settings in case model/device changed
+                from src.core.settings import get_settings
+
+                self.settings = get_settings()
+
+                # Reload models
+                if self.recording_session is not None:
+                    self.recording_session.load_asr_model()
+                self._init_slm_runtime()
+
+                # Clear cached GPU/health status so the maintenance
+                # tab picks up new device configuration on next poll.
                 try:
-                    self.slm_runtime.disable()
-                    self.slm_runtime = None
+                    from src.api.system import _detect_gpu_status
+
+                    _detect_gpu_status.cache_clear()
                 except Exception:
-                    logger.exception("SLM teardown failed during restart")
+                    pass
 
-            # Reload settings in case model/device changed
-            from src.core.settings import get_settings
-
-            self.settings = get_settings()
-
-            # Reload models
-            if self.recording_session is not None:
-                self.recording_session.load_asr_model()
-            self._init_slm_runtime()
-            logger.info("Engine restart complete.")
+                logger.info("Engine restart complete.")
+            finally:
+                self._restart_lock.release()
 
         t = threading.Thread(target=_do_restart, name="engine-restart", daemon=True)
         t.start()
@@ -681,8 +700,6 @@ class ApplicationCoordinator:
                 width=1200,
                 height=800,
                 min_size=(800, 600),
-                frameless=True,
-                easy_drag=False,
                 background_color="#1e1e1e",
             )
             self.window.set_window(self._main_window)

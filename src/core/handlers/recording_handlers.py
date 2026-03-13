@@ -145,13 +145,22 @@ class RecordingSession:
             logger.exception("VAD model preload failed (will retry on first transcription)")
 
     def unload_asr_model(self) -> None:
-        """Release the ASR model (called during engine restart or cleanup)."""
-        if self._asr_model:
-            try:
-                del self._asr_model
-                self._asr_model = None
-            except Exception:
-                logger.exception("ASR model cleanup failed")
+        """Release the ASR model (called during engine restart)."""
+        import gc
+
+        if self._asr_model is not None:
+            logger.info("Unloading ASR model...")
+            self._asr_model = None
+            gc.collect()
+
+    def shutdown_models(self) -> None:
+        """Mark models as released WITHOUT running native destructors.
+
+        During process shutdown, forcing gc.collect() triggers CTranslate2's
+        native CUDA destructor while the driver is tearing down → abort().
+        Just null the tracking flag; the OS reclaims everything on exit.
+        """
+        self._asr_model = None
 
     def cancel_for_shutdown(self) -> None:
         """Signal the recording loop to abort without transcribing."""

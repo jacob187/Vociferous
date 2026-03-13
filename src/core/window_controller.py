@@ -1,20 +1,22 @@
-"""
-WindowController — pywebview window management for the frameless title bar.
+"""WindowController — pywebview window management.
 
-Extracted from ApplicationCoordinator to keep window-specific logic
-(minimize, maximize, close, native dialogs) in one place.
+Platform-specific:
+  Windows — DwmSetWindowAttribute(DWMWA_USE_IMMERSIVE_DARK_MODE) to
+            force the native title bar to dark mode.
+  Linux   — No patches needed; title bar follows GTK/system theme.
 """
 
 from __future__ import annotations
 
 import logging
+import sys
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class WindowController:
-    """Thin wrapper around the pywebview main window for frameless title-bar controls."""
+    """Thin wrapper around the pywebview main window."""
 
     def __init__(self) -> None:
         self._main_window: Any = None  # webview.Window
@@ -23,6 +25,60 @@ class WindowController:
     def set_window(self, window: Any) -> None:
         """Bind the pywebview window after creation."""
         self._main_window = window
+        window.events.shown += self._on_shown
+
+    def _on_shown(self) -> None:
+        """Apply platform-specific title bar theming after the window is visible."""
+        if sys.platform != "win32":
+            return
+        try:
+            form = getattr(self._main_window, "native", None)
+            if form is None:
+                return
+            from System import Action  # type: ignore[import-untyped]
+
+            form.Invoke(Action(self._apply_dark_titlebar))
+        except Exception:
+            logger.warning("Failed to apply dark title bar", exc_info=True)
+
+    def _apply_dark_titlebar(self) -> None:
+        """Use DWM to force the native title bar to dark mode (Windows only).
+
+        MUST be called on the WinForms UI thread (via Form.Invoke).
+        """
+        import ctypes
+
+        form = self._main_window.native
+        hwnd = form.Handle.ToInt32()
+
+        # DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+        value = ctypes.c_int(1)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, 20, ctypes.byref(value), ctypes.sizeof(value),
+        )
+
+        # Replace the default Python icon — pywebview's WinForms backend
+        # hardcodes ExtractIconW(sys.executable) and ignores the icon param.
+        self._apply_icon(form)
+
+        logger.info("Dark title bar applied (HWND %#x)", hwnd)
+
+    def _apply_icon(self, form: Any) -> None:
+        """Load vociferous_icon.png and set it as the Form icon."""
+        try:
+            import ctypes
+            from src.core.resource_manager import ResourceManager
+            from System.Drawing import Bitmap, Icon  # type: ignore[import-untyped]
+
+            icon_path = ResourceManager.get_icon_path("vociferous_icon")
+            bitmap = Bitmap(icon_path)
+            hicon = bitmap.GetHicon()
+            form.Icon = Icon.FromHandle(hicon).Clone()
+            ctypes.windll.user32.DestroyIcon(hicon.ToInt32())
+            bitmap.Dispose()
+            logger.info("Custom icon set from %s", icon_path)
+        except Exception:
+            logger.warning("Failed to set custom icon", exc_info=True)
 
     def minimize(self) -> None:
         """Minimize the main window."""

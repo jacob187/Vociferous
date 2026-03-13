@@ -524,7 +524,7 @@
             variant="secondary"
             onclick={() => {
                 if (editText) {
-                    navigator.clipboard.writeText(editText);
+                    navigator.clipboard.writeText(editText).catch(() => {});
                     copied = true;
                     setTimeout(() => (copied = false), 1500);
                 }

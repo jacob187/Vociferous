@@ -182,6 +182,40 @@ def _release_lock() -> None:
         pass
 
 
+def _register_nvidia_dll_dirs() -> None:
+    """Add nvidia pip-package bin dirs to the DLL search path (Windows only).
+
+    Packages like nvidia-cublas-cu12 install DLLs under
+    site-packages/nvidia/<lib>/bin/.  Without this, CTranslate2 fails with
+    'cublas64_12.dll is not found or cannot be loaded'.
+
+    Two mechanisms are used because native extensions vary in how they load
+    DLLs:
+      - os.add_dll_directory:  for LoadLibraryExW(LOAD_LIBRARY_SEARCH_USER_DIRS)
+      - PATH prepend:          for plain LoadLibrary (what CTranslate2 uses)
+    """
+    import importlib.util
+    import pathlib
+
+    spec = importlib.util.find_spec("nvidia")
+    if spec is None or spec.submodule_search_locations is None:
+        return
+
+    extra_dirs: list[str] = []
+    for nvidia_root in spec.submodule_search_locations:
+        for bin_dir in pathlib.Path(nvidia_root).glob("*/bin"):
+            if bin_dir.is_dir():
+                d = str(bin_dir)
+                extra_dirs.append(d)
+                try:
+                    os.add_dll_directory(d)
+                except OSError:
+                    pass
+
+    if extra_dirs:
+        os.environ["PATH"] = os.pathsep.join(extra_dirs) + os.pathsep + os.environ.get("PATH", "")
+
+
 def main() -> int:
     # 0. Parse startup flags
     import argparse
@@ -206,6 +240,13 @@ def main() -> int:
     if not _acquire_lock():
         sys.stderr.write("ERROR: Vociferous is already running. Only one instance allowed.\n")
         return 1
+
+    # 2.5. Register NVIDIA DLL paths (Windows only).
+    # pip-installed nvidia-cublas-cu12 drops DLLs in site-packages but
+    # Python's default DLL search won't find them.  os.add_dll_directory
+    # fixes that before CTranslate2 / faster-whisper try to load cuBLAS.
+    if sys.platform == "win32":
+        _register_nvidia_dll_dirs()
 
     # 3. Settings
     from src.core.settings import init_settings
