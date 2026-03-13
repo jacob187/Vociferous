@@ -276,7 +276,7 @@ if ($modelsMissing) {
 
         Write-Host ""
         Write-Host "Downloading SLM model (Qwen3-8B-ct2-AWQ)..." -ForegroundColor Cyan
-        & $VenvPython $ProvisionScript install qwen8b
+        & $VenvPython $ProvisionScript install qwen4b
 
         Write-Host "[OK] Models downloaded" -ForegroundColor Green
     } else {
