@@ -146,59 +146,66 @@ class TestMessagesToChatml:
 
 
 class TestTemplates:
-    def test_insight_template_has_placeholders(self) -> None:
+    def test_analytics_template_has_placeholders(self) -> None:
         for key in [
             "count",
             "total_words",
             "recorded_time",
+            "speech_time",
+            "silence_time",
             "time_saved",
             "avg_length",
+            "avg_pace",
+            "current_streak",
+            "longest_streak",
             "verbatim_vocab_pct",
             "verbatim_fillers",
             "verbatim_filler_density",
             "verbatim_fk_grade",
             "verbatim_avg_sentence_len",
+            "top_fillers",
             "refinement_section",
+            "transcription_speed",
+            "refinement_wpm",
+            "today_count",
+            "today_words",
+            "days_active_this_week",
         ]:
-            assert f"{{{key}}}" in PromptBuilder.INSIGHT_TEMPLATE
+            assert f"{{{key}}}" in PromptBuilder.ANALYTICS_TEMPLATE
 
-    def test_motd_template_has_placeholders(self) -> None:
-        for key in ["count", "total_words", "avg_pace", "vocab_pct"]:
-            assert f"{{{key}}}" in PromptBuilder.MOTD_TEMPLATE
-
-    def test_insight_template_can_format(self) -> None:
-        """Ensure the template formats without error given valid data."""
-        result = PromptBuilder.INSIGHT_TEMPLATE.format_map(
+    def test_analytics_template_can_format(self) -> None:
+        """Ensure the unified template formats without error given valid data."""
+        result = PromptBuilder.ANALYTICS_TEMPLATE.format_map(
             {
                 "count": 10,
                 "total_words": "1,234",
                 "recorded_time": "5m",
+                "speech_time": "4m",
+                "silence_time": "1m",
                 "time_saved": "2m",
                 "avg_length": "30s",
+                "avg_pace": 150,
+                "current_streak": 3,
+                "longest_streak": 7,
                 "verbatim_vocab_pct": "25%",
                 "verbatim_fillers": 5,
                 "verbatim_filler_density": "3.2%",
                 "verbatim_fk_grade": 6.5,
                 "verbatim_avg_sentence_len": 12.3,
+                "top_fillers": '"um" (3), "uh" (2)',
                 "refinement_section": "",
+                "refined_count": 0,
+                "transcription_speed": 5.0,
+                "transcripts_with_transcription_time": 8,
+                "refinement_wpm": 0,
+                "transcripts_with_refinement_time": 0,
+                "refinement_time_saved": "0s",
+                "today_count": 2,
+                "today_words": "150",
+                "days_active_this_week": 4,
             }
         )
         assert "10" in result
         assert "1,234" in result
-
-    def test_motd_template_can_format(self) -> None:
-        result = PromptBuilder.MOTD_TEMPLATE.format(
-            count=5,
-            total_words="500",
-            avg_pace=120,
-            vocab_pct="30%",
-            verbatim_fillers=12,
-            verbatim_filler_density="3.2%",
-            refined_count=3,
-            time_saved="2m",
-            today_count=2,
-            today_words="150",
-            days_active_this_week=4,
-        )
-        assert "5" in result
-        assert "120" in result
+        assert "PARAGRAPH 1" in result
+        assert "PARAGRAPH 2" in result

@@ -501,7 +501,7 @@
             const z = getZoomFactor();
             const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
             tagAssignX = Math.min(rect.left / z, window.innerWidth / z - 280);
-            tagAssignY = rect.top / z - 8;
+            tagAssignY = Math.max(rect.top / z - 8, 328);
         }
         tagAssignOpen = true;
     }

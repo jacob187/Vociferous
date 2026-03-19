@@ -237,13 +237,6 @@ class RestartEngineIntent(InteractionIntent):
 
 
 @dataclass(frozen=True, slots=True)
-class RefreshInsightIntent(InteractionIntent):
-    """Force-trigger insight regeneration, bypassing TTL/count guards."""
-
-    source: IntentSource = IntentSource.API
-
-
-@dataclass(frozen=True, slots=True)
 class ImportAudioFileIntent(InteractionIntent):
     """Import an audio file from disk for transcription."""
 

@@ -65,21 +65,11 @@ def get_insight() -> dict:
     return {"text": coordinator.get_insight_text()}
 
 
-@post("/api/insight/refresh", sync_to_thread=True)
-def refresh_insight() -> dict:
-    """Force-trigger insight regeneration, bypassing TTL/count guards."""
-    from src.core.intents.definitions import RefreshInsightIntent
-
-    coordinator = get_coordinator()
-    started = coordinator.command_bus.dispatch(RefreshInsightIntent())
-    return {"status": "generating" if started else "unavailable"}
-
-
 @get("/api/motd", sync_to_thread=True)
 def get_motd() -> dict:
-    """Return the cached TranscribeView header MOTD, or empty text if none exists yet."""
+    """Return the cached insight text (alias for /api/insight; kept for frontend compat)."""
     coordinator = get_coordinator()
-    return {"text": coordinator.get_motd_text()}
+    return {"text": coordinator.get_insight_text()}
 
 
 @post("/api/export")
@@ -460,7 +450,6 @@ async def dispatch_intent(data: dict) -> Response:
         "assign_tags": defs.AssignTagsIntent,
         "update_config": defs.UpdateConfigIntent,
         "restart_engine": defs.RestartEngineIntent,
-        "refresh_insight": defs.RefreshInsightIntent,
         "import_audio_file": defs.ImportAudioFileIntent,
     }
 

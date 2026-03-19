@@ -17,72 +17,66 @@ class PromptBuilder:
     - **Custom generation**: Freeform system+user prompt (insight, MOTD, etc.).
     """
 
-    # ── Insight / MOTD templates ────────────────────────────────────────────
+    # ── Analytics insight template (unified) ────────────────────────────────
 
-    INSIGHT_TEMPLATE: str = """\
-You are a witty, encouraging assistant embedded in Vociferous, a local AI-powered \
-speech-to-text application. The user dictates speech into text on their own machine \
-with full privacy — no cloud, no data collection.
+    ANALYTICS_TEMPLATE: str = """\
+You are embedded in a local AI-powered speech-to-text desktop application. \
+The user dictates speech into text on their own machine with full privacy.
 
-Here are the user's current usage statistics:
-
-Overall:
-- Total transcriptions: {count}
-- Total words captured: {total_words}
-- Total recording time: {recorded_time}
-- Estimated time saved vs typing: {time_saved}
-- Average recording length: {avg_length}
-
-Verbatim (raw speech-to-text output):
-- Vocabulary diversity: {verbatim_vocab_pct}
-- Filler words detected: {verbatim_fillers} ({verbatim_filler_density} of words)
-- Average Flesch-Kincaid reading level: grade {verbatim_fk_grade}
-- Average sentence length: {verbatim_avg_sentence_len} words
-
-{refinement_section}\
-Write exactly ONE short paragraph (2-3 sentences) giving the user personalized, \
-specific feedback based on these statistics. Be warm, direct, and subtly witty. \
-Reference concrete numbers. If refinement data is available, highlight the measurable \
-improvement between verbatim and refined text — this demonstrates the value of the \
-refinement pipeline. Do not use bullet points. Do not begin with "You" or "Your". \
-Do not mention the app name. Do not use exclamation marks more than once. \
-Write as a confident peer, not a cheerleader."""
-
-    MOTD_TEMPLATE: str = """\
-You are embedded in Vociferous, a local AI-powered speech-to-text desktop application.
-The user has captured the following usage data:
-
-All-time:
-- Total transcriptions: {count}
-- Total words captured: {total_words}
-- Average pace: {avg_pace} wpm
-- Vocabulary diversity: {vocab_pct}
-- Filler words detected: {verbatim_fillers} ({verbatim_filler_density} of words)
-- Transcripts refined by AI: {refined_count}
-- Estimated time saved vs typing: {time_saved}
+Below are the user's usage statistics. Study all of them, then write TWO short \
+paragraphs as described in the instructions at the end.
 
 Today's session:
 - Transcriptions today: {today_count}
 - Words today: {today_words}
 - Days active this week: {days_active_this_week}
 
-Write 1–3 sentences reacting to these stats. Be warm, specific, and subtly witty. \
-Think a sharp colleague glancing at your dashboard — direct, a little wry, never generic.
+All-time overview:
+- Total transcriptions: {count}
+- Total words captured: {total_words}
+- Total recording time: {recorded_time}
+- Total speech time (VAD): {speech_time}
+- Total silence time: {silence_time}
+- Estimated time saved vs typing: {time_saved}
+- Average recording length: {avg_length}
+- Average speaking pace: {avg_pace} wpm
+- Current daily streak: {current_streak} days
+- Longest daily streak: {longest_streak} days
+
+Verbatim speech quality (raw transcription output):
+- Vocabulary diversity: {verbatim_vocab_pct}
+- Filler words detected: {verbatim_fillers} ({verbatim_filler_density} of words)
+- Top fillers: {top_fillers}
+- Average Flesch-Kincaid grade: {verbatim_fk_grade}
+- Average sentence length: {verbatim_avg_sentence_len} words
+
+{refinement_section}\
+Processing performance:
+- Transcription speed: {transcription_speed}x realtime ({transcripts_with_transcription_time} samples)
+- Refinement throughput: {refinement_wpm} wpm ({transcripts_with_refinement_time} samples)
+- Refinement time saved vs manual editing: {refinement_time_saved}
+
+Instructions — write exactly TWO short paragraphs, separated by a blank line:
+
+PARAGRAPH 1 — Daily: Pick 2–3 of the most interesting statistics from today's \
+session (or this week if today is sparse). React to them with specific numbers. \
+Think a sharp colleague glancing at your dashboard — direct, a little wry.
+
+PARAGRAPH 2 — Long-term: Pick 2–3 of the most meaningful cumulative or trend \
+statistics. Highlight concrete improvements or patterns. If refinement data is \
+available, the measurable difference between verbatim and refined quality is \
+always worth mentioning.
 
 Rules:
-- Pick ONE angle from the data above. Vary your angle — do not always comment on the same stat.
-- Reference a concrete number.
-- Do NOT begin with "You" or "Your".
+- Be warm, specific, and subtly witty. Write as a confident peer, not a cheerleader.
+- Reference concrete numbers in both paragraphs.
+- Do NOT begin any sentence with "You" or "Your".
 - No exclamation marks. No app name. No preamble or meta-talk.
-- Do NOT describe what the app does.
-- If today's session data is zero, focus on all-time stats instead.
+- Do NOT describe what the app does. Do not use bullet points.
+- If today's data is zero, fold daily observations into the long-term paragraph \
+and write only ONE paragraph instead.
 
-Bad example: "You've made 13 transcriptions with 2,071 words at 150 wpm."
-Good example: "Four sessions before lunch — either a productive morning or a very long meeting."
-Good example: "153 words per minute and still finding time to say 'um' 78 times."
-Good example: "Five days active this week. The keyboard is starting to feel jealous."
-
-Output only the sentences. Nothing else."""
+Output only the paragraphs. Nothing else."""
 
     def __init__(
         self,

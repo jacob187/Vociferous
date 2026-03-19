@@ -521,7 +521,6 @@ class TestRecordingSessionLifecycle:
             event_bus_emit=_emit_to(events_list),
             shutdown_event=threading.Event(),
             insight_manager_provider=lambda: None,
-            motd_manager_provider=lambda: None,
         )
 
     def test_cancel_for_shutdown_sets_stop_and_clears_recording(self, events):

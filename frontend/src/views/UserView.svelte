@@ -1,12 +1,13 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { getTranscripts, getHealth, getConfig, getInsight, refreshInsight, type Transcript } from "../lib/api";
+    import { getTranscripts, getHealth, getConfig, type Transcript } from "../lib/api";
     import { toast } from "../lib/toast.svelte";
     import { ws } from "../lib/ws";
     import { formatCount } from "../lib/formatters";
     import { computeTextMetrics, fleschKincaidGrade, countFillers, countFillersByWord } from "../lib/textAnalysis";
     import StatCard from "../lib/components/StatCard.svelte";
     import ActivityHeatmap from "../lib/components/ActivityHeatmap.svelte";
+    import AnalyticsParagraph from "../lib/components/AnalyticsParagraph.svelte";
     import {
         Timer,
         MessageSquareText,
@@ -53,8 +54,6 @@
     let showExplanations = $state(false);
     let activeTab = $state<UserTab>("dashboard");
     let healthInfo: { version: string; transcripts: number } | null = $state(null);
-    let slmInsight = $state("");
-    let refreshingInsight = $state(false);
 
     /* ── Derived Metrics ── */
     function safeText(e: { text: string }): string {
@@ -290,18 +289,6 @@
         return Math.max(0, manualSeconds - totalRefinementTime);
     });
 
-    let insight = $derived.by(() => {
-        if (slmInsight) return slmInsight;
-        if (count < 3) return "Don't be shy! Record a bit more to see your Vociferous metrics!";
-        const ratio = recordedSeconds > 0 ? typingSeconds / recordedSeconds : 0;
-        if (ratio > 2.5) return `Speaking ${ratio.toFixed(1)}x faster than typing—voice is your superpower!`;
-        if (ratio > 1.5) return "Dictation is significantly faster than typing for you! You're a certified yapper~";
-        if (avgSeconds < 15) return "Quick-capture style: rapid-fire notes and thoughts. Keep that momentum going!";
-        if (avgSeconds > 60)
-            return "Deep-work style: long-form dictation sessions. Now that's what I'd call elite comms!";
-        return "Consistent dictation is key—keep up the great work!";
-    });
-
     let titleText = $derived(userName.trim() ? `${userName.trim()}'s Vociferous Journey` : "Your Vociferous Journey");
 
     /* ── Formatting ── */
@@ -325,16 +312,14 @@
         const gen = ++loadGeneration;
         loading = true;
         try {
-            const [transcriptResult, health, config, insightRes] = await Promise.all([
+            const [transcriptResult, health, config] = await Promise.all([
                 getTranscripts({ limit: TRANSCRIPT_EXPORT_LIMIT }),
                 getHealth().catch(() => null),
                 getConfig().catch(() => ({})),
-                getInsight().catch(() => ({ text: "" })),
             ]);
             if (gen !== loadGeneration) return; // stale response
             entries = transcriptResult.items.filter((t) => t.include_in_analytics);
             healthInfo = health;
-            slmInsight = insightRes.text || "";
             // Extract user name and typing WPM from config
             const u = config as Record<string, unknown>;
             const userSection = u?.user as Record<string, unknown> | undefined;
@@ -356,10 +341,6 @@
             ws.on("transcription_complete", () => loadData()),
             ws.on("transcript_deleted", () => loadData()),
             ws.on("transcripts_batch_deleted", () => loadData()),
-            ws.on("insight_ready", (data) => {
-                slmInsight = data.text || "";
-                refreshingInsight = false;
-            }),
         ];
         return () => unsubs.forEach((fn) => fn());
     });
@@ -451,25 +432,7 @@
                         {titleText}
                     </h2>
                     <div class="w-12 h-[2px] rounded-full bg-[var(--accent)]"></div>
-                    <p class="text-center text-[var(--text-sm)] text-[var(--accent)] italic m-0 max-w-[760px]">
-                        {insight}
-                    </p>
-                    <button
-                        class="text-[var(--text-xs)] text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-colors cursor-pointer bg-transparent border-none p-0 disabled:opacity-40 disabled:cursor-not-allowed"
-                        disabled={refreshingInsight}
-                        onclick={async () => {
-                            refreshingInsight = true;
-                            try {
-                                const res = await refreshInsight();
-                                if (res.status !== "generating") refreshingInsight = false;
-                            } catch (e) {
-                                refreshingInsight = false;
-                                toast.error("Failed to refresh insight");
-                            }
-                        }}
-                    >
-                        {refreshingInsight ? "Generating…" : "↻ Refresh insight"}
-                    </button>
+                    <AnalyticsParagraph class="text-center text-[var(--text-sm)] text-[var(--accent)]" />
                 </div>
 
                 <!-- ═══ Activity Heatmap (shared, above tabs) ═══ -->

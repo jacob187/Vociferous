@@ -144,7 +144,6 @@ class TestHandlerRegistration:
             DeleteTagIntent,
             DeleteTranscriptIntent,
             RefineTranscriptIntent,
-            RefreshInsightIntent,
             RenameTranscriptIntent,
             RestartEngineIntent,
             RetitleTranscriptIntent,
@@ -180,7 +179,6 @@ class TestHandlerRegistration:
             BatchToggleTagIntent,
             UpdateConfigIntent,
             RestartEngineIntent,
-            RefreshInsightIntent,
             RetitleTranscriptIntent,
         ]
 
@@ -191,8 +189,8 @@ class TestHandlerRegistration:
 
     def test_handler_count_matches_intent_count(self, coordinator):
         """No extra/ghost handlers registered beyond the expected set."""
-        # 27 intents are registered in _register_handlers
-        assert len(coordinator.command_bus._handlers) == 27
+        # 26 intents are registered in _register_handlers
+        assert len(coordinator.command_bus._handlers) == 26
 
     def test_handlers_are_callable(self, coordinator):
         """Every registered handler must be callable."""
@@ -202,7 +200,7 @@ class TestHandlerRegistration:
     def test_double_register_does_not_duplicate(self, coordinator):
         """Calling _register_handlers again overwrites, doesn't stack."""
         coordinator._register_handlers()
-        assert len(coordinator.command_bus._handlers) == 27
+        assert len(coordinator.command_bus._handlers) == 26
 
 
 # ── Shutdown & Cleanup ────────────────────────────────────────────────────
@@ -515,19 +513,14 @@ class TestCoordinatorAccessors:
         coordinator.insight_manager = mock_manager
         assert coordinator.get_insight_text() == "Some insight text"
 
-    def test_get_motd_text_no_manager(self, coordinator):
-        """get_motd_text() returns empty string when motd_manager is None."""
-        assert coordinator.motd_manager is None
-        assert coordinator.get_motd_text() == ""
-
-    def test_get_motd_text_with_manager(self, coordinator):
-        """get_motd_text() delegates to motd_manager.cached_text."""
+    def test_get_motd_text_aliases_insight(self, coordinator):
+        """get_motd_text() returns the same cached text as get_insight_text()."""
         from unittest.mock import MagicMock
 
         mock_manager = MagicMock()
-        mock_manager.cached_text = "Today's MOTD"
-        coordinator.motd_manager = mock_manager
-        assert coordinator.get_motd_text() == "Today's MOTD"
+        mock_manager.cached_text = "Unified insight"
+        coordinator.insight_manager = mock_manager
+        assert coordinator.get_motd_text() == "Unified insight"
 
 
 # ── Engine Restarted Event ────────────────────────────────────────────────

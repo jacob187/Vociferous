@@ -38,7 +38,6 @@ from src.api.system import (
     maximize_window,
     minimize_window,
     prewarm_health_cache,
-    refresh_insight,
     restart_engine,
     start_key_capture,
     stop_key_capture,
@@ -292,7 +291,6 @@ def create_app(coordinator: ApplicationCoordinator) -> Litestar:
             download_model,
             restart_engine,
             get_insight,
-            refresh_insight,
             get_motd,
             export_file,
             import_audio_file,
@@ -357,7 +355,6 @@ def _wire_event_bridge(coordinator: ApplicationCoordinator, ws_manager: Connecti
         "bulk_refinement_complete",
         "bulk_refinement_error",
         "insight_ready",
-        "motd_ready",
         "transcripts_cleared",
     ]
 

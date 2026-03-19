@@ -60,7 +60,6 @@ class ApplicationCoordinator:
         self.slm_runtime: SLMRuntime | None = None
         self._uvicorn_server: Any = None  # uvicorn.Server for graceful shutdown
         self.insight_manager: Any = None  # InsightManager | None
-        self.motd_manager: Any = None  # InsightManager | None (MOTD)
         self.title_generator: Any = None  # TitleGenerator | None
 
         # Recording session (created in start())
@@ -109,7 +108,6 @@ class ApplicationCoordinator:
             event_bus_emit=self.event_bus.emit,
             shutdown_event=self._shutdown_event,
             insight_manager_provider=lambda: self.insight_manager,
-            motd_manager_provider=lambda: self.motd_manager,
             title_generator_provider=lambda: self.title_generator,
         )
 
@@ -128,13 +126,10 @@ class ApplicationCoordinator:
         # 3. SLM runtime (CTranslate2 Generator).
         self._init_slm_runtime()
 
-        # 3b. Insight manager (lazy background SLM insight for idle screen)
+        # 3b. Insight manager (unified analytics paragraph for UserView + TranscribeView)
         self._init_insight_manager()
 
-        # 3c. MOTD manager (short punchy header line for TranscribeView)
-        self._init_motd_manager()
-
-        # 3d. Title generator (auto-title transcripts via SLM)
+        # 3c. Title generator (auto-title transcripts via SLM)
         self._init_title_generator()
 
         # 3e. Load ASR model (CTranslate2 Whisper).
@@ -253,12 +248,12 @@ class ApplicationCoordinator:
 
             def on_slm_state(state):
                 self.event_bus.emit("engine_status", {"slm": state.value})
-                # When SLM becomes idle, opportunistically try MOTD generation.
+                # When SLM becomes idle, opportunistically try insight generation.
                 # This fires both on startup (LOADING→READY) and after any inference job finishes.
                 from src.services.slm_types import SLMState as _SLMState
 
-                if state == _SLMState.READY and self.motd_manager is not None:
-                    self.motd_manager.maybe_schedule()
+                if state == _SLMState.READY and self.insight_manager is not None:
+                    self.insight_manager.maybe_schedule()
 
             def on_slm_error(msg):
                 self.event_bus.emit("refinement_error", {"message": msg})
@@ -280,7 +275,7 @@ class ApplicationCoordinator:
             logger.exception("SLM runtime failed to initialize (non-fatal)")
 
     def _init_insight_manager(self) -> None:
-        """Initialize the InsightManager for lazy UserView dashboard insight generation."""
+        """Initialize the unified InsightManager for analytics paragraphs (UserView + TranscribeView)."""
         try:
             from src.core.insight_manager import InsightManager
             from src.core.usage_stats import compute_usage_stats
@@ -292,30 +287,9 @@ class ApplicationCoordinator:
                     compute_usage_stats(self.db, typing_wpm=self.settings.user.typing_wpm) if self.db else {}
                 ),
             )
-            logger.info("InsightManager initialized")
+            logger.info("InsightManager initialized (unified)")
         except Exception:
             logger.exception("InsightManager failed to initialize (non-fatal)")
-
-    def _init_motd_manager(self) -> None:
-        """Initialize the MOTD InsightManager for the TranscribeView header line."""
-        try:
-            from src.core.insight_manager import _MOTD_PROMPT, InsightManager
-            from src.core.usage_stats import compute_usage_stats
-
-            self.motd_manager = InsightManager(
-                slm_runtime_provider=lambda: self.slm_runtime,
-                event_emitter=self.event_bus.emit,
-                stats_provider=lambda: (
-                    compute_usage_stats(self.db, typing_wpm=self.settings.user.typing_wpm) if self.db else {}
-                ),
-                ttl_transcripts=3,
-                prompt_template=_MOTD_PROMPT,
-                cache_filename="motd_cache.json",
-                event_name="motd_ready",
-            )
-            logger.info("MOTD InsightManager initialized")
-        except Exception:
-            logger.exception("MOTD InsightManager failed to initialize (non-fatal)")
 
     def _init_title_generator(self) -> None:
         """Initialize the TitleGenerator for auto-naming transcripts via SLM."""
@@ -476,7 +450,6 @@ class ApplicationCoordinator:
             ImportAudioFileIntent,
             RefineTranscriptIntent,
             RetranscribeIntent,
-            RefreshInsightIntent,
             RenameTranscriptIntent,
             RestartEngineIntent,
             RetitleTranscriptIntent,
@@ -542,7 +515,6 @@ class ApplicationCoordinator:
         bus.register(BatchToggleTagIntent, tag.handle_batch_toggle_tag)
         bus.register(UpdateConfigIntent, system.handle_update_config)
         bus.register(RestartEngineIntent, system.handle_restart_engine)
-        bus.register(RefreshInsightIntent, system.handle_refresh_insight)
         bus.register(RetitleTranscriptIntent, title.handle_retitle)
 
     # --- Hotkey ---
@@ -759,7 +731,7 @@ class ApplicationCoordinator:
         return ""
 
     def get_motd_text(self) -> str:
-        """Return the cached MOTD text, or empty string if unavailable."""
-        if self.motd_manager is not None:
-            return self.motd_manager.cached_text
+        """Return the cached insight text (same as get_insight_text; kept for API compat)."""
+        if self.insight_manager is not None:
+            return self.insight_manager.cached_text
         return ""

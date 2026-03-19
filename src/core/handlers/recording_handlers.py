@@ -81,7 +81,6 @@ class RecordingSession:
         event_bus_emit: Callable,
         shutdown_event: threading.Event,
         insight_manager_provider: Callable[[], Any],
-        motd_manager_provider: Callable[[], Any],
         title_generator_provider: Callable[[], Any] = lambda: None,
     ) -> None:
         self._audio_service_provider = audio_service_provider
@@ -90,7 +89,6 @@ class RecordingSession:
         self._emit = event_bus_emit
         self._shutdown_event = shutdown_event
         self._insight_manager_provider = insight_manager_provider
-        self._motd_manager_provider = motd_manager_provider
         self._title_generator_provider = title_generator_provider
 
         self._is_recording = False
@@ -479,13 +477,10 @@ class RecordingSession:
                 },
             )
 
-            # Schedule lazy insight generation if the cache is stale.
+            # Schedule analytics insight generation if a threshold has been crossed.
             insight_manager = self._insight_manager_provider()
             if insight_manager is not None:
                 insight_manager.maybe_schedule()
-            motd_manager = self._motd_manager_provider()
-            if motd_manager is not None:
-                motd_manager.maybe_schedule()
 
             # Schedule SLM-based auto-titling for the new transcript.
             # Skip initial title when auto-refine is enabled — refinement

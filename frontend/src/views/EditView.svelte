@@ -299,7 +299,7 @@
         <button
             class="mt-0.5 shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-transparent border-none text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-overlay)] cursor-pointer transition-colors"
             onclick={discard}
-            title="Discard and go back (Esc)"
+            title={isDirty ? "Discard and go back (Esc)" : "Go back (Esc)"}
         >
             <ArrowLeft size={16} />
         </button>
@@ -448,8 +448,8 @@
 
     <!-- ── Footer ── -->
     <ActionBar>
-        <StyledButton size="sm" variant="destructive" onclick={discard}>
-            <X size={13} /> Discard
+        <StyledButton size="sm" variant={isDirty ? "destructive" : "secondary"} onclick={discard}>
+            <X size={13} /> {isDirty ? "Discard" : "Close"}
         </StyledButton>
 
         <StyledButton

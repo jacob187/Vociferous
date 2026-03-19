@@ -43,7 +43,6 @@
         getHealth,
         getTranscript,
         getTranscripts,
-        getMotd,
         getTags,
         assignTags,
         createTag,
@@ -57,6 +56,7 @@
     import { PlusCircle } from "lucide-svelte";
     import type { Transcript, Tag } from "../lib/api";
     import TagBar from "../lib/components/TagBar.svelte";
+    import AnalyticsParagraph from "../lib/components/AnalyticsParagraph.svelte";
     import { toast } from "../lib/toast.svelte";
 
     type WorkspaceState = "idle" | "recording" | "transcribing" | "ready" | "viewing" | "editing";
@@ -152,9 +152,6 @@
             toast.error(`Failed to update tag color: ${e.message}`);
         }
     }
-
-    /* ===== SLM insight (header subtitle) ===== */
-    let slmInsight = $state("");
 
     async function toggleTag(tagId: number) {
         if (transcriptId == null) return;
@@ -299,11 +296,6 @@
 
         loadRecentSessions();
         loadTags();
-        getMotd()
-            .then((res) => {
-                slmInsight = res.text || "";
-            })
-            .catch(() => {});
         getHealth()
             .then((health) => {
                 if (health.recording_active) {
@@ -397,9 +389,6 @@
             ws.on("transcription_error", (data) => {
                 transcriptText = `Error: ${data.message}`;
                 viewState = "ready";
-            }),
-            ws.on("motd_ready", (data) => {
-                slmInsight = data.text || "";
             }),
             ws.on("audio_level", (data) => {
                 audioLevel = data.level;
@@ -650,19 +639,10 @@
                 >
                     {greeting}
                 </h1>
-                {#if slmInsight}
-                    <p
-                        class="text-[var(--text-base)] text-[var(--text-secondary)] italic mb-0 leading-[var(--leading-normal)] opacity-85 max-w-prose px-[var(--space-4)] [overflow-wrap:anywhere]"
-                    >
-                        {slmInsight}
-                    </p>
-                {:else if !refinementEnabled}
+                <AnalyticsParagraph />
+                {#if !refinementEnabled}
                     <p class="text-[var(--text-sm)] text-[var(--text-tertiary)] mb-0">
                         Enable Grammar Refinement in Settings to unlock AI insights.
-                    </p>
-                {:else}
-                    <p class="text-[var(--text-sm)] text-[var(--text-tertiary)] mb-0">
-                        Click the mic button or use your hotkey to start recording
                     </p>
                 {/if}
                 <!-- Stats card -->
@@ -705,15 +685,7 @@
                 >
                     {greeting}
                 </h1>
-                {#if slmInsight}
-                    <p
-                        class="text-[var(--text-base)] text-[var(--text-secondary)] italic mb-0 leading-[var(--leading-normal)] opacity-85 max-w-prose px-[var(--space-4)] [overflow-wrap:anywhere]"
-                    >
-                        {slmInsight}
-                    </p>
-                {:else}
-                    <p class="text-[var(--text-sm)] text-[var(--text-tertiary)] mb-0">Recording in progress</p>
-                {/if}
+                <AnalyticsParagraph />
                 {#if sessionStats && sessionStats.count > 0}
                     <div
                         class="inline-flex items-stretch bg-[var(--surface-secondary)] border border-[var(--shell-border)] rounded-[var(--radius-md)] mt-[var(--space-2)]"

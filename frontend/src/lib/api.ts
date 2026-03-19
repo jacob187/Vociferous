@@ -250,14 +250,6 @@ export function getInsight(): Promise<{ text: string }> {
     return request("/insight");
 }
 
-export function refreshInsight(): Promise<{ status: string }> {
-    return request("/insight/refresh", { method: "POST" });
-}
-
-export function getMotd(): Promise<{ text: string }> {
-    return request("/motd");
-}
-
 export function exportFile(content: string, filename: string): Promise<{ path: string }> {
     return request("/export", {
         method: "POST",

@@ -52,9 +52,3 @@ class SystemHandlers:
     def handle_restart_engine(self, intent: Any) -> None:
         self._restart_engine()
 
-    def handle_refresh_insight(self, intent: Any) -> bool:
-        """Trigger insight regeneration. Returns True if generation started."""
-        manager = self._insight_manager_provider()
-        if manager is None:
-            return False
-        return manager.request_generation()

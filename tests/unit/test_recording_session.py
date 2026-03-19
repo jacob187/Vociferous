@@ -47,7 +47,6 @@ def session(emit, fake_db, fake_audio_service, fresh_settings):
         event_bus_emit=emit,
         shutdown_event=threading.Event(),
         insight_manager_provider=lambda: None,
-        motd_manager_provider=lambda: None,
         title_generator_provider=lambda: None,
     )
     return s
@@ -317,7 +316,6 @@ class TestHandleBeginGuards:
             event_bus_emit=emit,
             shutdown_event=threading.Event(),
             insight_manager_provider=lambda: None,
-            motd_manager_provider=lambda: None,
         )
         s.handle_begin(MagicMock())
         assert s._is_recording is False

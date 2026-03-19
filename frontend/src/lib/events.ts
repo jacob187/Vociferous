@@ -144,10 +144,6 @@ export interface InsightReadyData {
     text: string;
 }
 
-export interface MotdReadyData {
-    text: string;
-}
-
 // --- Event type → data mapping ---
 
 export interface WSEventMap {
@@ -176,7 +172,6 @@ export interface WSEventMap {
     tag_deleted: TagDeletedData;
     key_captured: KeyCapturedData;
     insight_ready: InsightReadyData;
-    motd_ready: MotdReadyData;
 }
 
 /** All known event type strings. */
@@ -302,7 +297,5 @@ export const wsEventValidators: {
     key_captured: (data): data is KeyCapturedData =>
         isObject(data) && isString(data.combo) && isString(data.display),
     insight_ready: (data): data is InsightReadyData =>
-        isObject(data) && isString(data.text),
-    motd_ready: (data): data is MotdReadyData =>
         isObject(data) && isString(data.text),
 };

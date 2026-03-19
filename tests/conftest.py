@@ -107,7 +107,6 @@ def coordinator(tmp_path: Path):
         event_bus_emit=coord.event_bus.emit,
         shutdown_event=coord._shutdown_event,
         insight_manager_provider=lambda: coord.insight_manager,
-        motd_manager_provider=lambda: coord.motd_manager,
     )
     coord._register_handlers()
 
