@@ -219,6 +219,18 @@ class TranscriptDB:
         "silence": "(t.duration_ms - t.speech_duration_ms)",
     }
 
+    def _paginate(
+        self,
+        count_sql: str,
+        rows_sql: str,
+        count_params: tuple = (),
+        rows_params: tuple = (),
+    ) -> tuple[int, list]:
+        """Execute a count query and a paginated rows query, returning (total, rows)."""
+        total: int = self._conn.execute(count_sql, count_params).fetchone()[0]
+        rows: list = self._conn.execute(rows_sql, rows_params).fetchall()
+        return total, rows
+
     def recent(
         self,
         limit: int = 50,
@@ -248,56 +260,35 @@ class TranscriptDB:
 
         with self._write_lock:
             if tag_ids:
+                placeholders = ",".join("?" * len(tag_ids))
                 if tag_mode == "all":
-                    placeholders = ",".join("?" * len(tag_ids))
                     where = f"""WHERE t.id IN (
                                SELECT transcript_id FROM transcript_tags
                                WHERE tag_id IN ({placeholders})
                                GROUP BY transcript_id
                                HAVING COUNT(DISTINCT tag_id) = ?
                            )"""
-                    count_params: tuple = (*tag_ids, len(tag_ids))
-                    query_params: tuple = (*tag_ids, len(tag_ids), limit, offset)
-
-                    total = self._conn.execute(
-                        f"""SELECT COUNT(*) FROM transcripts t {where}""",
-                        count_params,
-                    ).fetchone()[0]
-
-                    rows = self._conn.execute(
-                        f"""SELECT t.*
-                           FROM transcripts t
-                           {where}
-                           {order_clause} LIMIT ? OFFSET ?""",
-                        query_params,
-                    ).fetchall()
+                    total, rows = self._paginate(
+                        f"SELECT COUNT(*) FROM transcripts t {where}",
+                        f"SELECT t.* FROM transcripts t {where} {order_clause} LIMIT ? OFFSET ?",
+                        (*tag_ids, len(tag_ids)),
+                        (*tag_ids, len(tag_ids), limit, offset),
+                    )
                 else:
-                    placeholders = ",".join("?" * len(tag_ids))
                     where = f"""INNER JOIN transcript_tags tt ON t.id = tt.transcript_id
                            WHERE tt.tag_id IN ({placeholders})"""
-                    count_params = tuple(tag_ids)
-                    query_params = (*tag_ids, limit, offset)
-
-                    total = self._conn.execute(
-                        f"""SELECT COUNT(DISTINCT t.id) FROM transcripts t {where}""",
-                        count_params,
-                    ).fetchone()[0]
-
-                    rows = self._conn.execute(
-                        f"""SELECT DISTINCT t.*
-                           FROM transcripts t
-                           {where}
-                           {order_clause} LIMIT ? OFFSET ?""",
-                        query_params,
-                    ).fetchall()
+                    total, rows = self._paginate(
+                        f"SELECT COUNT(DISTINCT t.id) FROM transcripts t {where}",
+                        f"SELECT DISTINCT t.* FROM transcripts t {where} {order_clause} LIMIT ? OFFSET ?",
+                        tuple(tag_ids),
+                        (*tag_ids, limit, offset),
+                    )
             else:
-                total = self._conn.execute("SELECT COUNT(*) FROM transcripts").fetchone()[0]
-                rows = self._conn.execute(
-                    f"""SELECT t.*
-                       FROM transcripts t
-                       {order_clause} LIMIT ? OFFSET ?""",
-                    (limit, offset),
-                ).fetchall()
+                total, rows = self._paginate(
+                    "SELECT COUNT(*) FROM transcripts",
+                    f"SELECT t.* FROM transcripts t {order_clause} LIMIT ? OFFSET ?",
+                    rows_params=(limit, offset),
+                )
             transcripts = [self._row_to_transcript(r) for r in rows]
             self._enrich_transcripts_with_tags(transcripts)
         return transcripts, total
