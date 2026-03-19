@@ -1,5 +1,43 @@
 # Vociferous Changelog
 
+## v6.2.0 — Analytics Unification, Threshold SLM Regen, Tech Debt
+
+**Date:** 2026-03-19
+**Status:** Feature / Refactor
+**Issues:** ISS-094, ISS-095, ISS-097, ISS-098, ISS-100, ISS-102, ISS-103, ISS-106
+
+### Added
+- **Unified analytics paragraph** (ISS-097) — `InsightManager` and `MOTDManager` merged into a single `InsightManager` that produces one cached analytics text shared by both TranscribeView and UserView. `AnalyticsParagraph.svelte` extracted as a reusable component. `InsightCache` class inlined (~5 lines replacing 41). Single `insight_updated` WebSocket event.
+- **Threshold-based SLM analytics regeneration** (ISS-098) — Auto-regenerate the analytics paragraph when `today_words` crosses a daily threshold (`500 / 1 000 / 2 500 / 5 000 / 10 000`). Only the next threshold above the last-generated level triggers a regen; crossing multiple thresholds at once fires once. Manual refresh button removed.
+- **Full stats pass to SLM prompt** (ISS-100) — All ~35 keys from `compute_usage_stats()` now forwarded to `InsightManager._generate_task()`. Two-paragraph prompt structure: SLM picks 2–3 daily highlights for paragraph 1, 2–3 long-term/cumulative highlights for paragraph 2.
+
+### Fixed
+- **EditView exit button label** (ISS-094) — Footer button shows neutral "Close" when `isDirty` is false; only shows destructive "Discard" when unsaved changes exist.
+- **Tag assign popover Y-axis overflow** (ISS-095) — Popover position Y-coordinate clamped so the tag picker never overflows the top of the viewport in TranscriptsView.
+
+### Refactored
+- **Remove plugin system** (ISS-102) — Deleted `PluginLoader` (79 LOC). Entry-point discovery for a plugin ecosystem that doesn't exist and isn't planned. Backend selection now hardcoded as a plain dict in `listener.py`. Test fixtures de-patched.
+- **DRY `db.py recent()`** (ISS-106) — Three duplicated count+fetch query branches collapsed via a new `_paginate(count_sql, rows_sql, ...)` helper. Bug fixes to pagination now require editing one place.
+
+---
+
+## v6.1.5 — Architectural Cleanup, Auto-Apply Default Prompt
+
+**Date:** 2026-03-19
+**Status:** Feature / Refactor
+
+### Added
+- **Auto-apply default refinement prompt** — When a refinement is triggered with no `instructions` string, both the single and bulk refine handlers now fall back to loading the transcript text of `settings.refinement.default_prompt_transcript_id` from the DB. Frontend auto-selects the default prompt on load and populates `customInstructions` so the user sees what will be used.
+
+### Refactored
+- **Core → API layering fix** — `system.py` was importing `src.api.system._detect_gpu_status` directly to clear its GPU status cache after engine restart. Core must not depend on API. Replaced with a `clear_gpu_status_cache()` method on the coordinator, called from the restart handler where it belongs.
+- **Eager lock initialisation** — `SLMRuntime._lock` was only created inside the first call that needed it. Moved to `__init__` so the lock is always present after construction.
+- **Coordinator query accessors** — `system.py` was reading `coordinator.db`, `coordinator.recording_session`, `coordinator.insight_manager` directly. Added four accessor methods to provide a stable interface and keep internal structure private.
+- **Dead code and dependency cleanup** — Removed unused `DistributionChart` component, deduplicated tag-enrichment blocks in `db.py search()`, shared `remove_system_tag_from_transcript()` lookup, removed redundant audio Stage-2 RMS re-computation, dropped `scipy` dependency (40 MB) in favour of a pure-numpy DC filter.
+- **Remove speculative ABC from `InteractionIntent`** — ABC inheritance with no abstract methods, no interface contract, and metaclass overhead for zero benefit.
+
+---
+
 ## v6.1.4 — CustomSelect Dropdown Positioning Fix
 
 **Date:** 2026-03-13
