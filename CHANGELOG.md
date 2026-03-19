@@ -1,5 +1,16 @@
 # Vociferous Changelog
 
+## v6.2.1 — Inline Trivial CRUD Intents
+
+**Date:** 2026-03-19
+**Status:** Refactor
+**Issues:** ISS-109
+
+### Refactored
+- **Inline 9 stateless CRUD intents** (ISS-109) — `CreateTagIntent`, `UpdateTagIntent`, `DeleteTagIntent`, `AssignTagsIntent`, `BatchToggleTagIntent`, `DeleteTranscriptIntent`, `BatchDeleteTranscriptsIntent`, `ClearTranscriptsIntent`, `RenameTranscriptIntent` deleted. Their single-line DB calls now live directly in the dedicated REST endpoint handlers (`tags.py`, `transcripts.py`). `TagHandlers` class deleted. `TranscriptHandlers` loses 4 methods. `application_coordinator._register_handlers` drops from 26 to 17 registrations. Net: −9 intent dataclasses, −1 handler file, −80 LOC.
+
+---
+
 ## v6.2.0 — Analytics Unification, Threshold SLM Regen, Tech Debt
 
 **Date:** 2026-03-19
