@@ -1,5 +1,5 @@
 """
-TranscriptHandlers — delete, clear, and commit-edits intents.
+TranscriptHandlers — commit-edits, revert, append, and analytics-inclusion intents.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class TranscriptHandlers:
-    """Handles transcript mutation intents: delete, clear, and commit edits."""
+    """Handles transcript mutation intents: commit edits, revert, append, analytics."""
 
     def __init__(
         self,
@@ -24,30 +24,6 @@ class TranscriptHandlers:
     ) -> None:
         self._db_provider = db_provider
         self._emit = event_bus_emit
-
-    def handle_delete(self, intent: Any) -> None:
-        db = self._db_provider()
-        if db:
-            deleted = db.delete_transcript(intent.transcript_id)
-            if deleted:
-                self._emit("transcript_deleted", {"id": intent.transcript_id})
-            else:
-                logger.warning("Delete requested for nonexistent transcript %d", intent.transcript_id)
-
-    def handle_batch_delete(self, intent: Any) -> None:
-        db = self._db_provider()
-        if db:
-            ids = list(intent.transcript_ids)
-            count = db.batch_delete_transcripts(ids)
-            logger.info("Batch deleted %d transcripts (requested %d)", count, len(ids))
-            self._emit("transcripts_batch_deleted", {"ids": ids, "count": count})
-
-    def handle_clear(self, intent: Any) -> None:
-        db = self._db_provider()
-        if db:
-            count = db.clear_all_transcripts()
-            logger.info("Cleared all transcripts: %d deleted", count)
-            self._emit("transcripts_cleared", {"count": count})
 
     def handle_commit_edits(self, intent: Any) -> None:
         db = self._db_provider()
@@ -68,16 +44,6 @@ class TranscriptHandlers:
                 "transcript_updated",
                 {"id": intent.transcript_id},
             )
-
-    def handle_rename(self, intent: Any) -> None:
-        """Set or update a transcript's display_name."""
-        db = self._db_provider()
-        if db:
-            title = (intent.title or "").strip()
-            if not title:
-                return
-            db.update_display_name(intent.transcript_id, title)
-            self._emit("transcript_updated", {"id": intent.transcript_id})
 
     def handle_append(self, intent: Any) -> None:
         """Append a new recording segment to an existing transcript."""

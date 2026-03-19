@@ -429,28 +429,19 @@ class ApplicationCoordinator:
         """Instantiate domain handler objects and wire them into the CommandBus."""
         from src.core.handlers.refinement_handlers import RefinementHandlers
         from src.core.handlers.system_handlers import SystemHandlers
-        from src.core.handlers.tag_handlers import TagHandlers
         from src.core.handlers.title_handlers import TitleHandlers
         from src.core.handlers.transcript_handlers import TranscriptHandlers
         from src.core.intents.definitions import (
             AppendToTranscriptIntent,
-            AssignTagsIntent,
-            BatchDeleteTranscriptsIntent,
-            BatchToggleTagIntent,
             BeginRecordingIntent,
             BulkRefineTranscriptsIntent,
             CancelBulkRefinementIntent,
             CancelRecordingIntent,
-            ClearTranscriptsIntent,
             CommitEditsIntent,
             CommitRefinementIntent,
-            CreateTagIntent,
-            DeleteTagIntent,
-            DeleteTranscriptIntent,
             ImportAudioFileIntent,
             RefineTranscriptIntent,
             RetranscribeIntent,
-            RenameTranscriptIntent,
             RestartEngineIntent,
             RetitleTranscriptIntent,
             RevertToRawIntent,
@@ -458,14 +449,9 @@ class ApplicationCoordinator:
             StopRecordingIntent,
             ToggleRecordingIntent,
             UpdateConfigIntent,
-            UpdateTagIntent,
         )
 
         transcript = TranscriptHandlers(
-            db_provider=lambda: self.db,
-            event_bus_emit=self.event_bus.emit,
-        )
-        tag = TagHandlers(
             db_provider=lambda: self.db,
             event_bus_emit=self.event_bus.emit,
         )
@@ -496,23 +482,14 @@ class ApplicationCoordinator:
         bus.register(ToggleRecordingIntent, self.recording_session.handle_toggle)
         bus.register(ImportAudioFileIntent, self.recording_session.handle_import)
         bus.register(RetranscribeIntent, self.recording_session.handle_retranscribe)
-        bus.register(DeleteTranscriptIntent, transcript.handle_delete)
-        bus.register(BatchDeleteTranscriptsIntent, transcript.handle_batch_delete)
-        bus.register(ClearTranscriptsIntent, transcript.handle_clear)
         bus.register(CommitEditsIntent, transcript.handle_commit_edits)
         bus.register(RevertToRawIntent, transcript.handle_revert_to_raw)
-        bus.register(RenameTranscriptIntent, transcript.handle_rename)
         bus.register(AppendToTranscriptIntent, transcript.handle_append)
         bus.register(SetAnalyticsInclusionIntent, transcript.handle_set_analytics_inclusion)
         bus.register(RefineTranscriptIntent, refinement.handle_refine)
         bus.register(CommitRefinementIntent, refinement.handle_commit_refinement)
         bus.register(BulkRefineTranscriptsIntent, refinement.handle_bulk_refine)
         bus.register(CancelBulkRefinementIntent, refinement.handle_cancel_bulk_refine)
-        bus.register(CreateTagIntent, tag.handle_create)
-        bus.register(UpdateTagIntent, tag.handle_update)
-        bus.register(DeleteTagIntent, tag.handle_delete)
-        bus.register(AssignTagsIntent, tag.handle_assign_tags)
-        bus.register(BatchToggleTagIntent, tag.handle_batch_toggle_tag)
         bus.register(UpdateConfigIntent, system.handle_update_config)
         bus.register(RestartEngineIntent, system.handle_restart_engine)
         bus.register(RetitleTranscriptIntent, title.handle_retitle)

@@ -68,22 +68,6 @@ class RevertToRawIntent(InteractionIntent):
 
 
 @dataclass(frozen=True, slots=True)
-class DeleteTranscriptIntent(InteractionIntent):
-    """Delete a transcript."""
-
-    transcript_id: int = 0
-    source: IntentSource = IntentSource.CONTROLS
-
-
-@dataclass(frozen=True, slots=True)
-class BatchDeleteTranscriptsIntent(InteractionIntent):
-    """Delete multiple transcripts in a single operation."""
-
-    transcript_ids: tuple[int, ...] = field(default_factory=tuple)
-    source: IntentSource = IntentSource.API
-
-
-@dataclass(frozen=True, slots=True)
 class RefineTranscriptIntent(InteractionIntent):
     """Trigger SLM refinement on a transcript."""
 
@@ -128,76 +112,11 @@ class CancelBulkRefinementIntent(InteractionIntent):
     source: IntentSource = IntentSource.API
 
 
-# --- Tag Intents ---
-
-
-@dataclass(frozen=True, slots=True)
-class CreateTagIntent(InteractionIntent):
-    """Create a new tag."""
-
-    name: str = ""
-    color: str | None = None
-    source: IntentSource = IntentSource.API
-
-
-@dataclass(frozen=True, slots=True)
-class UpdateTagIntent(InteractionIntent):
-    """Update a tag's name and/or color."""
-
-    tag_id: int = 0
-    name: str | None = None
-    color: str | None = None
-    source: IntentSource = IntentSource.API
-
-
-@dataclass(frozen=True, slots=True)
-class DeleteTagIntent(InteractionIntent):
-    """Delete a tag."""
-
-    tag_id: int = 0
-    source: IntentSource = IntentSource.API
-
-
-@dataclass(frozen=True, slots=True)
-class AssignTagsIntent(InteractionIntent):
-    """Set the exact tag set for a transcript (replaces existing)."""
-
-    transcript_id: int = 0
-    tag_ids: tuple[int, ...] = ()
-    source: IntentSource = IntentSource.API
-
-
-@dataclass(frozen=True, slots=True)
-class BatchToggleTagIntent(InteractionIntent):
-    """Add or remove a single tag from multiple transcripts in one transaction."""
-
-    transcript_ids: tuple[int, ...] = field(default_factory=tuple)
-    tag_id: int = 0
-    add: bool = True
-    source: IntentSource = IntentSource.API
-
-
-@dataclass(frozen=True, slots=True)
-class ClearTranscriptsIntent(InteractionIntent):
-    """Delete all transcripts."""
-
-    source: IntentSource = IntentSource.API
-
-
 @dataclass(frozen=True, slots=True)
 class UpdateConfigIntent(InteractionIntent):
     """Update application configuration settings."""
 
     settings: dict = field(default_factory=dict)
-    source: IntentSource = IntentSource.API
-
-
-@dataclass(frozen=True, slots=True)
-class RenameTranscriptIntent(InteractionIntent):
-    """Manually rename a transcript (set display_name)."""
-
-    transcript_id: int = 0
-    title: str = ""
     source: IntentSource = IntentSource.API
 
 

@@ -39,49 +39,6 @@ def wired(coordinator, event_collector):
     return coordinator, event_collector
 
 
-# ── DeleteTranscriptIntent ────────────────────────────────────────────────
-
-
-class TestDeleteTranscript:
-    """Delete transcript via CommandBus → DB row removed + event emitted."""
-
-    def test_delete_existing(self, wired):
-        coord, events = wired
-        t = coord.db.add_transcript(raw_text="hello world", duration_ms=1000)
-        assert coord.db.get_transcript(t.id) is not None
-
-        from src.core.intents.definitions import DeleteTranscriptIntent
-
-        result = coord.command_bus.dispatch(DeleteTranscriptIntent(transcript_id=t.id))
-
-        assert result is True
-        assert coord.db.get_transcript(t.id) is None
-        deleted_events = events.of_type("transcript_deleted")
-        assert len(deleted_events) == 1
-        assert deleted_events[0]["id"] == t.id
-
-    def test_delete_nonexistent_no_crash(self, wired):
-        """Deleting a non-existent transcript should not raise or emit."""
-        coord, events = wired
-        from src.core.intents.definitions import DeleteTranscriptIntent
-
-        result = coord.command_bus.dispatch(DeleteTranscriptIntent(transcript_id=99999))
-        # Handler runs but db.delete_transcript returns False → no event emitted
-        assert result is True
-        assert len(events.of_type("transcript_deleted")) == 0
-
-    def test_delete_without_db(self, coordinator, event_collector):
-        """If db is None, handler silently returns."""
-        event_collector.subscribe_all(coordinator.event_bus, ALL_EVENTS)
-        coordinator.db = None
-
-        from src.core.intents.definitions import DeleteTranscriptIntent
-
-        result = coordinator.command_bus.dispatch(DeleteTranscriptIntent(transcript_id=1))
-        assert result is True
-        assert len(event_collector.of_type("transcript_deleted")) == 0
-
-
 # ── CommitEditsIntent ─────────────────────────────────────────────────────
 
 
@@ -221,80 +178,6 @@ class TestRecordingStateMachine:
 
         # StopRecording sets the stop event
         assert coord.recording_session._recording_stop.is_set()
-
-
-# ── ClearTranscriptsIntent ────────────────────────────────────────────────
-
-
-class TestClearTranscripts:
-    """Clear all transcripts via CommandBus → DB emptied + event emitted."""
-
-    def test_clear_deletes_all(self, wired):
-        coord, events = wired
-        t1 = coord.db.add_transcript(raw_text="one", duration_ms=100)
-        t2 = coord.db.add_transcript(raw_text="two", duration_ms=200)
-
-        from src.core.intents.definitions import ClearTranscriptsIntent
-
-        coord.command_bus.dispatch(ClearTranscriptsIntent())
-
-        cleared = events.of_type("transcripts_cleared")
-        assert len(cleared) == 1
-        assert cleared[0]["count"] == 2  # only non-protected deleted
-
-        # Verify added rows are gone (protected seeded transcript at ID 1 survives)
-        assert coord.db.get_transcript(t1.id) is None
-        assert coord.db.get_transcript(t2.id) is None
-
-    def test_clear_empty_db(self, wired):
-        """Clearing with no transcripts emits count 0."""
-        coord, events = wired
-
-        from src.core.intents.definitions import ClearTranscriptsIntent
-
-        coord.command_bus.dispatch(ClearTranscriptsIntent())
-
-        cleared = events.of_type("transcripts_cleared")
-        assert len(cleared) == 1
-        assert cleared[0]["count"] == 0
-
-
-# ── RenameTranscriptIntent ────────────────────────────────────────────────
-
-
-class TestRenameTranscript:
-    """Rename transcript via CommandBus → display_name set + event."""
-
-    def test_rename_emits_update(self, wired):
-        coord, events = wired
-        t = coord.db.add_transcript(raw_text="hello", duration_ms=100)
-
-        from src.core.intents.definitions import RenameTranscriptIntent
-
-        coord.command_bus.dispatch(
-            RenameTranscriptIntent(transcript_id=t.id, title="My Title"),
-        )
-
-        updated = events.of_type("transcript_updated")
-        assert len(updated) == 1
-        assert updated[0]["id"] == t.id
-
-        # Verify in DB
-        refreshed = coord.db.get_transcript(t.id)
-        assert refreshed.display_name == "My Title"
-
-    def test_rename_empty_title_is_noop(self, wired):
-        """Empty/whitespace title should NOT rename or emit."""
-        coord, events = wired
-        t = coord.db.add_transcript(raw_text="hello", duration_ms=100)
-
-        from src.core.intents.definitions import RenameTranscriptIntent
-
-        coord.command_bus.dispatch(
-            RenameTranscriptIntent(transcript_id=t.id, title="   "),
-        )
-
-        assert len(events.of_type("transcript_updated")) == 0
 
 
 # ── RetitleTranscriptIntent ───────────────────────────────────────────────

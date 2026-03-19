@@ -54,7 +54,7 @@ async def get_transcript(transcript_id: int) -> Response:
 
 @delete("/api/transcripts/{transcript_id:int}", status_code=200)
 async def delete_transcript(transcript_id: int) -> Response:
-    """Delete a transcript via CommandBus intent."""
+    """Delete a transcript and emit transcript_deleted event."""
     import asyncio
 
     coordinator = get_coordinator()
@@ -67,47 +67,43 @@ async def delete_transcript(transcript_id: int) -> Response:
     if transcript.is_protected:
         return Response(content={"error": "Protected transcripts cannot be deleted"}, status_code=403)
 
-    from src.core.intents.definitions import DeleteTranscriptIntent
-
-    coordinator.command_bus.dispatch(DeleteTranscriptIntent(transcript_id=transcript_id))
-    return Response(content={"deleted": True})
+    deleted = await asyncio.to_thread(coordinator.db.delete_transcript, transcript_id)
+    if deleted:
+        coordinator.event_bus.emit("transcript_deleted", {"id": transcript_id})
+    return Response(content={"deleted": bool(deleted)})
 
 
 @post("/api/transcripts/batch-delete", status_code=200)
 async def batch_delete_transcripts(data: dict) -> Response:
-    """Delete multiple transcripts in one shot via CommandBus intent."""
+    """Delete multiple transcripts in one shot."""
+    import asyncio
+
     ids = data.get("ids", [])
     if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
         return Response(content={"error": "'ids' must be a list of integers"}, status_code=400)
     if not ids:
         return Response(content={"deleted": 0})
 
-    from src.core.intents.definitions import BatchDeleteTranscriptsIntent
-
     coordinator = get_coordinator()
-    intent = BatchDeleteTranscriptsIntent(transcript_ids=tuple(ids))
-    coordinator.command_bus.dispatch(intent)
-    return Response(content={"deleted": len(ids)})
+    if coordinator.db is None:
+        return Response(content={"error": "Database not available"}, status_code=503)
+    count = await asyncio.to_thread(coordinator.db.batch_delete_transcripts, ids)
+    coordinator.event_bus.emit("transcripts_batch_deleted", {"ids": ids, "count": count})
+    return Response(content={"deleted": count})
 
 
 @delete("/api/transcripts", status_code=200)
 async def clear_all_transcripts() -> Response:
-    """Delete all transcripts via CommandBus intent."""
+    """Delete all transcripts."""
     import asyncio
-
-    from src.core.intents.definitions import ClearTranscriptsIntent
 
     coordinator = get_coordinator()
     if coordinator.db is None:
         return Response(content={"error": "Database not available"}, status_code=503)
 
-    count = await asyncio.to_thread(coordinator.db.transcript_count)
-    intent = ClearTranscriptsIntent()
-    success = coordinator.command_bus.dispatch(intent)
-    if not success:
-        return Response(content={"error": "Clear failed"}, status_code=500)
-    remaining = await asyncio.to_thread(coordinator.db.transcript_count)
-    return Response(content={"deleted": count - remaining})
+    deleted = await asyncio.to_thread(coordinator.db.clear_all_transcripts)
+    coordinator.event_bus.emit("transcripts_cleared", {"count": deleted})
+    return Response(content={"deleted": deleted})
 
 
 @get("/api/transcripts/search", sync_to_thread=True)
@@ -128,6 +124,8 @@ def search_transcripts(q: str, limit: int = 50, offset: int = 0) -> dict:
 @post("/api/transcripts/batch-tag-toggle")
 async def batch_tag_toggle(data: dict) -> Response:
     """Add or remove a single tag from multiple transcripts in one DB transaction."""
+    import asyncio
+
     transcript_ids = data.get("transcript_ids", [])
     tag_id = data.get("tag_id")
     add = data.get("add", True)
@@ -139,11 +137,19 @@ async def batch_tag_toggle(data: dict) -> Response:
     if not transcript_ids:
         return Response(content={"toggled": 0})
 
-    from src.core.intents.definitions import BatchToggleTagIntent
-
     coordinator = get_coordinator()
-    intent = BatchToggleTagIntent(transcript_ids=tuple(transcript_ids), tag_id=tag_id, add=bool(add))
-    coordinator.command_bus.dispatch(intent)
+    if coordinator.db is None:
+        return Response(content={"error": "Database not available"}, status_code=503)
+
+    tag = await asyncio.to_thread(coordinator.db.get_tag, tag_id)
+    if tag is None:
+        return Response(content={"error": "Tag not found"}, status_code=404)
+    # Block auto-managed system tags (Refined, Compound) but allow user-assignable system tags (e.g. Prompt).
+    _AUTO_MANAGED = {"Refined", "Compound"}
+    if tag.is_system and tag.name in _AUTO_MANAGED:
+        return Response(content={"error": "Auto-managed system tags cannot be toggled"}, status_code=403)
+
+    await asyncio.to_thread(coordinator.db.batch_toggle_tag, list(transcript_ids), tag_id, add=bool(add))
     return Response(content={"toggled": len(transcript_ids)})
 
 
@@ -245,18 +251,16 @@ async def retranscribe_transcript(transcript_id: int) -> Response:
 
 @post("/api/transcripts/{transcript_id:int}/rename")
 async def rename_transcript(transcript_id: int, data: dict) -> Response:
-    """Rename a transcript (set display_name) via CommandBus intent."""
-    from src.core.intents.definitions import RenameTranscriptIntent
-
+    """Rename a transcript (set display_name)."""
     title = data.get("title", "").strip()
     if not title:
         return Response(content={"error": "Title is required"}, status_code=400)
 
     coordinator = get_coordinator()
-    intent = RenameTranscriptIntent(transcript_id=transcript_id, title=title)
-    success = coordinator.command_bus.dispatch(intent)
-    if not success:
-        return Response(content={"error": "Rename failed"}, status_code=500)
+    if coordinator.db is None:
+        return Response(content={"error": "Database not available"}, status_code=503)
+    coordinator.db.update_display_name(transcript_id, title)
+    coordinator.event_bus.emit("transcript_updated", {"id": transcript_id})
     return Response(content={"status": "renamed", "title": title})
 
 

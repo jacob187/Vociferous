@@ -28,6 +28,7 @@ ALL_LIFECYCLE_EVENTS = [
     "recording_started",
     "recording_stopped",
     "transcript_deleted",
+    "transcript_updated",
     "refinement_started",
     "refinement_complete",
     "refinement_error",
@@ -130,21 +131,13 @@ class TestHandlerRegistration:
         """Every intent defined in the coordinator must have a handler."""
         from src.core.intents.definitions import (
             AppendToTranscriptIntent,
-            AssignTagsIntent,
-            BatchDeleteTranscriptsIntent,
-            BatchToggleTagIntent,
             BeginRecordingIntent,
             BulkRefineTranscriptsIntent,
             CancelBulkRefinementIntent,
             CancelRecordingIntent,
-            ClearTranscriptsIntent,
             CommitEditsIntent,
             CommitRefinementIntent,
-            CreateTagIntent,
-            DeleteTagIntent,
-            DeleteTranscriptIntent,
             RefineTranscriptIntent,
-            RenameTranscriptIntent,
             RestartEngineIntent,
             RetitleTranscriptIntent,
             RevertToRawIntent,
@@ -152,7 +145,6 @@ class TestHandlerRegistration:
             StopRecordingIntent,
             ToggleRecordingIntent,
             UpdateConfigIntent,
-            UpdateTagIntent,
         )
 
         expected_intents = [
@@ -160,23 +152,14 @@ class TestHandlerRegistration:
             StopRecordingIntent,
             CancelRecordingIntent,
             ToggleRecordingIntent,
-            DeleteTranscriptIntent,
-            BatchDeleteTranscriptsIntent,
-            ClearTranscriptsIntent,
             CommitEditsIntent,
             RevertToRawIntent,
-            RenameTranscriptIntent,
             AppendToTranscriptIntent,
             SetAnalyticsInclusionIntent,
             RefineTranscriptIntent,
             CommitRefinementIntent,
             BulkRefineTranscriptsIntent,
             CancelBulkRefinementIntent,
-            CreateTagIntent,
-            UpdateTagIntent,
-            DeleteTagIntent,
-            AssignTagsIntent,
-            BatchToggleTagIntent,
             UpdateConfigIntent,
             RestartEngineIntent,
             RetitleTranscriptIntent,
@@ -189,8 +172,8 @@ class TestHandlerRegistration:
 
     def test_handler_count_matches_intent_count(self, coordinator):
         """No extra/ghost handlers registered beyond the expected set."""
-        # 26 intents are registered in _register_handlers
-        assert len(coordinator.command_bus._handlers) == 26
+        # 17 intents are registered in _register_handlers
+        assert len(coordinator.command_bus._handlers) == 17
 
     def test_handlers_are_callable(self, coordinator):
         """Every registered handler must be callable."""
@@ -200,7 +183,7 @@ class TestHandlerRegistration:
     def test_double_register_does_not_duplicate(self, coordinator):
         """Calling _register_handlers again overwrites, doesn't stack."""
         coordinator._register_handlers()
-        assert len(coordinator.command_bus._handlers) == 26
+        assert len(coordinator.command_bus._handlers) == 17
 
 
 # ── Shutdown & Cleanup ────────────────────────────────────────────────────
@@ -362,10 +345,10 @@ class TestCommandBusIntegration:
     def test_dispatch_returns_true_on_success(self, wired):
         """Dispatching a registered intent returns True."""
         coord, _ = wired
-        from src.core.intents.definitions import DeleteTranscriptIntent
+        from src.core.intents.definitions import CommitEditsIntent
 
         t = coord.db.add_transcript(raw_text="test", duration_ms=100)
-        result = coord.command_bus.dispatch(DeleteTranscriptIntent(transcript_id=t.id))
+        result = coord.command_bus.dispatch(CommitEditsIntent(transcript_id=t.id, content="edited"))
         assert result is True
 
     def test_dispatch_unregistered_intent_returns_false(self, wired):
@@ -380,22 +363,23 @@ class TestCommandBusIntegration:
         result = coord.command_bus.dispatch(FakeIntent())
         assert result is False
 
-    def test_full_pipeline_delete(self, wired):
+    def test_full_pipeline_commit(self, wired):
         """Intent dispatch → handler mutates DB → EventBus emits event."""
         coord, events = wired
         t = coord.db.add_transcript(raw_text="pipeline test", duration_ms=500)
 
-        from src.core.intents.definitions import DeleteTranscriptIntent
+        from src.core.intents.definitions import CommitEditsIntent
 
-        coord.command_bus.dispatch(DeleteTranscriptIntent(transcript_id=t.id))
+        coord.command_bus.dispatch(CommitEditsIntent(transcript_id=t.id, content="updated text"))
 
         # DB mutation
-        assert coord.db.get_transcript(t.id) is None
+        refreshed = coord.db.get_transcript(t.id)
+        assert refreshed.normalized_text == "updated text"
 
         # Event emission
-        deleted = events.of_type("transcript_deleted")
-        assert len(deleted) == 1
-        assert deleted[0]["id"] == t.id
+        updated = events.of_type("transcript_updated")
+        assert len(updated) == 1
+        assert updated[0]["id"] == t.id
 
 
 # ── Graceful Degradation ─────────────────────────────────────────────────
@@ -409,21 +393,12 @@ class TestGracefulDegradation:
         coord, events = wired
         assert coord.audio_service is None
 
-        from src.core.intents.definitions import (
-            CommitEditsIntent,
-            CreateTagIntent,
-            DeleteTranscriptIntent,
-        )
+        from src.core.intents.definitions import CommitEditsIntent
 
         t = coord.db.add_transcript(raw_text="no audio needed", duration_ms=100)
-
-        # All should succeed
         coord.command_bus.dispatch(CommitEditsIntent(transcript_id=t.id, content="edited"))
-        coord.command_bus.dispatch(CreateTagIntent(name="AudioFree"))
-        coord.command_bus.dispatch(DeleteTranscriptIntent(transcript_id=t.id))
 
-        assert len(events.of_type("tag_created")) == 1
-        assert len(events.of_type("transcript_deleted")) == 1
+        assert len(events.of_type("transcript_updated")) == 1
 
     def test_handlers_work_without_slm(self, wired):
         """Refinement with no SLM emits error but doesn't crash."""
@@ -448,9 +423,6 @@ class TestGracefulDegradation:
             BeginRecordingIntent,
             CancelRecordingIntent,
             CommitEditsIntent,
-            CreateTagIntent,
-            DeleteTagIntent,
-            DeleteTranscriptIntent,
             RefineTranscriptIntent,
             StopRecordingIntent,
             ToggleRecordingIntent,
@@ -461,16 +433,11 @@ class TestGracefulDegradation:
         coordinator.command_bus.dispatch(StopRecordingIntent())
         coordinator.command_bus.dispatch(CancelRecordingIntent())
         coordinator.command_bus.dispatch(ToggleRecordingIntent())
-        coordinator.command_bus.dispatch(DeleteTranscriptIntent(transcript_id=1))
         coordinator.command_bus.dispatch(CommitEditsIntent(transcript_id=1, content="x"))
-        coordinator.command_bus.dispatch(CreateTagIntent(name="ghost"))
-        coordinator.command_bus.dispatch(DeleteTagIntent(tag_id=1))
         coordinator.command_bus.dispatch(RefineTranscriptIntent(transcript_id=1, level=1))
 
         # No events emitted for DB-dependent operations when db=None
-        assert len(event_collector.of_type("transcript_deleted")) == 0
-        assert len(event_collector.of_type("tag_created")) == 0
-        assert len(event_collector.of_type("tag_deleted")) == 0
+        assert len(event_collector.of_type("transcript_updated")) == 0
 
 
 # ── Coordinator Query Accessors ───────────────────────────────────────────

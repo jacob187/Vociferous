@@ -173,7 +173,7 @@ class TestTranscriptRoutes:
         assert resp.status_code == 404
 
     def test_delete_transcript_via_api(self, api):
-        """DELETE /api/transcripts/:id dispatches DeleteTranscriptIntent."""
+        """DELETE /api/transcripts/:id removes the row and emits transcript_deleted."""
         client, coord, events = api
         t = coord.db.add_transcript(raw_text="delete me", duration_ms=100)
 
@@ -229,19 +229,6 @@ class TestTranscriptRoutes:
 
 
 class TestIntentDispatch:
-    def test_dispatch_delete_transcript(self, api):
-        """POST /api/intents with delete_transcript type."""
-        client, coord, events = api
-        t = coord.db.add_transcript(raw_text="via intents", duration_ms=100)
-
-        resp = client.post(
-            "/api/intents",
-            json={"type": "delete_transcript", "transcript_id": t.id},
-        )
-        assert resp.status_code == 201
-        assert resp.json()["dispatched"] is True
-        assert coord.db.get_transcript(t.id) is None
-
     def test_dispatch_unknown_intent(self, api):
         client, _, _ = api
         resp = client.post("/api/intents", json={"type": "nonexistent_intent"})
