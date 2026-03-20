@@ -6,8 +6,8 @@
 -->
 <script lang="ts">
     import { onMount } from "svelte";
-    import { getInsight } from "$lib/api";
-    import { ws } from "$lib/ws";
+    import { getInsight } from "../api";
+    import { ws } from "../ws";
 
     /** Optional extra CSS classes applied to the outermost wrapper. */
     let { class: className = "" }: { class?: string } = $props();

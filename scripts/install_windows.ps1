@@ -29,7 +29,7 @@ function Test-PythonCandidate {
 
         $allArgs = @($ExtraArgs) + "--version"
         $ver = & $Exe @allArgs 2>&1
-        return ($ver -match "Python (3\.1[2-9]|3\.[2-9]\d)")
+        return ($ver -match "Python (3\.1[23])")
     } catch { return $false }
 }
 
@@ -37,7 +37,12 @@ $PythonCmd = $null
 $PythonArgs = @()
 
 # Phase 1: PATH-based candidates (filtered for MS Store stubs)
+# Specific-version py launcher calls come first — ``py -3.12`` / ``py -3.13``
+# are preferred because pythonnet 3.0.5 (Windows .NET interop) requires Python <3.14.
+# Generic ``py -3`` would silently pick up 3.14+ if that is the newest installed.
 $pathCandidates = @(
+    @{ Cmd = "py";      Args = @("-3.12") },
+    @{ Cmd = "py";      Args = @("-3.13") },
     @{ Cmd = "python3"; Args = @() },
     @{ Cmd = "python";  Args = @() },
     @{ Cmd = "py";      Args = @("-3") },
@@ -59,6 +64,8 @@ if (-not $PythonCmd) {
     # py launcher — winget and python.org both install it here
     $pyLauncher = "$env:LOCALAPPDATA\Programs\Python\Launcher\py.exe"
     if (Test-Path $pyLauncher) {
+        $probePaths += @{ Cmd = $pyLauncher; Args = @("-3.12") }
+        $probePaths += @{ Cmd = $pyLauncher; Args = @("-3.13") }
         $probePaths += @{ Cmd = $pyLauncher; Args = @("-3") }
         $probePaths += @{ Cmd = $pyLauncher; Args = @() }
     }
@@ -88,7 +95,7 @@ if (-not $PythonCmd) {
 }
 
 if (-not $PythonCmd) {
-    Write-Host "Error: Python 3.12 or newer is required." -ForegroundColor Red
+    Write-Host "Error: Python 3.12 or 3.13 is required." -ForegroundColor Red
     Write-Host ""
 
     # Detect the MS Store stub specifically — this is by far the most common cause
@@ -103,8 +110,26 @@ if (-not $PythonCmd) {
         Write-Host "  2. Reinstall Python from https://www.python.org/downloads/"
         Write-Host "     and CHECK 'Add Python to PATH' during installation."
     } else {
-        Write-Host "Download from: https://www.python.org/downloads/"
-        Write-Host "Make sure to check 'Add Python to PATH' during installation."
+        # Detect if Python 3.14+ is available but 3.12/3.13 are not
+        $has314 = $false
+        foreach ($cand in @("python3", "python")) {
+            try {
+                $v = & $cand --version 2>&1
+                if ($v -match "Python 3\.1[4-9]") { $has314 = $true; break }
+            } catch {}
+        }
+        try { $v = & py -3 --version 2>&1; if ($v -match "Python 3\.1[4-9]") { $has314 = $true } } catch {}
+        if ($has314) {
+            Write-Host "DETECTED: Python 3.14+ is installed, but it is not yet supported." -ForegroundColor Yellow
+            Write-Host "  The 'pythonnet' dependency (Windows .NET interop) requires Python <3.14." -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "Install Python 3.12 or 3.13 alongside your existing installation:" -ForegroundColor White
+            Write-Host "  winget install --id Python.Python.3.12 --accept-package-agreements"
+            Write-Host "  (then re-run this script — it will prefer 3.12/3.13 automatically)"
+        } else {
+            Write-Host "Install Python 3.12 or 3.13 from: https://www.python.org/downloads/"
+            Write-Host "Make sure to check 'Add Python to PATH' during installation."
+        }
     }
     exit 1
 }
@@ -154,9 +179,18 @@ $VenvDir = Join-Path $ProjectDir ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 $VenvPip = Join-Path $VenvDir "Scripts\pip.exe"
 
-if ((Test-Path $VenvDir) -and (-not (Test-Path $VenvPython))) {
-    Write-Host "[WARN] Existing .venv is not usable on Windows. Recreating..." -ForegroundColor Yellow
-    Remove-Item -Path $VenvDir -Recurse -Force
+if (Test-Path $VenvDir) {
+    $venvOk = $false
+    if (Test-Path $VenvPython) {
+        try {
+            $venvVer = & $VenvPython --version 2>&1
+            $venvOk = ($venvVer -match "Python (3\.1[23])")
+        } catch {}
+    }
+    if (-not $venvOk) {
+        Write-Host "[WARN] Existing .venv is stale or built with an unsupported Python version. Recreating..." -ForegroundColor Yellow
+        Remove-Item -Path $VenvDir -Recurse -Force
+    }
 }
 
 if (-not (Test-Path $VenvPython)) {
