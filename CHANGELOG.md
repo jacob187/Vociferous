@@ -1,5 +1,15 @@
 # Vociferous Changelog
 
+## v6.2.3 — Fix InsightManager today_words Timezone Mismatch
+
+**Date:** 2026-03-19
+**Status:** Bugfix
+
+### Fixed
+- **InsightManager/usage_stats today_words timezone mismatch** — `compute_usage_stats()` was using `datetime.now(timezone.utc)` for "today" date comparisons while the frontend uses local time. For any non-UTC timezone, these diverge at day boundaries: the MOTD's cached `today_words` was generated when UTC and local were on the same date, but after UTC midnight the live stats box switched to local "today" while the backend's count reset to zero. Fixed by converting all stored UTC timestamps to local time via `.astimezone()` before date comparison. Affects `today_count`, `today_words`, `days_active_this_week`, streak ordinals, and `current_streak`. Added `TestSessionStats` test class (5 tests) explicitly covering these values. Dropped unused `timezone` import from `usage_stats.py`.
+
+---
+
 ## v6.2.2 — API Domain Split & Decorator-Based Handler Registration
 
 **Date:** 2026-03-19
