@@ -23,7 +23,7 @@ $ProjectDir = Split-Path -Parent $ScriptDir
 function Test-PythonCandidate {
     param([string]$Exe, [string[]]$ExtraArgs)
     try {
-        # Reject Microsoft Store stubs — they never return a real version
+        # Reject Microsoft Store stubs - they never return a real version
         $resolved = (Get-Command $Exe -ErrorAction SilentlyContinue).Source
         if ($resolved -and $resolved -match "Microsoft\\WindowsApps") { return $false }
 
@@ -37,9 +37,9 @@ $PythonCmd = $null
 $PythonArgs = @()
 
 # Phase 1: PATH-based candidates (filtered for MS Store stubs)
-# Specific-version py launcher calls come first — ``py -3.12`` / ``py -3.13``
+# Specific-version py launcher calls come first - `py -3.12` / `py -3.13`
 # are preferred because pythonnet 3.0.5 (Windows .NET interop) requires Python <3.14.
-# Generic ``py -3`` would silently pick up 3.14+ if that is the newest installed.
+# Generic `py -3` would silently pick up 3.14+ if that is the newest installed.
 $pathCandidates = @(
     @{ Cmd = "py";      Args = @("-3.12") },
     @{ Cmd = "py";      Args = @("-3.13") },
@@ -61,7 +61,7 @@ foreach ($c in $pathCandidates) {
 if (-not $PythonCmd) {
     $probePaths = @()
 
-    # py launcher — winget and python.org both install it here
+    # py launcher - winget and python.org both install it here
     $pyLauncher = "$env:LOCALAPPDATA\Programs\Python\Launcher\py.exe"
     if (Test-Path $pyLauncher) {
         $probePaths += @{ Cmd = $pyLauncher; Args = @("-3.12") }
@@ -98,7 +98,7 @@ if (-not $PythonCmd) {
     Write-Host "Error: Python 3.12 or 3.13 is required." -ForegroundColor Red
     Write-Host ""
 
-    # Detect the MS Store stub specifically — this is by far the most common cause
+    # Detect the MS Store stub specifically - this is by far the most common cause
     $storeStub = (Get-Command python -ErrorAction SilentlyContinue).Source
     if ($storeStub -and $storeStub -match "Microsoft\\WindowsApps") {
         Write-Host "DETECTED: 'python' on your PATH is the Microsoft Store stub," -ForegroundColor Yellow
@@ -125,7 +125,7 @@ if (-not $PythonCmd) {
             Write-Host ""
             Write-Host "Install Python 3.12 or 3.13 alongside your existing installation:" -ForegroundColor White
             Write-Host "  winget install --id Python.Python.3.12 --accept-package-agreements"
-            Write-Host "  (then re-run this script — it will prefer 3.12/3.13 automatically)"
+            Write-Host "  (then re-run this script - it will prefer 3.12/3.13 automatically)"
         } else {
             Write-Host "Install Python 3.12 or 3.13 from: https://www.python.org/downloads/"
             Write-Host "Make sure to check 'Add Python to PATH' during installation."
@@ -236,7 +236,7 @@ $FrontendDistDir = Join-Path $FrontendDir "dist"
 if (Test-Path $FrontendDistDir) {
     Write-Host "[OK] Frontend already built (frontend/dist exists)" -ForegroundColor Green
 } else {
-    # Find npm — same approach as Python: check PATH first, then well-known locations
+    # Find npm - same approach as Python: check PATH first, then well-known locations
     $npmExe = $null
     $npxExe = $null
     $npmOnPath = Get-Command npm -ErrorAction SilentlyContinue
@@ -247,7 +247,7 @@ if (Test-Path $FrontendDistDir) {
         # Probe the standard Node.js install location
         $nodeDir = "$env:ProgramFiles\nodejs"
         if (Test-Path "$nodeDir\npm.cmd") {
-            # Add to session PATH — postinstall scripts (esbuild etc.) spawn
+            # Add to session PATH - postinstall scripts (esbuild etc.) spawn
             # child processes via cmd.exe that need 'node' resolvable on PATH
             $env:PATH = "$nodeDir;$env:PATH"
             $npmExe = "npm"
