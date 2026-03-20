@@ -13,7 +13,7 @@ Statistics are split into three views:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from src.core.text_analysis import compute_text_metrics
@@ -246,7 +246,7 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
     transcript_dates: set[int] = set()
     for t in transcripts:
         try:
-            dt = datetime.fromisoformat(t.created_at.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(t.created_at.replace("Z", "+00:00")).astimezone()
             transcript_dates.add(dt.toordinal())
         except (ValueError, AttributeError):
             continue
@@ -254,7 +254,7 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
     current_streak = 0
     longest_streak = 0
     if transcript_dates:
-        today_ordinal = datetime.now(timezone.utc).toordinal()
+        today_ordinal = datetime.now().astimezone().toordinal()
         # Walk backward from today counting consecutive days
         d = today_ordinal
         while d in transcript_dates:
@@ -273,7 +273,7 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
         longest_streak = max(longest_streak, run)
 
     # ── Session-level stats ──
-    now = datetime.now(timezone.utc)
+    now = datetime.now().astimezone()  # local time — matches frontend date boundaries
     today_str = now.strftime("%Y-%m-%d")
     week_start = now.toordinal() - now.weekday()  # Monday = 0
     today_count = 0
@@ -281,7 +281,7 @@ def compute_usage_stats(db: TranscriptDB, typing_wpm: int = _TYPING_WPM) -> dict
     active_days: set[int] = set()
     for t in transcripts:
         try:
-            dt = datetime.fromisoformat(t.created_at.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(t.created_at.replace("Z", "+00:00")).astimezone()
         except (ValueError, AttributeError):
             continue
         if dt.strftime("%Y-%m-%d") == today_str:

@@ -428,3 +428,64 @@ class TestStreaks:
         stats = compute_usage_stats(db)
         assert stats["current_streak"] >= 1
         assert stats["longest_streak"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# Session-level stats (today_count / today_words)
+# ---------------------------------------------------------------------------
+
+
+class TestSessionStats:
+    """today_count and today_words must use local time, matching the frontend."""
+
+    def test_today_count_includes_current_transcript(self, db):
+        """A transcript just added counts as today."""
+        db.add_transcript(raw_text="hello world test", duration_ms=3000)
+
+        stats = compute_usage_stats(db)
+        assert stats["today_count"] == 1
+        assert stats["today_words"] == 3
+
+    def test_today_words_matches_word_count(self, db):
+        """today_words is the split word count of best-available text."""
+        db.add_transcript(raw_text="one two three four five", duration_ms=5000)
+
+        stats = compute_usage_stats(db)
+        assert stats["today_words"] == 5
+
+    def test_today_words_uses_normalized_text_when_refined(self, db):
+        """When normalized_text differs from raw_text, today_words counts normalized."""
+        from datetime import timezone
+
+        t = db.add_transcript(raw_text="um yeah so basically hello world", duration_ms=5000)
+        db.update_normalized_text(t.id, "hello world")
+
+        stats = compute_usage_stats(db)
+        assert stats["today_words"] == 2  # normalized: "hello world"
+
+    def test_today_count_zero_for_old_transcript(self, db):
+        """A transcript with a past UTC timestamp is not counted as today."""
+        from datetime import datetime, timedelta, timezone
+
+        past_utc = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        # Insert a transcript with a manually back-dated created_at
+        with db._conn as con:
+            con.execute(
+                "INSERT INTO transcripts (timestamp, raw_text, normalized_text, display_name, "
+                "duration_ms, speech_duration_ms, transcription_time_ms, refinement_time_ms, "
+                "include_in_analytics, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (past_utc, "old text here", "old text here", "", 3000, 0, 0, 0, 1, past_utc),
+            )
+
+        stats = compute_usage_stats(db)
+        assert stats["today_count"] == 0
+        assert stats["today_words"] == 0
+
+    def test_multiple_today_transcripts_accumulate(self, db):
+        """today_count and today_words accumulate across multiple today entries."""
+        db.add_transcript(raw_text="alpha beta", duration_ms=2000)
+        db.add_transcript(raw_text="gamma delta epsilon", duration_ms=3000)
+
+        stats = compute_usage_stats(db)
+        assert stats["today_count"] == 2
+        assert stats["today_words"] == 5  # 2 + 3
