@@ -513,3 +513,75 @@ class TestEngineRestartedEvent:
             coordinator.restart_engine()
             # Wait until the background thread signals completion, or time out
             assert event_received.wait(timeout=5.0), "engine_restarted event not emitted within 5 s"
+
+
+# ── Server Ready Probe ────────────────────────────────────────────────────
+
+
+class TestWaitForServer:
+    """_wait_for_server exits only when the port is accepting connections."""
+
+    def test_returns_immediately_when_server_is_up(self, fresh_coordinator):
+        """If the port is already listening, _wait_for_server returns within a few ms."""
+        import socket
+
+        server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_sock.bind(("127.0.0.1", 0))
+        server_sock.listen(1)
+        _, port = server_sock.getsockname()
+
+        try:
+            fresh_coordinator._wait_for_server(host="127.0.0.1", port=port, timeout=5.0)
+        finally:
+            server_sock.close()
+
+    def test_waits_until_server_comes_up(self, fresh_coordinator):
+        """_wait_for_server blocks until the port opens, then returns."""
+        import socket
+        import threading
+        import time
+
+        # Grab a free port by binding briefly, then release it.
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+
+        # Run _wait_for_server concurrently — it will poll and block.
+        probe_done = threading.Event()
+        probe_start = time.monotonic()
+
+        def run_probe() -> None:
+            fresh_coordinator._wait_for_server(host="127.0.0.1", port=port, timeout=5.0)
+            probe_done.set()
+
+        probe_thread = threading.Thread(target=run_probe, daemon=True)
+        probe_thread.start()
+
+        # Open the socket after a deliberate delay.
+        time.sleep(0.3)
+        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv.bind(("127.0.0.1", port))
+        srv.listen(1)
+
+        assert probe_done.wait(timeout=3.0), "_wait_for_server never returned"
+        elapsed = time.monotonic() - probe_start
+        srv.close()
+        probe_thread.join(timeout=1.0)
+
+        assert elapsed >= 0.2, f"returned too fast ({elapsed:.3f}s) — likely a false positive"
+
+    def test_times_out_gracefully_when_server_never_starts(self, fresh_coordinator):
+        """_wait_for_server logs a warning and returns (does not raise) after timeout."""
+        import socket
+
+        # Grab a free port and immediately close it — nothing is listening there.
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+
+        # Must return without raising even though the port is deaf.
+        fresh_coordinator._wait_for_server(host="127.0.0.1", port=port, timeout=0.3)

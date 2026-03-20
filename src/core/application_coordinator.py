@@ -150,6 +150,11 @@ class ApplicationCoordinator:
         # 7. Start API server in background thread
         self._start_api_server()
 
+        # 7b. Wait until the server is actually accepting connections before
+        #     handing the URL to WebKit — eliminates the "Connection refused"
+        #     race on fast hardware where the window opens before uvicorn binds.
+        self._wait_for_server()
+
         # 8. Open pywebview window (blocks main thread)
         self._open_window()
 
@@ -588,6 +593,23 @@ class ApplicationCoordinator:
         self._server_thread = threading.Thread(target=run_server, daemon=True, name="api-server")
         self._server_thread.start()
         logger.info("API server starting on http://127.0.0.1:18900")
+
+    def _wait_for_server(self, host: str = "127.0.0.1", port: int = 18900, timeout: float = 15.0) -> None:
+        """Block until the API server is accepting TCP connections or timeout expires."""
+        import socket
+        import time
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                with socket.create_connection((host, port), timeout=0.1):
+                    logger.info("API server ready (http://%s:%d)", host, port)
+                    return
+            except OSError:
+                time.sleep(0.05)
+        logger.warning(
+            "API server did not become ready within %.1fs — opening window anyway", timeout
+        )
 
     def _open_window(self) -> None:
         """Open the main pywebview window. Blocks until closed."""
