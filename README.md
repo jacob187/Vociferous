@@ -133,6 +133,12 @@ Record. Transcribe. Refine. Copy. That's the core loop. The rest is infrastructu
 
 ---
 
+## Engineering Notes
+
+- CPU-only refinement roadmap: [`docs/cpu-refinement-speedup-plan.md`](docs/cpu-refinement-speedup-plan.md)
+
+---
+
 ## Quick Start
 
 ### Prerequisites
