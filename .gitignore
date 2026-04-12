@@ -104,6 +104,7 @@ tests/__pycache__/
 # =========================
 
 dev_tools/
+.claude/
 
 # =========================
 # Generated Desktop Entry (use: make install-desktop)
