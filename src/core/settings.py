@@ -97,8 +97,8 @@ class MemorySettings(BaseModel):
 
     # Minutes of inactivity before unloading models from RAM.
     # 0 = never unload (keep always resident).
-    slm_idle_minutes: float = 10.0
-    asr_idle_minutes: float = 15.0
+    slm_idle_minutes: float = 3.0
+    asr_idle_minutes: float = 5.0
 
 
 class OutputSettings(BaseModel):
