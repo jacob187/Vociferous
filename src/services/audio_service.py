@@ -202,7 +202,8 @@ class AudioService:
 
         # Thread-safe queue for audio callback data
         audio_queue: Queue[NDArray[np.int16]] = Queue()
-        recording: list[np.int16] = []
+        frames: list[NDArray[np.int16]] = []
+        total_samples: int = 0
         consecutive_errors = 0
         _DEVICE_LOSS_THRESHOLD = 10  # consecutive error callbacks before declaring loss
 
@@ -280,11 +281,12 @@ class AudioService:
                         initial_frames_to_skip -= 1
                         continue
 
-                    recording.extend(frame)
+                    frames.append(frame)
+                    total_samples += len(frame)
                     if spool_writer is not None:
                         spool_writer.write_frames(frame)
 
-                    if len(recording) >= max_recording_samples:
+                    if total_samples >= max_recording_samples:
                         logger.warning(
                             "Recording exceeded max duration (%.1f min) — stopping automatically",
                             s.recording.max_recording_minutes,
@@ -311,7 +313,8 @@ class AudioService:
                 try:
                     frame = audio_queue.get_nowait()
                     if len(frame) >= frame_size:
-                        recording.extend(frame)
+                        frames.append(frame)
+                        total_samples += len(frame)
                         if spool_writer is not None:
                             spool_writer.write_frames(frame)
                         drained += 1
@@ -320,7 +323,7 @@ class AudioService:
             if drained:
                 logger.debug("Drained %d residual frames from audio queue", drained)
 
-        audio_data = np.array(recording, dtype=np.int16)
+        audio_data = np.concatenate(frames) if frames else np.array([], dtype=np.int16)
         duration = len(audio_data) / self.sample_rate
         min_duration_ms = self._settings_provider().recording.min_duration_ms
 
