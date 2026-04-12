@@ -459,6 +459,27 @@
                         >
                             <label
                                 class="text-[var(--text-sm)] text-[var(--text-primary)]"
+                                for="setting-theme"
+                                data-tip="Switch between dark and light interface themes."
+                                >Theme</label
+                            >
+                            <div class="w-full max-w-[460px]">
+                                <CustomSelect
+                                    id="setting-theme"
+                                    options={[
+                                        { value: "dark", label: "Dark" },
+                                        { value: "light", label: "Light" },
+                                    ]}
+                                    value={getSafe(config, "display.theme", "dark")}
+                                    onchange={(v: string) => setSafe("display.theme", v)}
+                                />
+                            </div>
+                        </div>
+                        <div
+                            class="grid grid-cols-[200px_minmax(0,1fr)] items-center gap-x-[var(--space-4)] min-h-[36px]"
+                        >
+                            <label
+                                class="text-[var(--text-sm)] text-[var(--text-primary)]"
                                 for="setting-uiscale"
                                 data-tip="Scale the entire interface. Useful for high-DPI displays or accessibility."
                                 >UI Scale</label

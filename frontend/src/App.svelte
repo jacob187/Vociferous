@@ -32,6 +32,11 @@
         if (appEl) appEl.style.zoom = clamped === 100 ? "" : `${clamped}%`;
     }
 
+    function applyTheme(theme: string): void {
+        const resolved = theme === "light" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", resolved);
+    }
+
     let unsubConfigUpdated: (() => void) | null = null;
     let unsubRecordingStarted: (() => void) | null = null;
     let unsubRecordingStopped: (() => void) | null = null;
@@ -48,6 +53,7 @@
             }
             refinementEnabled = (config as any)?.refinement?.enabled ?? true;
             applyUiScale((config as any)?.display?.ui_scale ?? 100);
+            applyTheme((config as any)?.display?.theme ?? "dark");
         } catch {
             console.warn("Could not check initial status");
         }
@@ -87,13 +93,13 @@
             }
 
             const display = data.display;
-            if (
-                typeof display === "object" &&
-                display !== null &&
-                "ui_scale" in display &&
-                typeof display.ui_scale === "number"
-            ) {
-                applyUiScale(display.ui_scale);
+            if (typeof display === "object" && display !== null) {
+                if ("ui_scale" in display && typeof display.ui_scale === "number") {
+                    applyUiScale(display.ui_scale);
+                }
+                if ("theme" in display && typeof display.theme === "string") {
+                    applyTheme(display.theme);
+                }
             }
         });
 

@@ -119,6 +119,7 @@ class DisplaySettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     ui_scale: int = 100
+    theme: str = "dark"  # "dark" or "light"
     render_markdown_in_editor: bool = False
 
 

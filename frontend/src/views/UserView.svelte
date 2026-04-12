@@ -20,8 +20,6 @@
         MessageCircle,
         ChevronDown,
         ChevronRight,
-        Github,
-        Linkedin,
         User,
         Loader2,
         Sparkles,
@@ -564,26 +562,6 @@
                             </p>
                         {/if}
 
-                        <div class="flex gap-[var(--space-3)]">
-                            <a
-                                class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-md)] text-[var(--text-secondary)] text-[var(--text-sm)] no-underline transition-[color,border-color] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
-                                href="https://www.linkedin.com/in/abrown7521/"
-                                target="_blank"
-                                rel="noopener"
-                            >
-                                <Linkedin size={15} /> LinkedIn
-                            </a>
-                            <a
-                                class="flex items-center gap-[var(--space-1)] py-[var(--space-1)] px-[var(--space-3)] border border-[var(--shell-border)] rounded-[var(--radius-md)] text-[var(--text-secondary)] text-[var(--text-sm)] no-underline transition-[color,border-color] duration-[var(--transition-fast)] hover:text-[var(--accent)] hover:border-[var(--accent)]"
-                                href="https://github.com/WanderingAstronomer/Vociferous"
-                                target="_blank"
-                                rel="noopener"
-                            >
-                                <Github size={15} /> GitHub
-                            </a>
-                        </div>
-
-                        <p class="text-[var(--text-xs)] text-[var(--accent)] m-0">Created by Andrew Brown</p>
                     </footer>
 
                     <!-- ═══ Deep Dive Tab ═══ -->
