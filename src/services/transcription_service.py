@@ -17,7 +17,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from src.core.constants import AudioConfig
-from src.core.cuda_runtime import detect_cuda_runtime
+from src.core.device_detection import detect_device, recommend_thread_count
 from src.core.exceptions import EngineError
 from src.core.model_registry import ASR_MODELS, get_asr_model
 from src.core.resource_manager import ResourceManager
@@ -61,50 +61,49 @@ def create_local_model(settings: VociferousSettings):
     from faster_whisper import WhisperModel
 
     model_dir = _resolve_model_path(settings)
-    n_threads = settings.model.n_threads
     device_pref = (settings.model.device or "auto").strip().lower()
-    cuda_status = detect_cuda_runtime()
+    cap = detect_device()
+
+    # Resolve n_threads: 0 means auto-detect from hardware.
+    n_threads = settings.model.n_threads
+    if n_threads <= 0:
+        n_threads = recommend_thread_count(cap)
 
     # Resolve the requested device against what CTranslate2 can actually use.
     if device_pref == "gpu":
-        if not cuda_status.cuda_available:
-            raise EngineError(f"GPU inference requested, but CUDA is not usable: {cuda_status.detail}")
-        fw_device = "cuda"
+        if cap.platform not in ("nvidia_cuda", "apple_silicon"):
+            raise EngineError(f"GPU inference requested, but no accelerator available: {cap.detail}")
+        fw_device = cap.ct2_device
     elif device_pref == "cpu":
         fw_device = "cpu"
     else:
-        fw_device = "cuda" if cuda_status.cuda_available else "cpu"
-        if fw_device == "cpu":
-            if cuda_status.driver_detected:
-                logger.warning(
-                    "ASR auto device fell back to CPU even though an NVIDIA GPU was detected: %s",
-                    cuda_status.detail,
-                )
-            else:
-                logger.info("ASR auto device resolved to CPU: %s", cuda_status.detail)
+        fw_device = cap.ct2_device
+        logger.info("ASR auto device resolved to %s: %s", fw_device, cap.detail)
 
-    # int8 on GPU requires explicit Tensor Core GEMM support and can hang silently
-    # without it. float16 on CPU is also bogus, so normalize that to float32.
+    # Normalize compute type for the resolved device.
+    # int8 on CUDA requires Tensor Core GEMM support and can hang without it.
+    # float16/bfloat16 on non-CUDA backends (CPU, auto/Accelerate) is unsupported.
     raw_compute_type = settings.model.compute_type
     if fw_device == "cuda" and raw_compute_type == "int8":
         compute_type = "float16"
-    elif fw_device == "cpu" and raw_compute_type in {"float16", "bfloat16"}:
+    elif fw_device in {"cpu", "auto"} and raw_compute_type in {"float16", "bfloat16"}:
         compute_type = "float32"
         logger.warning(
-            "ASR compute_type %s is not supported on CPU; using float32 instead.",
+            "ASR compute_type %s is not supported on %s device; using float32 instead.",
             raw_compute_type,
+            fw_device,
         )
     else:
         compute_type = raw_compute_type
 
     logger.info(
-        "Loading faster-whisper model from %s (cpu_threads=%d, device_pref=%s, resolved_device=%s, compute_type=%s, cuda_detail=%s)...",
+        "Loading faster-whisper model from %s (cpu_threads=%d, device_pref=%s, resolved_device=%s, compute_type=%s, platform=%s)...",
         model_dir,
         n_threads,
         device_pref,
         fw_device,
         compute_type,
-        cuda_status.detail,
+        cap.platform,
     )
 
     start = time.perf_counter()
@@ -190,7 +189,7 @@ def transcribe(
             audio_float,
             language=language,
             initial_prompt=initial_prompt,
-            beam_size=5,
+            beam_size=settings.model.beam_size,
             patience=1.0,
             repetition_penalty=1.0,
             no_speech_threshold=0.5,

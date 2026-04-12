@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from src.core.cuda_runtime import CudaRuntimeStatus
+from src.core.device_detection import DeviceCapability
 from src.core.exceptions import EngineError
 from src.core.settings import ModelSettings, get_settings
 from src.services.transcription_service import (
@@ -240,16 +240,18 @@ class TestCreateLocalModelRuntimeResolution:
         settings = self._settings_with(fresh_settings, device="auto", compute_type="float16")
         captured, dummy_model = self._capture_whisper_ctor()
 
+        cpu_only_cap = DeviceCapability(
+            platform="cpu_only",
+            ct2_device="cpu",
+            optimal_compute_type="int8",
+            cpu_cores=8,
+            detail="CPU-only inference (NVIDIA driver present but CUDA unavailable)",
+        )
+
         with (
             patch("src.services.transcription_service._resolve_model_path", return_value=Path("/tmp/fake-model")),
-            patch(
-                "src.services.transcription_service.detect_cuda_runtime",
-                return_value=CudaRuntimeStatus(
-                    driver_detected=True,
-                    cuda_available=False,
-                    detail="CTranslate2 detected 0 CUDA devices; NVIDIA driver is present but the CUDA runtime is not usable",
-                ),
-            ),
+            patch("src.services.transcription_service.detect_device", return_value=cpu_only_cap),
+            patch("src.services.transcription_service.recommend_thread_count", return_value=4),
             patch.dict(sys.modules, {"faster_whisper": types.SimpleNamespace(WhisperModel=dummy_model)}),
         ):
             create_local_model(settings)
@@ -261,17 +263,18 @@ class TestCreateLocalModelRuntimeResolution:
         settings = self._settings_with(fresh_settings, device="auto", compute_type="int8")
         captured, dummy_model = self._capture_whisper_ctor()
 
+        cuda_cap = DeviceCapability(
+            platform="nvidia_cuda",
+            ct2_device="cuda",
+            optimal_compute_type="float16",
+            cpu_cores=16,
+            detail="CTranslate2 detected 1 CUDA device(s)",
+        )
+
         with (
             patch("src.services.transcription_service._resolve_model_path", return_value=Path("/tmp/fake-model")),
-            patch(
-                "src.services.transcription_service.detect_cuda_runtime",
-                return_value=CudaRuntimeStatus(
-                    driver_detected=True,
-                    cuda_available=True,
-                    cuda_device_count=1,
-                    detail="CTranslate2 detected 1 CUDA device(s)",
-                ),
-            ),
+            patch("src.services.transcription_service.detect_device", return_value=cuda_cap),
+            patch("src.services.transcription_service.recommend_thread_count", return_value=4),
             patch.dict(sys.modules, {"faster_whisper": types.SimpleNamespace(WhisperModel=dummy_model)}),
         ):
             create_local_model(settings)
@@ -279,20 +282,22 @@ class TestCreateLocalModelRuntimeResolution:
         assert captured["kwargs"]["device"] == "cuda"
         assert captured["kwargs"]["compute_type"] == "float16"
 
-    def test_explicit_gpu_raises_clear_error_when_cuda_unusable(self, fresh_settings):
+    def test_explicit_gpu_raises_clear_error_when_no_accelerator(self, fresh_settings):
         settings = self._settings_with(fresh_settings, device="gpu", compute_type="float16")
+
+        cpu_only_cap = DeviceCapability(
+            platform="cpu_only",
+            ct2_device="cpu",
+            optimal_compute_type="int8",
+            cpu_cores=8,
+            detail="CPU-only inference",
+        )
 
         with (
             patch("src.services.transcription_service._resolve_model_path", return_value=Path("/tmp/fake-model")),
-            patch(
-                "src.services.transcription_service.detect_cuda_runtime",
-                return_value=CudaRuntimeStatus(
-                    driver_detected=True,
-                    cuda_available=False,
-                    detail="CTranslate2 CUDA probe failed: missing cudnn64_9.dll",
-                ),
-            ),
+            patch("src.services.transcription_service.detect_device", return_value=cpu_only_cap),
+            patch("src.services.transcription_service.recommend_thread_count", return_value=4),
             patch.dict(sys.modules, {"faster_whisper": types.SimpleNamespace(WhisperModel=object)}),
         ):
-            with pytest.raises(EngineError, match="CUDA is not usable: CTranslate2 CUDA probe failed"):
+            with pytest.raises(EngineError, match="no accelerator available"):
                 create_local_model(settings)

@@ -35,8 +35,9 @@ class ModelSettings(BaseModel):
     model: str = "large-v3-turbo-int8"
     device: str = "auto"  # faster-whisper resolves device at model load time
     language: str = "en"
-    n_threads: int = 4
+    n_threads: int = 0  # 0 = auto-detect based on platform (see device_detection.py)
     compute_type: str = "int8"
+    beam_size: int = Field(default=1, ge=1)  # 1 = greedy (optimal for turbo models); set 5 for non-turbo
     # Stylistic anchor for the CTranslate2 Whisper decoder.  This text is
     # tokenized and passed as prompt tokens before each audio chunk.
     # Combined with condition_on_previous_text=False, this prompt becomes
@@ -116,7 +117,8 @@ class RefinementSettings(BaseModel):
     enabled: bool = True
     model_id: str = "qwen4b"
     n_gpu_layers: int = -1  # -1 = full GPU (CT2 device="cuda"), 0 = CPU only
-    n_threads: int = 4  # CPU thread count (only used when device=CPU)
+    n_threads: int = 0  # 0 = auto-detect; CPU thread count (only used when device=CPU)
+    compute_type: str = "int8"  # SLM-specific compute type (independent of ASR)
     use_thinking: bool = False  # Allow model to reason in <think> blocks before output
     temperature: float = 0.3
     top_p: float = 0.9

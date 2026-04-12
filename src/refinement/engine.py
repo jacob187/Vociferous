@@ -62,7 +62,7 @@ class RefinementEngine:
         import ctranslate2
         from tokenizers import Tokenizer
 
-        from src.core.cuda_runtime import detect_cuda_runtime
+        from src.core.device_detection import detect_device, recommend_thread_count
 
         model_path = Path(model_path)
         if not model_path.exists():
@@ -75,23 +75,28 @@ class RefinementEngine:
             invariants=self.invariants,
         )
 
-        # Map n_gpu_layers to CT2 device
+        # Resolve n_threads: 0 means auto-detect from hardware.
+        cap = detect_device()
+        if n_threads <= 0:
+            n_threads = recommend_thread_count(cap)
+
+        # Map n_gpu_layers to CT2 device using unified detection.
         if n_gpu_layers == 0:
             ct2_device = "cpu"
         else:
-            cuda_status = detect_cuda_runtime()
-            ct2_device = "cuda" if cuda_status.cuda_available else "cpu"
-            if ct2_device == "cpu" and cuda_status.driver_detected:
+            ct2_device = cap.ct2_device
+            if ct2_device == "cpu" and "NVIDIA driver present" in cap.detail:
                 logger.warning(
                     "SLM fell back to CPU even though an NVIDIA GPU was detected: %s",
-                    cuda_status.detail,
+                    cap.detail,
                 )
 
         # int8 on GPU requires explicit Tensor Core GEMM support; upgrade to float16
-        # for CUDA to avoid silent hangs. int8 remains correct for CPU-only inference.
+        # for CUDA to avoid silent hangs. float16/bfloat16 on non-CUDA backends
+        # (CPU, auto/Accelerate) is unsupported — fall back to float32.
         if ct2_device == "cuda" and compute_type == "int8":
             compute_type = "float16"
-        elif ct2_device == "cpu" and compute_type in {"float16", "bfloat16"}:
+        elif ct2_device in {"cpu", "auto"} and compute_type in {"float16", "bfloat16"}:
             compute_type = "float32"
 
         logger.info(
