@@ -20,6 +20,13 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+try:
+    from scipy.signal import lfilter
+
+    _HAS_SCIPY = True
+except ImportError:
+    _HAS_SCIPY = False
+
 from src.core.model_registry import SILERO_VAD
 from src.core.resource_manager import ResourceManager
 
@@ -193,14 +200,17 @@ class AudioPipeline:
         Removes DC offset, AC hum (50/60 Hz), and sub-bass rumble below
         100 Hz.  No effect on speech content — fundamental floor is ~85 Hz.
 
-        Uses a recursive filter: ``y[n] = α·(y[n-1] + x[n] - x[n-1])``.
-        For a 10 s recording at 16 kHz that's ~160 k iterations in Python.
-        IIR recurrences are inherently sequential — vectorizing with pure
-        NumPy is numerically unstable for long sequences, and adding
-        ``scipy.signal.lfilter`` isn't worth the 40 MB dependency for a
-        one-shot postprocessing step that completes in tens of milliseconds.
+        Uses ``scipy.signal.lfilter`` when available (<1 ms via C extension),
+        falling back to a pure-Python loop (~50-150 ms for 10 s at 16 kHz).
         """
         alpha = self._hp_alpha
+
+        if _HAS_SCIPY:
+            # IIR coefficients: y[n] = alpha*(y[n-1] + x[n] - x[n-1])
+            # maps to transfer function b=[alpha, -alpha], a=[1, -alpha]
+            return lfilter([alpha, -alpha], [1.0, -alpha], audio).astype(np.float32)
+
+        # Fallback: pure-Python sequential IIR (no scipy installed)
         n = len(audio)
         out = np.empty(n, dtype=np.float32)
         out[0] = audio[0]
@@ -215,24 +225,21 @@ class AudioPipeline:
         chunk_size = self._CHUNK_SIZE
         n_chunks = len(audio) // chunk_size
 
-        # Silero VAD v5 state: single tensor [2, batch=1, 128]
+        # Pre-allocate buffers reused across all iterations to avoid
+        # per-chunk dict/array allocation overhead (~312 chunks per 10 s).
         state = np.zeros((2, 1, 128), dtype=np.float32)
         sr = np.array(self.sample_rate, dtype=np.int64)
+        chunk_buffer = np.empty((1, chunk_size), dtype=np.float32)
+        ort_inputs: dict = {"input": chunk_buffer, "state": state, "sr": sr}
 
         probabilities: list[float] = []
 
         for i in range(n_chunks):
             start = i * chunk_size
-            end = start + chunk_size
-            chunk_data = audio[start:end].reshape(1, -1)
-
-            ort_inputs = {
-                "input": chunk_data,
-                "state": state,
-                "sr": sr,
-            }
+            np.copyto(chunk_buffer[0], audio[start : start + chunk_size])
 
             output, state = session.run(None, ort_inputs)
+            ort_inputs["state"] = state
             probabilities.append(float(output[0][0]))
 
         return probabilities
