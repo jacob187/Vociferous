@@ -99,10 +99,18 @@ class RefinementHandlers:
 
         state = slm_runtime.state
         if state == SLMState.DISABLED:
-            self._emit(
-                "refinement_error",
-                {"message": "Refinement is disabled. Enable it in Settings and ensure a model is downloaded."},
-            )
+            # The model may have been unloaded by the idle unload manager.
+            # If refinement is still enabled in settings, trigger a reload.
+            if slm_runtime.ensure_loaded():
+                self._emit(
+                    "refinement_error",
+                    {"message": "The refinement model is reloading (was idle-unloaded). Please try again in a moment."},
+                )
+            else:
+                self._emit(
+                    "refinement_error",
+                    {"message": "Refinement is disabled. Enable it in Settings and ensure a model is downloaded."},
+                )
             self._fallback_raw_clipboard(intent.transcript_id)
             return
         if state == SLMState.LOADING:
@@ -259,6 +267,8 @@ class RefinementHandlers:
 
         state = slm_runtime.state
         if state == SLMState.DISABLED:
+            if slm_runtime.ensure_loaded():
+                return None, "The refinement model is reloading (was idle-unloaded). Please try again in a moment."
             return None, "Refinement is disabled. Enable it in Settings and ensure a model is downloaded."
         if state == SLMState.LOADING:
             return None, "The refinement model is still loading. Please wait a moment and try again."

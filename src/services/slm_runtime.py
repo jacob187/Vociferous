@@ -74,6 +74,25 @@ class SLMRuntime:
         self._unload_model()
         self.state = SLMState.DISABLED
 
+    def ensure_loaded(self) -> bool:
+        """Reload the model if it was unloaded (idle or otherwise).
+
+        Returns True if the model is READY (or will be shortly via
+        background loading), False if refinement is user-disabled.
+        Called by the idle unload system to transparently reload
+        on demand.
+        """
+        if self.state == SLMState.READY:
+            return True
+        if self.state == SLMState.LOADING:
+            return True  # already loading
+        # Only reload if refinement is enabled in settings.
+        s = self._settings_provider()
+        if not s.refinement.enabled:
+            return False
+        self.enable()
+        return True
+
     def shutdown(self) -> None:
         """Mark disabled WITHOUT touching the native engine object.
 

@@ -62,6 +62,7 @@ class ApplicationCoordinator:
         self.insight_manager: Any = None  # InsightManager | None
         self.title_generator: Any = None  # TitleGenerator | None
         self.obsidian_service: Any = None  # ObsidianVaultService | None
+        self.idle_unload: Any = None  # IdleUnloadManager | None
 
         # Recording session (created in start())
         self.recording_session: Any = None  # RecordingSession
@@ -136,10 +137,13 @@ class ApplicationCoordinator:
         # 3d. Obsidian vault auto-save service.
         self._init_obsidian_service()
 
-        # 3e. Load ASR model (CTranslate2 Whisper).
+        # 3e. Idle unload manager (frees RAM when models are unused).
+        self._init_idle_unload()
+
+        # 3f. Load ASR model (CTranslate2 Whisper).
         self.recording_session.load_asr_model()
 
-        # 3f. Preload Silero VAD model (eliminates cold-start on first transcription).
+        # 3g. Preload Silero VAD model (eliminates cold-start on first transcription).
         self.recording_session.load_vad_model()
 
         # 4. Audio service with event callbacks
@@ -173,6 +177,10 @@ class ApplicationCoordinator:
 
         logger.info("Shutdown requested...")
         self._shutdown_event.set()
+
+        # Stop the idle unload timer before tearing down models.
+        if self.idle_unload is not None:
+            self.idle_unload.stop()
 
         # Cancel any in-progress recording so the recording loop
         # treats this as a cancellation (not a normal stop).
@@ -349,6 +357,69 @@ class ApplicationCoordinator:
         except Exception:
             logger.exception("ObsidianVaultService failed to initialize (non-fatal)")
 
+    def _init_idle_unload(self) -> None:
+        """Initialize the idle unload manager to free RAM when models sit unused.
+
+        Subscribes to events that indicate model activity:
+        - transcription_complete / recording_started → touch ASR timer
+        - refinement_started / refinement_complete → touch SLM timer
+        - transcript_updated (from title gen / insight gen) → touch SLM timer
+
+        When a model exceeds its idle timeout (configurable via
+        settings.memory.slm_idle_minutes / asr_idle_minutes), the manager
+        calls the model's unload function.  Both models transparently
+        reload on next use — SLM via enable(), ASR via lazy load in
+        _transcribe_and_store().
+        """
+        try:
+            from src.core.idle_unload import IdleUnloadManager
+            from src.services.slm_types import SLMState
+
+            self.idle_unload = IdleUnloadManager(
+                settings_provider=lambda: self.settings,
+                slm_unloader=lambda: self.slm_runtime.disable() if self.slm_runtime else None,
+                slm_state_checker=lambda: (
+                    self.slm_runtime is not None and self.slm_runtime.state == SLMState.READY
+                ),
+                asr_unloader=lambda: self.recording_session.unload_asr_model() if self.recording_session else None,
+                asr_state_checker=lambda: (
+                    self.recording_session is not None and self.recording_session._asr_model is not None
+                ),
+                event_emitter=self.event_bus.emit,
+            )
+
+            # Wire activity markers to event bus.
+
+            def _touch_asr(_data: dict) -> None:
+                if self.idle_unload:
+                    self.idle_unload.touch_asr()
+
+            def _touch_slm(_data: dict) -> None:
+                if self.idle_unload:
+                    self.idle_unload.touch_slm()
+
+            # ASR activity: recording started (user intends to transcribe),
+            # and transcription complete (model was just used).
+            self.event_bus.on("recording_started", _touch_asr)
+            self.event_bus.on("transcription_complete", _touch_asr)
+
+            # SLM activity: only events that mean the SLM actually ran.
+            # We intentionally exclude transcript_updated (fires on manual
+            # edits too) to avoid keeping the SLM resident when only the
+            # DB is being touched.
+            self.event_bus.on("refinement_started", _touch_slm)
+            self.event_bus.on("refinement_complete", _touch_slm)
+            self.event_bus.on("insight_ready", _touch_slm)
+
+            self.idle_unload.start()
+            logger.info(
+                "IdleUnloadManager started (SLM: %.0fm, ASR: %.0fm)",
+                self.settings.memory.slm_idle_minutes,
+                self.settings.memory.asr_idle_minutes,
+            )
+        except Exception:
+            logger.exception("IdleUnloadManager failed to initialize (non-fatal)")
+
     def restart_engine(self) -> None:
         """Tear down and reload ASR + SLM models on a background thread.
 
@@ -391,6 +462,12 @@ class ApplicationCoordinator:
                 # Using the event bus here keeps the core layer free of any
                 # dependency on the API layer.
                 self.event_bus.emit("engine_restarted", {})
+
+                # Reset idle timers so freshly loaded models aren't immediately
+                # unloaded if the restart took longer than the idle timeout.
+                if self.idle_unload:
+                    self.idle_unload.touch_slm()
+                    self.idle_unload.touch_asr()
 
                 logger.info("Engine restart complete.")
             finally:

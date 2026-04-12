@@ -90,6 +90,17 @@ class LoggingSettings(BaseModel):
     structured_output: bool = False
 
 
+class MemorySettings(BaseModel):
+    """Memory management configuration."""
+
+    model_config = ConfigDict(frozen=True)
+
+    # Minutes of inactivity before unloading models from RAM.
+    # 0 = never unload (keep always resident).
+    slm_idle_minutes: float = 10.0
+    asr_idle_minutes: float = 15.0
+
+
 class OutputSettings(BaseModel):
     """Text output configuration."""
 
@@ -170,6 +181,7 @@ class VociferousSettings(BaseSettings):
     output: OutputSettings = Field(default_factory=OutputSettings)
     refinement: RefinementSettings = Field(default_factory=RefinementSettings)
     display: DisplaySettings = Field(default_factory=DisplaySettings)
+    memory: MemorySettings = Field(default_factory=MemorySettings)
     obsidian: ObsidianSettings = Field(default_factory=ObsidianSettings)
 
     model_config = {
