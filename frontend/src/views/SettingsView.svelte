@@ -10,11 +10,12 @@
     import { toast } from "../lib/toast.svelte";
     import { ws } from "../lib/ws";
     import { onMount, onDestroy } from "svelte";
-    import { Save, Undo2, Loader2, Cpu, Mic, Sliders, Eye, RotateCcw, Check, BarChart3, Sparkles, TriangleAlert } from "lucide-svelte";
+    import { Save, Undo2, Loader2, Cpu, Mic, Sliders, Eye, RotateCcw, Check, BarChart3, Sparkles, TriangleAlert, BookOpen } from "lucide-svelte";
     import CustomSelect from "../lib/components/CustomSelect.svelte";
     import KeyBindCapture from "../lib/components/KeyBindCapture.svelte";
     import MaintenanceCard from "../lib/components/MaintenanceCard.svelte";
     import OutputCard from "../lib/components/OutputCard.svelte";
+    import ObsidianCard from "../lib/components/ObsidianCard.svelte";
     import AsrModelCard from "../lib/components/AsrModelCard.svelte";
     import RefinementCard from "../lib/components/RefinementCard.svelte";
     import StyledButton from "../lib/components/StyledButton.svelte";
@@ -24,12 +25,13 @@
 
     /* ===== Tabs ===== */
 
-    type SettingsTab = "analytics" | "appearance" | "maintenance" | "output" | "recording" | "refinement" | "asr";
+    type SettingsTab = "analytics" | "appearance" | "maintenance" | "obsidian" | "output" | "recording" | "refinement" | "asr";
 
     const tabs: { id: SettingsTab; label: string; icon: typeof Cpu }[] = [
         { id: "analytics", label: "Analytics", icon: BarChart3 },
         { id: "appearance", label: "Appearance", icon: Eye },
         { id: "maintenance", label: "Maintenance", icon: RotateCcw },
+        { id: "obsidian", label: "Obsidian", icon: BookOpen },
         { id: "output", label: "Output", icon: Sliders },
         { id: "recording", label: "Recording", icon: Mic },
         { id: "refinement", label: "Refinement", icon: Sparkles },
@@ -446,6 +448,8 @@
                             </div>
                         </div>
                     </div>
+                {:else if activeTab === "obsidian"}
+                    <ObsidianCard {config} {getSafe} {setSafe} />
                 {:else if activeTab === "output"}
                     <OutputCard {config} {getSafe} {setSafe} />
                 {:else if activeTab === "appearance"}

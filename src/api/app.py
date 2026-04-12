@@ -56,7 +56,7 @@ from src.api.transcripts import (
     retranscribe_transcript,
     search_transcripts,
 )
-from src.api.window import close_window, export_file, maximize_window, minimize_window
+from src.api.window import close_window, export_file, maximize_window, minimize_window, pick_folder
 from src.core.constants import APP_VERSION
 from src.core.resource_manager import ResourceManager
 
@@ -296,6 +296,7 @@ def create_app(coordinator: ApplicationCoordinator) -> Litestar:
             minimize_window,
             maximize_window,
             close_window,
+            pick_folder,
             dispatch_intent,
             # Key capture
             start_key_capture,
@@ -354,6 +355,8 @@ def _wire_event_bridge(coordinator: ApplicationCoordinator, ws_manager: Connecti
         "bulk_refinement_error",
         "insight_ready",
         "transcripts_cleared",
+        "obsidian_saved",
+        "obsidian_error",
     ]
 
     for event_type in event_types:

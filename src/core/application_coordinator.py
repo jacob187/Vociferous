@@ -61,6 +61,7 @@ class ApplicationCoordinator:
         self._uvicorn_server: Any = None  # uvicorn.Server for graceful shutdown
         self.insight_manager: Any = None  # InsightManager | None
         self.title_generator: Any = None  # TitleGenerator | None
+        self.obsidian_service: Any = None  # ObsidianVaultService | None
 
         # Recording session (created in start())
         self.recording_session: Any = None  # RecordingSession
@@ -131,6 +132,9 @@ class ApplicationCoordinator:
 
         # 3c. Title generator (auto-title transcripts via SLM)
         self._init_title_generator()
+
+        # 3d. Obsidian vault auto-save service.
+        self._init_obsidian_service()
 
         # 3e. Load ASR model (CTranslate2 Whisper).
         self.recording_session.load_asr_model()
@@ -309,6 +313,41 @@ class ApplicationCoordinator:
             logger.info("TitleGenerator initialized")
         except Exception:
             logger.exception("TitleGenerator failed to initialize (non-fatal)")
+
+    def _init_obsidian_service(self) -> None:
+        """Initialize the Obsidian vault auto-save service.
+
+        Subscribes to transcription_complete and transcript_updated events
+        so new transcripts are automatically written to the vault, and edits
+        / refinements update the existing file.  All writes are fire-and-forget
+        on daemon threads — errors never block the main pipeline.
+        """
+        try:
+            from src.services.obsidian_vault import ObsidianVaultService
+
+            self.obsidian_service = ObsidianVaultService(
+                settings_provider=lambda: self.settings,
+                db_provider=lambda: self.db,
+                event_emitter=self.event_bus.emit,
+            )
+
+            # Wire event listeners.  The enabled check lives inside the
+            # service methods, but we also gate on settings here to avoid
+            # spawning threads when the feature is off.
+            def _on_transcription_complete(data: dict) -> None:
+                if self.settings.obsidian.enabled and data.get("id") is not None:
+                    self.obsidian_service.save_transcript(data["id"])
+
+            def _on_transcript_updated(data: dict) -> None:
+                if self.settings.obsidian.enabled and data.get("id") is not None:
+                    self.obsidian_service.update_transcript(data["id"])
+
+            self.event_bus.on("transcription_complete", _on_transcription_complete)
+            self.event_bus.on("transcript_updated", _on_transcript_updated)
+
+            logger.info("ObsidianVaultService initialized")
+        except Exception:
+            logger.exception("ObsidianVaultService failed to initialize (non-fatal)")
 
     def restart_engine(self) -> None:
         """Tear down and reload ASR + SLM models on a background thread.
@@ -679,6 +718,10 @@ class ApplicationCoordinator:
     def show_save_dialog(self, suggested_name: str) -> str | None:
         """Show a native save-file dialog and return the chosen path, or None if cancelled."""
         return self.window.show_save_dialog(suggested_name)
+
+    def show_folder_dialog(self) -> str | None:
+        """Show a native folder-picker dialog and return the chosen path, or None if cancelled."""
+        return self.window.show_folder_dialog()
 
     def show_open_dialog(self, file_types: tuple[str, ...] = ()) -> str | None:
         """Show a native open-file dialog and return the chosen path, or None if cancelled."""

@@ -137,6 +137,22 @@ class RefinementSettings(BaseModel):
     default_prompt_transcript_id: int | None = None
 
 
+class ObsidianSettings(BaseModel):
+    """Obsidian Vault auto-save configuration.
+
+    When enabled, each completed transcription is automatically written
+    as a markdown note into the configured Obsidian vault subfolder.
+    Updates (edits, refinements) overwrite the corresponding file.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = False
+    vault_path: str = ""  # Absolute path to vault root (parent of .obsidian/)
+    subfolder: str = "Vociferous"  # Created automatically inside vault
+    include_frontmatter: bool = True
+
+
 # --- Main Settings ---
 
 
@@ -154,6 +170,7 @@ class VociferousSettings(BaseSettings):
     output: OutputSettings = Field(default_factory=OutputSettings)
     refinement: RefinementSettings = Field(default_factory=RefinementSettings)
     display: DisplaySettings = Field(default_factory=DisplaySettings)
+    obsidian: ObsidianSettings = Field(default_factory=ObsidianSettings)
 
     model_config = {
         "env_prefix": "VOCIFEROUS_",

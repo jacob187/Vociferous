@@ -38,6 +38,14 @@ def close_window() -> dict:
     return {"status": "ok"}
 
 
+@post("/api/window/pick-folder", sync_to_thread=True)
+def pick_folder() -> dict:
+    """Show a native folder-picker dialog and return the chosen path."""
+    coordinator = get_coordinator()
+    path = coordinator.show_folder_dialog()
+    return {"path": path}
+
+
 @post("/api/export")
 async def export_file(data: dict) -> Response:
     """

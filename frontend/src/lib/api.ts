@@ -325,3 +325,7 @@ export function maximizeWindow(): Promise<{ status: string; maximized?: boolean 
 export function closeWindow(): Promise<{ status: string }> {
     return request("/window/close", { method: "POST" });
 }
+
+export function pickFolder(): Promise<{ path: string | null }> {
+    return request("/window/pick-folder", { method: "POST" });
+}
