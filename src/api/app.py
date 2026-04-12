@@ -142,7 +142,7 @@ class ConnectionManager:
                         self._connections.discard(ws)
 
         try:
-            loop.call_soon_threadsafe(asyncio.ensure_future, _do_broadcast())
+            asyncio.run_coroutine_threadsafe(_do_broadcast(), loop)
         except RuntimeError:
             # Loop closed (shutdown)
             pass
