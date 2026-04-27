@@ -390,11 +390,12 @@
             return;
         }
         if (!selectedEntry) return;
+        const idToDelete = selectedEntry.id;
         try {
-            await deleteTranscript(selectedEntry.id);
-            entries = entries.filter((e) => e.id !== selectedEntry!.id);
-            searchResults = searchResults.filter((e) => e.id !== selectedEntry!.id);
+            await deleteTranscript(idToDelete);
             selection.clear();
+            entries = entries.filter((e) => e.id !== idToDelete);
+            searchResults = searchResults.filter((e) => e.id !== idToDelete);
             toast.success("Transcript deleted");
         } catch (e: any) {
             error = e.message;
@@ -630,9 +631,9 @@
         const unsubs = [
             ws.on("transcription_complete", () => loadTranscripts()),
             ws.on("transcript_deleted", (data) => {
+                if (selection.isSelected(data.id)) selection.clear();
                 entries = entries.filter((e) => e.id !== data.id);
                 searchResults = searchResults.filter((e) => e.id !== data.id);
-                if (selection.isSelected(data.id)) selection.clear();
             }),
             ws.on("transcripts_batch_deleted", (data) => {
                 const deleted = new Set(data.ids);
